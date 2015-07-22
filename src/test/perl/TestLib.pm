@@ -227,7 +227,6 @@ sub psql
 	print("# Running SQL command: $sql\n");
 	run [ 'psql', '-X', '-A', '-t', '-q', '-d', $dbname, '-f', '-' ], '<', \$sql, '>', \$stdout, '2>', \$stderr or die;
 	chomp $stdout;
-	$stdout =~ s/\r//g if $Config{osname} eq 'msys';
 	return $stdout;
 }
 
