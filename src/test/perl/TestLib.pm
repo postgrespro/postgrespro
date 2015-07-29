@@ -143,8 +143,7 @@ sub standard_initdb
 
 	open CONF, ">>$pgdata/postgresql.conf";
 	print CONF "\n# Added by TestLib.pm)\n";
-	print CONF "fsync = off\n";
-	if ($windows_os)
+	if ($Config{osname} eq "MSWin32")
 	{
 		print CONF "listen_addresses = '127.0.0.1'\n";
 	}
@@ -155,7 +154,7 @@ sub standard_initdb
 	}
 	close CONF;
 
-	$ENV{PGHOST}         = $windows_os ? "127.0.0.1" : $tempdir_short;
+	$ENV{PGHOST}         = ($Config{osname} eq "MSWin32") ? "127.0.0.1" : $tempdir_short;
 }
 
 # Set up the cluster to allow replication connections, in the same way that
@@ -166,7 +165,7 @@ sub configure_hba_for_replication
 
 	open HBA, ">>$pgdata/pg_hba.conf";
 	print HBA "\n# Allow replication (set up by TestLib.pm)\n";
-	if (! $windows_os)
+	if ($Config{osname} ne "MSWin32")
 	{
 		print HBA "local replication all trust\n";
 	}
@@ -190,7 +189,7 @@ sub start_test_server
 	standard_initdb "$tempdir/pgdata";
 
 	$ret = system_log('pg_ctl', '-D', "$tempdir/pgdata", '-w', '-l',
-	  "$log_path/postmaster.log", '-o', "--log-statement=all",
+	  "$log_path/postmaster.log", '-o', "--fsync=off --log-statement=all",
 	  'start');
 
 	if ($ret != 0)

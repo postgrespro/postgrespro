@@ -92,7 +92,7 @@ unlink "$tempdir/pgdata/$superlongname";
 # The following tests test symlinks. Windows doesn't have symlinks, so
 # skip on Windows.
 SKIP: {
-    skip "symlinks not supported on Windows", 10 if ($windows_os);
+    skip "symlinks not supported on Windows", 10 if ($Config{osname} eq "MSWin32");
 
 	# Create a temporary directory in the system location and symlink it
 	# to our physical temp location.  That way we can use shorter names
@@ -176,7 +176,7 @@ is($lsn, '', 'restart LSN of new slot is null');
 command_ok([ 'pg_basebackup', '-D', "$tempdir/backupxs_sl", '-X', 'stream', '-S', 'slot1' ],
 	'pg_basebackup -X stream with replication slot runs');
 $lsn = psql 'postgres', q{SELECT restart_lsn FROM pg_replication_slots WHERE slot_name = 'slot1'};
-like($lsn, qr!^0/[0-9A-Z]{8}$!, 'restart LSN of slot has advanced');
+like($lsn, qr!^0/[0-9A-Z]{7,8}$!, 'restart LSN of slot has advanced');
 
 command_ok([ 'pg_basebackup', '-D', "$tempdir/backupxs_sl_R", '-X', 'stream', '-S', 'slot1', '-R' ],
 	'pg_basebackup with replication slot and -R runs');
