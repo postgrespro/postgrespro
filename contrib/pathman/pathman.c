@@ -18,6 +18,7 @@
 PG_MODULE_MAGIC;
 
 #define ALL NIL
+#define MAX_PARTITIONS 2048
 
 /*
  * Partitioning type
@@ -39,8 +40,9 @@ typedef enum PartType
 typedef struct PartRelationInfo
 {
 	Oid			oid;
-	List	   *children;
-	// Bitmapset  *children;
+	// List	   *children;
+	/* TODO: is there any better solution to store children in shared memory? */
+	Oid			children[MAX_PARTITIONS];
 	int			children_count;
 	PartType	parttype;
 	Index		attnum;
@@ -169,7 +171,9 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 		{
 			ereport(LOG, (errmsg("Restrictions empty. Copy children from partrel")));
 			// children = get_children_oids(partrel);
-			children = list_copy(partrel->children);
+			// children = list_copy(partrel->children);
+			for (i=0; i<partrel->children_count; i++)
+				children = lappend_int(children, partrel->children[i]);
 		}
 
 		if (length(children) > 0)
@@ -195,6 +199,7 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 				new_rte_array[i] = root->simple_rte_array[i];
 			}
 
+			root->simple_rel_array_size += len;
 			root->simple_rel_array = new_rel_array;
 			root->simple_rte_array = new_rte_array;
 			/* TODO: free old arrays */
@@ -209,7 +214,7 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 		{
 			childOID = (Oid) lfirst_int(lc);
 			append_child_relation(root, rel, rti, rte, childOID);
-			root->simple_rel_array_size += 1;
+			// root->simple_rel_array_size += 1;
 		}
 
 		/* TODO: clear old path list */
@@ -585,7 +590,7 @@ load_part_relations_hashtable()
 			prinfo->attnum = DatumGetInt32(SPI_getbinval(tuple, tupdesc, 2, &isnull));
 			prinfo->parttype = DatumGetInt32(SPI_getbinval(tuple, tupdesc, 3, &isnull));
 			/* children will be filled in later */
-			prinfo->children = NIL;
+			// prinfo->children = NIL;
 		}
 	}
 
@@ -649,8 +654,9 @@ load_hash_restrictions_hashtable()
 			/* appending children to PartRelationInfo */
 			prinfo = (PartRelationInfo*)
 				hash_search(relations, (const void *)&key.parent_oid, HASH_ENTER, &found);
-			prinfo->children = lappend_int(prinfo->children, child_oid);
-			prinfo->children_count++;
+			// prinfo->children = lappend_int(prinfo->children, child_oid);
+			// prinfo->children_count++;
+			prinfo->children[prinfo->children_count++] = child_oid;
         }
     }
 
@@ -710,12 +716,14 @@ on_partitions_removed(PG_FUNCTION_ARGS) {
 		hash_search(relations, (const void *) &relid, HASH_FIND, 0);
 
 	/* remove children relations from hash_restrictions */
-	for (i=0; i<length(prel->children); i++)
+	// for (i=0; i<length(prel->children); i++)
+	for (i=0; i<prel->children_count; i++)
 	{
 		key.parent_oid = relid;
 		key.hash = i;
 		hash_search(hash_restrictions, (const void *)&key, HASH_REMOVE, 0);
 	}
+	prel->children_count = 0;
 	hash_search(relations, (const void *) &relid, HASH_REMOVE, 0);
 
 	LWLockRelease(AddinShmemInitLock);
