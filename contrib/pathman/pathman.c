@@ -5,6 +5,7 @@
 #include "nodes/primnodes.h"
 #include "optimizer/paths.h"
 #include "optimizer/pathnode.h"
+#include "optimizer/planner.h"
 #include "utils/hsearch.h"
 #include "utils/tqual.h"
 #include "utils/rel.h"
@@ -72,6 +73,8 @@ void _PG_init(void);
 void _PG_fini(void);
 static void my_shmem_startup(void);
 static void my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte);
+static PlannedStmt * my_planner_hook(Query *parse, int cursorOptions, ParamListInfo boundParams);
+
 static void append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte, int childOID);
 static void init(void);
 static void create_part_relations_hashtable(void);
@@ -85,6 +88,7 @@ static List *handle_opexpr(const OpExpr *expr, const PartRelationInfo *prel);
 static List *handle_boolexpr(const BoolExpr *expr, const PartRelationInfo *prel);
 static List *handle_arrexpr(const ScalarArrayOpExpr *expr, const PartRelationInfo *prel);
 
+static void set_plain_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte);
 static void set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte);
 static List *accumulate_append_subpath(List *subpaths, Path *path);
 
@@ -102,6 +106,10 @@ _PG_init(void)
 	set_rel_pathlist_hook = my_hook;
 	shmem_startup_hook_original = shmem_startup_hook;
 	shmem_startup_hook = my_shmem_startup;
+
+	planner_hook = my_planner_hook;
+	/* TEMP */
+	// get_relation_info_hook = my_get_relation_info;
 }
 
 void
@@ -111,6 +119,38 @@ _PG_fini(void)
 	shmem_startup_hook = shmem_startup_hook_original;
 	hash_destroy(relations);
 	hash_destroy(hash_restrictions);
+}
+
+PlannedStmt *
+my_planner_hook(Query *parse, int cursorOptions, ParamListInfo boundParams)
+{
+	PlannedStmt	  *result;
+	RangeTblEntry *rte;
+	ListCell	  *lc;
+	PartRelationInfo *prel;
+
+	if (initialization_needed)
+		init();
+
+	/* Disable inheritance for relations covered by pathman (only for SELECT for now) */
+	if (parse->commandType == CMD_SELECT)
+	{
+		foreach(lc, parse->rtable)
+		{
+			rte = (RangeTblEntry*) lfirst(lc);
+			if (rte->inh)
+			{
+				/* look up this relation in pathman relations */
+				prel = (PartRelationInfo *)
+					hash_search(relations, (const void *) &rte->relid, HASH_FIND, 0);
+				if (prel != NULL)
+					rte->inh = false;
+			}
+		}
+	}
+
+	result = standard_planner(parse, cursorOptions, boundParams);
+	return result;
 }
 
 /*
@@ -141,28 +181,31 @@ my_shmem_startup(void)
 void
 my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 {
-	PartRelationInfo *partrel = NULL;
+	PartRelationInfo *prel = NULL;
 
-	if (initialization_needed)
-		init();
+	/* This works on for SELECT queries */
+	if (root->parse->commandType != CMD_SELECT)
+		return;
 
 	/* Lookup partitioning information for parent relation */
-	partrel = (PartRelationInfo *)
+	prel = (PartRelationInfo *)
 		hash_search(relations, (const void *) &rte->relid, HASH_FIND, 0);
 
-	if (partrel != NULL)
+	if (prel != NULL)
 	{
 		List *children = NIL;
 		ListCell	   *lc;
 		int	childOID = -1;
 		int	i;
 
+		rte->inh = true;
+
 		/* Run over restrictions and collect children partitions */
 		ereport(LOG, (errmsg("Checking restrictions")));
 		foreach(lc, rel->baserestrictinfo)
 		{
 			RestrictInfo *rinfo = (RestrictInfo*) lfirst(lc);
-			List *ret = walk_expr_tree(rinfo->clause, partrel);
+			List *ret = walk_expr_tree(rinfo->clause, prel);
 			children = list_concat_unique_int(children, ret);
 			list_free(ret);
 		}
@@ -172,8 +215,8 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 			ereport(LOG, (errmsg("Restrictions empty. Copy children from partrel")));
 			// children = get_children_oids(partrel);
 			// children = list_copy(partrel->children);
-			for (i=0; i<partrel->children_count; i++)
-				children = lappend_int(children, partrel->children[i]);
+			for (i=0; i<prel->children_count; i++)
+				children = lappend_int(children, prel->children[i]);
 		}
 
 		if (length(children) > 0)
@@ -210,6 +253,18 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 		}
 
 		ereport(LOG, (errmsg("Appending children")));
+		// Добавляем самого себя
+		// append_child_relation(root, rel, rti, rte, partrel->oid);
+		// {
+		// 	AppendRelInfo *appinfo;
+		// 	appinfo = makeNode(AppendRelInfo);
+		// 	appinfo->parent_relid = rti;
+		// 	appinfo->child_relid = rti;
+		// 	appinfo->parent_reloid = rte->relid;
+		// 	root->append_rel_list = lappend(root->append_rel_list, appinfo);
+		// }
+		// root->hasInheritedTarget = true;
+
 		foreach(lc, children)
 		{
 			childOID = (Oid) lfirst_int(lc);
@@ -219,7 +274,38 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 
 		/* TODO: clear old path list */
 		rel->pathlist = NIL;
+		// if (root->parse->commandType == CMD_SELECT)
 		set_append_rel_pathlist(root, rel, rti, rte);
+		// else
+		// {
+		// 	set_plain_rel_pathlist(root, rel, rte);
+		// 	/* Set plin pathlist for each child relation */
+		// 	int			parentRTindex = rti;
+		// 	ListCell   *l;
+		// 	foreach(l, root->append_rel_list)
+		// 	{
+		// 		AppendRelInfo *appinfo = (AppendRelInfo *) lfirst(l);
+		// 		int			childRTindex;
+		// 		RangeTblEntry *childRTE;
+		// 		RelOptInfo *childrel;
+
+		// 		/* append_rel_list contains all append rels; ignore others */
+		// 		if (appinfo->parent_relid != parentRTindex || appinfo->parent_relid == rti)
+		// 			continue;
+
+		// 		/* Re-locate the child RTE and RelOptInfo */
+		// 		childRTindex = appinfo->child_relid;
+		// 		// childRTE = root->simple_rte_array[childRTindex];
+		// 		// childrel = root->simple_rel_array[childRTindex];
+		// 		root->simple_rel_array[childRTindex] = NULL;
+
+		// 		/*
+		// 		 * Compute the child's access paths.
+		// 		 */
+		// 		// set_plain_rel_pathlist(root, childrel, childRTE);
+		// 		// set_cheapest(childrel);
+		// 	}
+		// }
 	}
 
 	/* Invoke original hook if needed */
