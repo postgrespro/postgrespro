@@ -78,7 +78,7 @@ DECLARE
 	insert_stmt TEXT;
 BEGIN
 	/* drop trigger and corresponding function */
-	PERFORM drop_hash_trigger(relation);
+	PERFORM drop_hash_triggers(relation);
 
 	/* determine fields for INSERT */
 	relid := relfilenode FROM pg_class WHERE relname = relation;
