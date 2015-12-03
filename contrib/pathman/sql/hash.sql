@@ -1,10 +1,10 @@
 /*
  * Creates hash partitions for specified relation
  */
-CREATE OR REPLACE FUNCTION public.create_hash_partitions(
-    IN relation TEXT
-    , IN attribute TEXT
-    , IN partitions_count INTEGER
+CREATE OR REPLACE FUNCTION create_hash_partitions(
+    relation TEXT
+    , attribute TEXT
+    , partitions_count INTEGER
 ) RETURNS VOID AS
 $$
 DECLARE
@@ -24,12 +24,12 @@ BEGIN
     /* Create partitions and update pg_pathman configuration */
     FOR partnum IN 0..partitions_count-1
     LOOP
-        EXECUTE format('CREATE TABLE %s_%s (LIKE %1$s INCLUDING ALL)',
-                        relation
+        EXECUTE format('CREATE TABLE %s_%s (LIKE %1$s INCLUDING ALL)'
+                        , relation
                         , partnum);
 
         EXECUTE format('ALTER TABLE %s_%s INHERIT %1$s'
-                        relation
+                        , relation
                         , partnum);
 
         -- EXECUTE format('CREATE TABLE %s_%s () INHERITS (%1$s)', relation, partnum);
@@ -52,7 +52,7 @@ $$ LANGUAGE plpgsql;
 /*
  * Creates hash trigger for specified relation
  */
-CREATE OR REPLACE FUNCTION public.create_hash_insert_trigger(
+CREATE OR REPLACE FUNCTION create_hash_insert_trigger(
     IN relation TEXT
     , IN attr TEXT
     , IN partitions_count INTEGER)
@@ -105,7 +105,7 @@ $$ LANGUAGE plpgsql;
 /*
  * Drops all partitions for specified relation
  */
-CREATE OR REPLACE FUNCTION public.drop_hash_partitions(IN relation TEXT)
+CREATE OR REPLACE FUNCTION drop_hash_partitions(IN relation TEXT)
 RETURNS VOID AS
 $$
 DECLARE
@@ -135,7 +135,7 @@ $$ LANGUAGE plpgsql;
 /*
  * Drops hash trigger
  */
-CREATE OR REPLACE FUNCTION public.drop_hash_triggers(IN relation TEXT)
+CREATE OR REPLACE FUNCTION drop_hash_triggers(IN relation TEXT)
 RETURNS VOID AS
 $$
 BEGIN
@@ -146,7 +146,7 @@ BEGIN
 END
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION public.create_hash_update_trigger(
+CREATE OR REPLACE FUNCTION create_hash_update_trigger(
     IN relation TEXT
     , IN attr TEXT
     , IN partitions_count INTEGER)

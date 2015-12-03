@@ -63,7 +63,7 @@ BEGIN
     SELECT relfilenode INTO v_relid
     FROM pg_class WHERE relname = v_relation;
 
-    SELECT max('max_dt') INTO v_part_timestamp FROM pg_pathman_range_rels;
+    SELECT max(max_dt) INTO v_part_timestamp FROM pg_pathman_range_rels;
 
     /* Create partitions and update pg_pathman configuration */
     FOR v_partnum IN 0..v_premake-1

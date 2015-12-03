@@ -4,10 +4,14 @@ MODULE_big = pathman
 OBJS = init.o pathman.o $(WIN32RES)
 
 EXTENSION = pathman
+EXTVERSION = 0.1
 DATA = pathman--0.1.sql
 PGFILEDESC = "pathman - partitioning tool"
 
 REGRESS = pathman
+
+$(EXTENSION)--$(EXTVERSION).sql: sql/init.sql sql/hash.sql sql/range.sql
+	cat $^ > $@
 
 ifdef USE_PGXS
 PG_CONFIG = pg_config
