@@ -59,13 +59,20 @@ CREATE OR REPLACE FUNCTION public.create_hash_insert_trigger(
 RETURNS VOID AS
 $$
 DECLARE
-    func TEXT := 'CREATE OR REPLACE FUNCTION %s_hash_insert_trigger_func() ' ||
-        'RETURNS TRIGGER AS $body$ DECLARE hash INTEGER; BEGIN ' ||
-        'hash := NEW.%s %% %s; %s ' ||
-        'RETURN NULL; END $body$ LANGUAGE plpgsql;';
-    trigger TEXT := 'CREATE TRIGGER %s_insert_trigger ' ||
-        'BEFORE INSERT ON %1$s ' ||
-        'FOR EACH ROW EXECUTE PROCEDURE %1$s_hash_insert_trigger_func();';
+    func TEXT := '
+        CREATE OR REPLACE FUNCTION %s_hash_insert_trigger_func()
+        RETURNS TRIGGER AS $body$
+        DECLARE
+            hash INTEGER;
+        BEGIN
+            hash := NEW.%s %% %s;
+            %s
+            RETURN NULL;
+        END $body$ LANGUAGE plpgsql;';
+    trigger TEXT := '
+        CREATE TRIGGER %s_insert_trigger
+        BEFORE INSERT ON %1$s
+        FOR EACH ROW EXECUTE PROCEDURE %1$s_hash_insert_trigger_func();';
     relid INTEGER;
     fields TEXT;
     fields_format TEXT;
@@ -146,17 +153,21 @@ CREATE OR REPLACE FUNCTION public.create_hash_update_trigger(
 RETURNS VOID AS
 $$
 DECLARE
-    func TEXT := 'CREATE OR REPLACE FUNCTION %s_update_trigger_func() RETURNS TRIGGER AS ' ||
-                 '$body$ DECLARE old_hash INTEGER; new_hash INTEGER; q TEXT; BEGIN '       ||
-                 'old_hash := OLD.%2$s %% %3$s; '                                          ||
-                 'new_hash := NEW.%2$s %% %3$s; '                                          ||
-                 'IF old_hash = new_hash THEN RETURN NEW; END IF; '                        ||
-                 'q := format(''DELETE FROM %1$s_%%s WHERE %4$s'', old_hash); '            ||
-                 'EXECUTE q USING %5$s; '                                                  ||
-                 'q := format(''INSERT INTO %1$s_%%s VALUES (%6$s)'', new_hash); '         ||
-                 'EXECUTE q USING %7$s; '                                                  ||
-                 'RETURN NULL; '                                                           ||
-                 'END $body$ LANGUAGE plpgsql';
+    func TEXT := '
+        CREATE OR REPLACE FUNCTION %s_update_trigger_func()
+        RETURNS TRIGGER AS
+        $body$
+        DECLARE old_hash INTEGER; new_hash INTEGER; q TEXT;
+        BEGIN
+            old_hash := OLD.%2$s %% %3$s;
+            new_hash := NEW.%2$s %% %3$s;
+            IF old_hash = new_hash THEN RETURN NEW; END IF;
+            q := format(''DELETE FROM %1$s_%%s WHERE %4$s'', old_hash);
+            EXECUTE q USING %5$s;
+            q := format(''INSERT INTO %1$s_%%s VALUES (%6$s)'', new_hash);
+            EXECUTE q USING %7$s;
+            RETURN NULL;
+        END $body$ LANGUAGE plpgsql';
     trigger TEXT := 'CREATE TRIGGER %s_update_trigger ' ||  
         'BEFORE UPDATE ON %1$s_%s ' ||
         'FOR EACH ROW EXECUTE PROCEDURE %1$s_update_trigger_func()';

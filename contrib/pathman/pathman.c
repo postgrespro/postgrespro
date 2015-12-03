@@ -391,14 +391,14 @@ handle_binary_opexpr(const PartRelationInfo *prel, const OpExpr *expr,
 					if (i >= 0 && i < rangerel->nranges)
 					{
 						re = &rangerel->ranges[i];
-						if (re->min <= value && re->max >= value)
+						if (re->min <= value && value < re->max)
 						{
 							found = true;
 							break;
 						}
 						else if (value < re->min)
 							endidx = i - 1;
-						else if (value > re->max)
+						else if (value >= re->max)
 							startidx = i + 1;
 					}
 					/* for debug's sake */

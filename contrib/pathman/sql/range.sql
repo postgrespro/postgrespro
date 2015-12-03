@@ -1,7 +1,7 @@
 /*
  * Creates RANGE partitions for specified relation
  */
-CREATE OR REPLACE FUNCTION create_range_partitions_time(
+CREATE OR REPLACE FUNCTION create_range_partitions(
     v_relation TEXT
     , v_attribute TEXT
     , v_start_timestamp TIMESTAMPTZ
@@ -19,10 +19,15 @@ BEGIN
         RAISE EXCEPTION 'Reltion "%s" has already been partitioned', v_relation;
     END IF;
 
-    PERFORM append_range_partitions_time(v_relation
-                                         , v_start_timestamp
-                                         , v_interval
-                                         , v_premake);
+    IF v_start_timestamp != NULL THEN
+        v_start_timestamp := v_start_timestamp;
+    ELSE
+        SELECT current_date INTO v_start_timestamp;
+    END IF;
+
+    PERFORM create_single_range_partition(v_relation
+                                          , v_start_timestamp
+                                          , v_interval);
 
     INSERT INTO pg_pathman_rels (
         relname
@@ -44,59 +49,73 @@ $$ LANGUAGE plpgsql;
 /*
  * Create additional partitions for existing RANGE partitioning
  */
-CREATE OR REPLACE FUNCTION append_range_partitions_time(
+CREATE OR REPLACE FUNCTION append_range_partitions(
     v_relation TEXT
-    , v_start_timestamp TIMESTAMPTZ
     , v_interval INTERVAL
     , v_premake INTEGER)
 RETURNS VOID AS
 $$
 DECLARE
     v_part_timestamp TIMESTAMPTZ;
-    v_part_relname TEXT;
     v_partnum INTEGER;
     v_relid INTEGER;
 BEGIN
     SELECT relfilenode INTO v_relid
     FROM pg_class WHERE relname = v_relation;
 
-    IF v_start_timestamp != NULL THEN
-        v_part_timestamp := v_start_timestamp;
-    ELSE
-        SELECT current_date INTO v_part_timestamp;
-    END IF;
+    SELECT max('max_dt') INTO v_part_timestamp FROM pg_pathman_range_rels;
 
     /* Create partitions and update pg_pathman configuration */
     FOR v_partnum IN 0..v_premake-1
     LOOP
-        v_part_relname := format('%s_%s'
-                                 , v_relation
-                                 , to_char(v_part_timestamp, 'YYYY_MM_DD'));
+        PERFORM create_single_range_partition(v_relation
+                                              , v_part_timestamp
+                                              , v_interval);
         v_part_timestamp := v_part_timestamp + v_interval;
-
-        /* Skip existing partitions */
-        IF EXISTS (SELECT * FROM pg_tables WHERE tablename = v_part_relname) THEN
-            CONTINUE;
-        END IF;
-
-        EXECUTE format('CREATE TABLE %s (LIKE %s INCLUDING ALL)'
-                       , v_part_relname
-                       , v_relation);
-
-        EXECUTE format('ALTER TABLE %s INHERIT %s'
-                       , v_part_relname
-                       , v_relation);
-
-        INSERT INTO pg_pathman_range_rels (parent, min_dt, max_dt, child)
-        VALUES (v_relation
-                , v_part_timestamp
-                , v_part_timestamp + v_interval
-                , v_part_relname);
     END LOOP;
 
     PERFORM pg_pathman_on_update_partitions(v_relid);
 END
 $$ LANGUAGE plpgsql;
+
+/*
+ *
+ */
+CREATE OR REPLACE FUNCTION create_single_range_partition(
+    v_parent_relname TEXT
+    , v_start_timestamp TIMESTAMPTZ
+    , v_interval INTERVAL)
+RETURNS VOID AS
+$$
+DECLARE
+    v_child_relname TEXT;
+BEGIN
+    v_child_relname := format('%s_%s'
+                             , v_parent_relname
+                             , to_char(v_start_timestamp, 'YYYY_MM_DD'));
+
+    /* Skip existing partitions */
+    IF EXISTS (SELECT * FROM pg_tables WHERE tablename = v_child_relname) THEN
+        RAISE WARNING 'Relation % already exists, skipping...', v_child_relname;
+        RETURN;
+    END IF;
+
+    EXECUTE format('CREATE TABLE %s (LIKE %s INCLUDING ALL)'
+                   , v_child_relname
+                   , v_parent_relname);
+
+    EXECUTE format('ALTER TABLE %s INHERIT %s'
+                   , v_child_relname
+                   , v_parent_relname);
+
+    INSERT INTO pg_pathman_range_rels (parent, min_dt, max_dt, child)
+    VALUES (v_parent_relname
+            , v_start_timestamp
+            , v_start_timestamp + v_interval
+            , v_child_relname);
+END
+$$ LANGUAGE plpgsql;
+
 
 /*
  * Creates range partitioning insert trigger
@@ -152,7 +171,6 @@ BEGIN
 
     EXECUTE v_func;
     EXECUTE v_trigger;
-    -- RETURN v_func;
     RETURN;
 END
 $$ LANGUAGE plpgsql;
@@ -160,7 +178,7 @@ $$ LANGUAGE plpgsql;
 /*
  * Drop partitions
  */
-CREATE OR REPLACE FUNCTION public.drop_range_partitions(IN relation TEXT)
+CREATE OR REPLACE FUNCTION drop_range_partitions(IN relation TEXT)
 RETURNS VOID AS
 $$
 DECLARE
@@ -178,7 +196,7 @@ BEGIN
     END LOOP;
 
     DELETE FROM pg_pathman_rels WHERE relname = relation;
-    DELETE FROM pg_pathman_hash_rels WHERE parent = relation;
+    DELETE FROM pg_pathman_range_rels WHERE parent = relation;
 
     /* Notify backend about changes */
     PERFORM pg_pathman_on_remove_partitions(v_relid);
@@ -188,10 +206,10 @@ $$ LANGUAGE plpgsql;
 /*
  * Drop trigger
  */
-CREATE OR REPLACE FUNCTION public.drop_range_triggers(IN relation TEXT)
+CREATE OR REPLACE FUNCTION drop_range_triggers(IN relation TEXT)
 RETURNS VOID AS
 $$
 BEGIN
-    EXECUTE format('DROP TRIGGER IF EXISTS %s_range_insert_trigger_func ON %1$s CASCADE', relation);
+    EXECUTE format('DROP TRIGGER IF EXISTS %s_insert_trigger ON %1$s CASCADE', relation);
 END
 $$ LANGUAGE plpgsql;
