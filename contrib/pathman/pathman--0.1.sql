@@ -1,26 +1,38 @@
 /*
  * Relations using partitioning
  */
-CREATE TABLE IF NOT EXISTS pg_pathman_rels (
-	id         SERIAL PRIMARY KEY,
-	relname    VARCHAR(127),
-	attr       VARCHAR(127),
-	parttype   INTEGER
+CREATE TABLE IF NOT EXISTS @extschema@.pg_pathman_rels (
+    id         SERIAL PRIMARY KEY,
+    relname    VARCHAR(127),
+    attname    VARCHAR(127),
+    atttype    INTEGER,
+    parttype   INTEGER
 );
 
 /*
  * Relations using hash strategy
  */
-CREATE TABLE IF NOT EXISTS pg_pathman_hash_rels (
-	id         SERIAL PRIMARY KEY,
-	parent     VARCHAR(127),
-	hash       INTEGER,
-	child      VARCHAR(127)
+CREATE TABLE IF NOT EXISTS @extschema@.pg_pathman_hash_rels (
+    id         SERIAL PRIMARY KEY,
+    parent     VARCHAR(127),
+    hash       INTEGER,
+    child      VARCHAR(127)
 );
 
 /*
- * Creates hash partitions for specified relation
+ * Relations using range strategy
  */
+CREATE TABLE IF NOT EXISTS @extschema@.pg_pathman_range_rels (
+    id         SERIAL PRIMARY KEY,
+    parent     VARCHAR(127),
+    min_int    INTEGER,
+    max_int    INTEGER,
+    min_dt     DATE,
+    max_dt     DATE,
+    child      VARCHAR(127) 
+);
+
+
 CREATE OR REPLACE FUNCTION public.create_hash_partitions(
 	IN relation TEXT, IN attribute TEXT, IN partitions_count INTEGER
 ) RETURNS VOID AS
@@ -144,77 +156,33 @@ BEGIN
 END
 $$ LANGUAGE plpgsql;
 
+
 CREATE OR REPLACE FUNCTION pg_pathman_on_create_partitions(relid INTEGER)
 RETURNS VOID AS 'pathman', 'on_partitions_created' LANGUAGE C STRICT;
+
+CREATE OR REPLACE FUNCTION pg_pathman_on_create_partitions(relid INTEGER)
+RETURNS VOID AS 'pathman', 'on_partitions_updated' LANGUAGE C STRICT;
 
 CREATE OR REPLACE FUNCTION pg_pathman_on_remove_partitions(relid INTEGER)
 RETURNS VOID AS 'pathman', 'on_partitions_removed' LANGUAGE C STRICT;
 
 
-CREATE OR REPLACE FUNCTION public.create_hash_update_trigger(IN relation TEXT, IN attr TEXT, IN partitions_count INTEGER)
-RETURNS VOID AS
-$$
-DECLARE
-	func TEXT := 'CREATE OR REPLACE FUNCTION %s_update_trigger_func() RETURNS TRIGGER AS ' ||
-				 '$body$ DECLARE old_hash INTEGER; new_hash INTEGER; q TEXT; BEGIN '       ||
-				 'old_hash := OLD.%2$s %% %3$s; '                                          ||
-				 'new_hash := NEW.%2$s %% %3$s; '                                          ||
-				 'IF old_hash = new_hash THEN RETURN NEW; END IF; '                        ||
-				 'q := format(''DELETE FROM %1$s_%%s WHERE %4$s'', old_hash); '            ||
-				 'EXECUTE q USING %5$s; '                                                  ||
-				 'q := format(''INSERT INTO %1$s_%%s VALUES (%6$s)'', new_hash); '         ||
-				 'EXECUTE q USING %7$s; '                                                  ||
-				 'RETURN NULL; '                                                           ||
-				 'END $body$ LANGUAGE plpgsql';
-	trigger TEXT := 'CREATE TRIGGER %s_update_trigger ' ||	
-		'BEFORE UPDATE ON %1$s_%s ' ||
-		'FOR EACH ROW EXECUTE PROCEDURE %1$s_update_trigger_func()';
-	att_names   TEXT;
-	old_fields  TEXT;
-	new_fields  TEXT;
-	att_val_fmt TEXT;
-	att_fmt     TEXT;
-	relid       INTEGER;
-BEGIN
-	relid := relfilenode FROM pg_class WHERE relname = relation;
-	SELECT string_agg(attname, ', '),
-		   string_agg('OLD.' || attname, ', '),
-		   string_agg('NEW.' || attname, ', '),
-		   string_agg(attname || '=$' || attnum, ' AND '),
-		   string_agg('$' || attnum, ', ')
-	FROM pg_attribute
-	WHERE attrelid=relid AND attnum>0
-	INTO   att_names,
-		   old_fields,
-		   new_fields,
-		   att_val_fmt,
-		   att_fmt;
-
-	EXECUTE format(func, relation, attr, partitions_count, att_val_fmt,
-				   old_fields, att_fmt, new_fields);
-	FOR num IN 0..partitions_count-1
-	LOOP
-		EXECUTE format(trigger, relation, num);
-	END LOOP;
-END
-$$ LANGUAGE plpgsql;
-
 -- CREATE OR REPLACE FUNCTION sample_rel_trigger_func()
 -- RETURNS TRIGGER AS $$
 -- DECLARE
--- 	hash integer := 0;
--- 	-- q TEXT = 'INSERT INTO sample_rel_% VALUES (NEW.*)';
+--  hash integer := 0;
+--  -- q TEXT = 'INSERT INTO sample_rel_% VALUES (NEW.*)';
 -- BEGIN
--- 	hash := NEW.val % 1000;
--- 	EXECUTE format('INSERT INTO sample_rel_%s VALUES ($1, $2)', hash)
--- 		USING NEW.id, NEW.val;
--- 	RETURN NULL;
+--  hash := NEW.val % 1000;
+--  EXECUTE format('INSERT INTO sample_rel_%s VALUES ($1, $2)', hash)
+--      USING NEW.id, NEW.val;
+--  RETURN NULL;
 -- END
 -- $$ LANGUAGE plpgsql;
 
 -- CREATE TRIGGER sample_rel_trigger
--- 	BEFORE INSERT ON sample_rel
--- 	FOR EACH ROW EXECUTE PROCEDURE sample_rel_trigger_func();
+--  BEFORE INSERT ON sample_rel
+--  FOR EACH ROW EXECUTE PROCEDURE sample_rel_trigger_func();
 
 
 
@@ -222,13 +190,13 @@ $$ LANGUAGE plpgsql;
 -- CREATE OR REPLACE FUNCTION public.create_children_tables(IN relation TEXT)
 -- RETURNS INTEGER AS $$
 -- DECLARE
--- 	q TEXT := 'CREATE TABLE %s_%s (CHECK (val IN (%s))) INHERITS (%s)';
+--  q TEXT := 'CREATE TABLE %s_%s (CHECK (val IN (%s))) INHERITS (%s)';
 -- BEGIN
--- 	FOR partnum IN 0..999
--- 	LOOP
--- 		EXECUTE format(q, relation, partnum, partnum, relation);
--- 	END LOOP;
--- 	RETURN 0;
+--  FOR partnum IN 0..999
+--  LOOP
+--      EXECUTE format(q, relation, partnum, partnum, relation);
+--  END LOOP;
+--  RETURN 0;
 -- END
 -- $$ LANGUAGE plpgsql;
 

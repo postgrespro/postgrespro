@@ -1,3 +1,4 @@
+#include "pathman.h"
 #include "postgres.h"
 #include "fmgr.h"
 #include "nodes/pg_list.h"
@@ -11,59 +12,14 @@
 #include "utils/rel.h"
 #include "utils/elog.h"
 #include "utils/array.h"
+#include "utils/date.h"
+#include "utils/typcache.h"
+#include "utils/lsyscache.h"
 #include "access/heapam.h"
 #include "storage/ipc.h"
 #include "catalog/pg_operator.h"
-#include "executor/spi.h"
 
 PG_MODULE_MAGIC;
-
-#define ALL NIL
-#define MAX_PARTITIONS 2048
-
-/*
- * Partitioning type
- */
-typedef enum PartType
-{
-	PT_HASH = 1
-} PartType;
-
-/*
- * PartRelationInfo
- *		Per-relation partitioning information
- *
- *		oid - parent table oid
- *		children - list of children oids
- *		parttype - partitioning type (HASH, LIST or RANGE)
- *		attnum - attribute number of parent relation
- */
-typedef struct PartRelationInfo
-{
-	Oid			oid;
-	// List	   *children;
-	/* TODO: is there any better solution to store children in shared memory? */
-	Oid			children[MAX_PARTITIONS];
-	int			children_count;
-	PartType	parttype;
-	Index		attnum;
-} PartRelationInfo;
-
-static HTAB *relations = NULL;
-static HTAB *hash_restrictions = NULL;
-static bool initialization_needed = true;
-
-typedef struct HashRelationKey
-{
-	int		hash;
-	Oid		parent_oid;
-} HashRelationKey;
-
-typedef struct HashRelation
-{
-	HashRelationKey key;
-	Oid		child_oid;
-} HashRelation;
 
 /* Original hooks */
 static set_rel_pathlist_hook_type set_rel_pathlist_hook_original = NULL;
@@ -76,14 +32,10 @@ static void my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry
 static PlannedStmt * my_planner_hook(Query *parse, int cursorOptions, ParamListInfo boundParams);
 
 static void append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte, int childOID);
-static void init(void);
-static void create_part_relations_hashtable(void);
-static void create_hash_restrictions_hashtable(void);
-static void load_part_relations_hashtable(void);
-static void load_hash_restrictions_hashtable(void);
+
 static List *walk_expr_tree(Expr *expr, const PartRelationInfo *prel);
 static int make_hash(const PartRelationInfo *prel, int value);
-static List *handle_binary_opexpr(const PartRelationInfo *partrel, const Var *v, const Const *c);
+static List *handle_binary_opexpr(const PartRelationInfo *partrel, const OpExpr *expr, const Var *v, const Const *c);
 static List *handle_opexpr(const OpExpr *expr, const PartRelationInfo *prel);
 static List *handle_boolexpr(const BoolExpr *expr, const PartRelationInfo *prel);
 static List *handle_arrexpr(const ScalarArrayOpExpr *expr, const PartRelationInfo *prel);
@@ -93,6 +45,7 @@ static void set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, Index rt
 static List *accumulate_append_subpath(List *subpaths, Path *path);
 
 PG_FUNCTION_INFO_V1( on_partitions_created );
+PG_FUNCTION_INFO_V1( on_partitions_updated );
 PG_FUNCTION_INFO_V1( on_partitions_removed );
 
 
@@ -153,16 +106,6 @@ my_planner_hook(Query *parse, int cursorOptions, ParamListInfo boundParams)
 	return result;
 }
 
-/*
- * Initialize hashtables
- */
-static void
-init(void)
-{
-	initialization_needed = false;
-	load_part_relations_hashtable();
-	load_hash_restrictions_hashtable();
-}
 
 static void
 my_shmem_startup(void)
@@ -171,6 +114,7 @@ my_shmem_startup(void)
 
 	create_part_relations_hashtable();
 	create_hash_restrictions_hashtable();
+	create_range_restrictions_hashtable();
 
 	LWLockRelease(AddinShmemInitLock);
 }
@@ -200,24 +144,30 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 
 		rte->inh = true;
 
+		for (i=0; i<prel->children_count; i++)
+			children = lappend_int(children, prel->children[i]);
+
 		/* Run over restrictions and collect children partitions */
 		ereport(LOG, (errmsg("Checking restrictions")));
 		foreach(lc, rel->baserestrictinfo)
 		{
 			RestrictInfo *rinfo = (RestrictInfo*) lfirst(lc);
 			List *ret = walk_expr_tree(rinfo->clause, prel);
-			children = list_concat_unique_int(children, ret);
-			list_free(ret);
+
+			if (ret != ALL)
+			{
+				children = list_intersection_int(children, ret);
+				list_free(ret);
+			}
 		}
 
-		if (children == NIL)
-		{
-			ereport(LOG, (errmsg("Restrictions empty. Copy children from partrel")));
-			// children = get_children_oids(partrel);
-			// children = list_copy(partrel->children);
-			for (i=0; i<prel->children_count; i++)
-				children = lappend_int(children, prel->children[i]);
-		}
+		// if (children == NIL)
+		// {
+		// 	ereport(LOG, (errmsg("Restrictions empty. Copy children from partrel")));
+		// 	// children = get_children_oids(partrel);
+		// 	// children = list_copy(partrel->children);
+
+		// }
 
 		if (length(children) > 0)
 		{
@@ -343,6 +293,7 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEnt
 	appinfo->child_relid = childRTindex;
 	appinfo->parent_reloid = rte->relid;
 	root->append_rel_list = lappend(root->append_rel_list, appinfo);
+	root->total_table_pages += (double) childrel->pages;
 
 	ereport(LOG,
 			(errmsg("Relation %u appended", childOID)));
@@ -382,23 +333,109 @@ walk_expr_tree(Expr *expr, const PartRelationInfo *prel)
  *	This function determines which partitions should appear in query plan
  */
 static List *
-handle_binary_opexpr(const PartRelationInfo *partrel, const Var *v, const Const *c)
+handle_binary_opexpr(const PartRelationInfo *prel, const OpExpr *expr,
+					 const Var *v, const Const *c)
 {
 	HashRelationKey		key;
 	HashRelation	   *hashrel;
-	int					value;
+	RangeRelation	   *rangerel;
+	int					int_value;
+	DateADT				dt_value;
+	Datum				value;
+	int i, j;
+	int startidx, endidx;
 
-	value = DatumGetInt32(c->constvalue);
-	key.hash = make_hash(partrel, value);
-	key.parent_oid = partrel->oid;
-	hashrel = (HashRelation *)
-		hash_search(hash_restrictions, (const void *)&key, HASH_FIND, NULL);
+	/* determine operator type */
+	TypeCacheEntry *tce = lookup_type_cache(v->vartype,
+		TYPECACHE_EQ_OPR | TYPECACHE_LT_OPR | TYPECACHE_GT_OPR);
+	int strategy = get_op_opfamily_strategy(expr->opno, tce->btree_opf);
 
-	if (hashrel != NULL) {
-		return list_make1_int(hashrel->child_oid);
+	switch (prel->parttype)
+	{
+		case PT_HASH:
+			if (expr->opno == Int4EqualOperator)
+			{
+				int_value = DatumGetInt32(c->constvalue);
+				key.hash = make_hash(prel, int_value);
+				key.parent_oid = prel->oid;
+				hashrel = (HashRelation *)
+					hash_search(hash_restrictions, (const void *)&key, HASH_FIND, NULL);
+
+				if (hashrel != NULL)
+					return list_make1_int(hashrel->child_oid);
+				else
+					return ALL;
+			}
+		case PT_RANGE:
+			value = c->constvalue;
+			rangerel = (RangeRelation *)
+				hash_search(range_restrictions, (const void *)&prel->oid, HASH_FIND, NULL);
+			if (rangerel != NULL)
+			{
+				RangeEntry *re;
+				List	   *children = NIL;
+				bool		found = false;
+				startidx = 0;
+				endidx = rangerel->nranges-1;
+				int counter = 0;
+
+				/* check boundaries */
+				if (rangerel->nranges == 0 || rangerel->ranges[0].min > value ||
+					rangerel->ranges[rangerel->nranges-1].max < value)
+					return ALL;
+
+				/* binary search */
+				while (true)
+				{
+					i = startidx + (endidx - startidx) / 2;
+					if (i >= 0 && i < rangerel->nranges)
+					{
+						re = &rangerel->ranges[i];
+						if (re->min <= value && re->max >= value)
+						{
+							found = true;
+							break;
+						}
+						else if (value < re->min)
+							endidx = i - 1;
+						else if (value > re->max)
+							startidx = i + 1;
+					}
+					/* for debug's sake */
+					Assert(++counter < 100);
+				}
+
+				/* filter partitions */
+				if (found)
+				{
+					switch(strategy)
+					{
+						case OP_STRATEGY_LT:
+							startidx = 0;
+							endidx = (re->min == value) ? i-1 : i;
+							break;
+						case OP_STRATEGY_LE:
+							startidx = 0;
+							endidx = i;
+							break;
+						case OP_STRATEGY_EQ:
+							return list_make1_int(re->child_oid);
+						case OP_STRATEGY_GE:
+							startidx = i;
+							endidx = rangerel->nranges-1;
+							break;
+						case OP_STRATEGY_GT:
+							startidx = (re->min == value) ? i+1 : i;
+							endidx = rangerel->nranges-1;
+					}
+					for (j=startidx; j<=endidx; j++)
+						children = lappend_int(children, rangerel->ranges[j].child_oid);
+					return children;
+				}
+			}
 	}
-	else
-		return ALL;
+
+	return ALL;
 }
 
 /*
@@ -417,19 +454,20 @@ handle_opexpr(const OpExpr *expr, const PartRelationInfo *prel)
 {
 	Node *firstarg = NULL;
 	Node *secondarg = NULL;
-	// Bitmapset *b = NULL;
 
-	/* TODO: expr->opno == 96 - describe. Probably some function needed */
-	if (length(expr->args) == 2 && expr->opno == Int4EqualOperator)
+	if (length(expr->args) == 2)
 	{
 		firstarg = (Node*) linitial(expr->args);
 		secondarg = (Node*) lsecond(expr->args);
-		if (firstarg->type == T_Var && secondarg->type == T_Const) {
-			if (((Var*)firstarg)->varattno == prel->attnum)
-			{
-				/* filter children */
-				return handle_binary_opexpr(prel, (Var*)firstarg, (Const*)secondarg);
-			}
+		if (firstarg->type == T_Var && secondarg->type == T_Const &&
+			((Var*)firstarg)->varattno == prel->attnum)
+		{
+			return handle_binary_opexpr(prel, expr, (Var*)firstarg, (Const*)secondarg);
+		}
+		else if (secondarg->type == T_Var && firstarg->type == T_Const &&
+			((Var*)secondarg)->varattno == prel->attnum)
+		{
+			return handle_binary_opexpr(prel, expr, (Var*)secondarg, (Const*)firstarg);
 		}
 	}
 
@@ -644,131 +682,6 @@ accumulate_append_subpath(List *subpaths, Path *path)
 	return lappend(subpaths, path);
 }
 
-static void
-load_part_relations_hashtable()
-{
-	PartRelationInfo *prinfo;
-	int ret;
-	int i;
-	int proc;
-	bool isnull;
-
-	SPI_connect();
-	ret = SPI_exec("SELECT pg_class.relfilenode, pg_attribute.attnum, pg_pathman_rels.parttype "
-				   "FROM pg_pathman_rels "
-				   "JOIN pg_class ON pg_class.relname = pg_pathman_rels.relname "
-				   "JOIN pg_attribute ON pg_attribute.attname = pg_pathman_rels.attr "
-				   "AND attrelid = pg_class.relfilenode", 0);
-	proc = SPI_processed;
-
-	if (ret > 0 && SPI_tuptable != NULL)
-	{
-		TupleDesc tupdesc = SPI_tuptable->tupdesc;
-		SPITupleTable *tuptable = SPI_tuptable;
-
-		for (i=0; i<proc; i++)
-		{
-			HeapTuple tuple = tuptable->vals[i];
-
-			int oid = DatumGetObjectId(SPI_getbinval(tuple, tupdesc, 1, &isnull));
-			prinfo = (PartRelationInfo*)hash_search(relations, (const void *)&oid, HASH_ENTER, NULL);
-			prinfo->oid = oid;
-			prinfo->attnum = DatumGetInt32(SPI_getbinval(tuple, tupdesc, 2, &isnull));
-			prinfo->parttype = DatumGetInt32(SPI_getbinval(tuple, tupdesc, 3, &isnull));
-			/* children will be filled in later */
-			// prinfo->children = NIL;
-		}
-	}
-
-	SPI_finish();
-}
-
-void
-create_part_relations_hashtable()
-{
-	HASHCTL		ctl;
-
-	memset(&ctl, 0, sizeof(ctl));
-	ctl.keysize = sizeof(int);
-	ctl.entrysize = sizeof(PartRelationInfo);
-
-	/* already exists, recreate */
-	if (relations != NULL)
-		hash_destroy(relations);
-
-	relations = ShmemInitHash("Partitioning relation info",
-							  128, 128,
-							  &ctl, HASH_ELEM | HASH_BLOBS);
-}
-
-static void
-load_hash_restrictions_hashtable()
-{
-	bool		found;
-	PartRelationInfo *prinfo;
-	HashRelation *hashrel;
-	HashRelationKey key;
-	int ret;
-	int i;
-	int proc;
-	bool isnull;
-
-	SPI_connect();
-	ret = SPI_exec("SELECT p.relfilenode, hr.hash, c.relfilenode "
-				   "FROM pg_pathman_hash_rels hr "
-				   "JOIN pg_class p ON p.relname = hr.parent "
-				   "JOIN pg_class c ON c.relname = hr.child", 0);
-	proc = SPI_processed;
-
-	if (ret > 0 && SPI_tuptable != NULL)
-    {
-    	TupleDesc tupdesc = SPI_tuptable->tupdesc;
-        SPITupleTable *tuptable = SPI_tuptable;
-
-        for (i=0; i<proc; i++)
-        {
-            HeapTuple tuple = tuptable->vals[i];
-			int child_oid = DatumGetObjectId(SPI_getbinval(tuple, tupdesc, 3, &isnull));
-
-			key.parent_oid = DatumGetObjectId(SPI_getbinval(tuple, tupdesc, 1, &isnull));
-			key.hash = DatumGetInt32(SPI_getbinval(tuple, tupdesc, 2, &isnull));
-
-			hashrel = (HashRelation *)
-				hash_search(hash_restrictions, (void *) &key, HASH_ENTER, &found);
-			hashrel->child_oid = child_oid;
-
-			/* appending children to PartRelationInfo */
-			prinfo = (PartRelationInfo*)
-				hash_search(relations, (const void *)&key.parent_oid, HASH_ENTER, &found);
-			// prinfo->children = lappend_int(prinfo->children, child_oid);
-			// prinfo->children_count++;
-			prinfo->children[prinfo->children_count++] = child_oid;
-        }
-    }
-
-	SPI_finish();
-}
-
-/*
- * Create hash restrictions table
- */
-void
-create_hash_restrictions_hashtable()
-{
-	HASHCTL		ctl;
-
-	memset(&ctl, 0, sizeof(ctl));
-	ctl.keysize = sizeof(HashRelationKey);
-	ctl.entrysize = sizeof(HashRelation);
-
-	/* already exists, recreate */
-	if (hash_restrictions != NULL)
-		hash_destroy(hash_restrictions);
-
-	hash_restrictions = ShmemInitHash("pg_pathman hash restrictions",
-									  1024, 1024,
-									  &ctl, HASH_ELEM | HASH_BLOBS);
-}
 
 /*
  * Callbacks
@@ -779,7 +692,30 @@ on_partitions_created(PG_FUNCTION_ARGS) {
 	LWLockAcquire(AddinShmemInitLock, LW_EXCLUSIVE);
 
 	load_part_relations_hashtable();
-	load_hash_restrictions_hashtable();
+	// load_hash_restrictions_hashtable();
+	// load_range_restrictions_hashtable();
+
+	LWLockRelease(AddinShmemInitLock);
+
+	PG_RETURN_NULL();
+}
+
+Datum
+on_partitions_updated(PG_FUNCTION_ARGS) {
+	HashRelationKey		key;
+	Oid					relid;
+	PartRelationInfo   *prel;
+	int i;
+
+	LWLockAcquire(AddinShmemInitLock, LW_EXCLUSIVE);
+
+	/* parent relation oid */
+	relid = DatumGetInt32(PG_GETARG_DATUM(0));
+
+	prel = (PartRelationInfo *)
+		hash_search(relations, (const void *) &relid, HASH_FIND, 0);
+	prel->children_count = 0;
+	load_part_relations_hashtable();
 
 	LWLockRelease(AddinShmemInitLock);
 
@@ -801,13 +737,19 @@ on_partitions_removed(PG_FUNCTION_ARGS) {
 	prel = (PartRelationInfo *)
 		hash_search(relations, (const void *) &relid, HASH_FIND, 0);
 
-	/* remove children relations from hash_restrictions */
-	// for (i=0; i<length(prel->children); i++)
-	for (i=0; i<prel->children_count; i++)
+	/* remove children relations */
+	switch (prel->parttype)
 	{
-		key.parent_oid = relid;
-		key.hash = i;
-		hash_search(hash_restrictions, (const void *)&key, HASH_REMOVE, 0);
+		case PT_HASH:
+			for (i=0; i<prel->children_count; i++)
+			{
+				key.parent_oid = relid;
+				key.hash = i;
+				hash_search(hash_restrictions, (const void *) &key, HASH_REMOVE, 0);
+			}
+			break;
+		case PT_RANGE:
+			hash_search(range_restrictions, (const void *) &relid, HASH_REMOVE, 0);
 	}
 	prel->children_count = 0;
 	hash_search(relations, (const void *) &relid, HASH_REMOVE, 0);

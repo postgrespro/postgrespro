@@ -1,7 +1,7 @@
 # contrib/pathman/Makefile
 
 MODULE_big = pathman
-OBJS = pathman.o $(WIN32RES)
+OBJS = init.o pathman.o $(WIN32RES)
 
 EXTENSION = pathman
 DATA = pathman--0.1.sql
