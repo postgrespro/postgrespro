@@ -204,7 +204,9 @@ load_range_restrictions(Oid parent_oid)
 
 	// SPI_connect();
 	ret = SPI_execute_with_args("SELECT p.relfilenode, c.relfilenode, "
-								"rr.min_int, rr.max_int, rr.min_dt, rr.max_dt "
+								"rr.min_int, rr.max_int, "
+								"rr.min_dt - '1 microsecond'::INTERVAL, "
+								"rr.max_dt - '1 microsecond'::INTERVAL "
 								"FROM pg_pathman_range_rels rr "
 								"JOIN pg_class p ON p.relname = rr.parent "
 								"JOIN pg_class c ON c.relname = rr.child "

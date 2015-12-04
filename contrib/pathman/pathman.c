@@ -18,6 +18,7 @@
 #include "access/heapam.h"
 #include "storage/ipc.h"
 #include "catalog/pg_operator.h"
+#include "catalog/pg_type.h"
 
 PG_MODULE_MAGIC;
 
@@ -367,7 +368,10 @@ handle_binary_opexpr(const PartRelationInfo *prel, const OpExpr *expr,
 					return ALL;
 			}
 		case PT_RANGE:
-			value = c->constvalue;
+			if (c->consttype == DATEOID)
+				value = TimeTzADTPGetDatum(date2timestamp_no_overflow(c->constvalue));
+			else
+				value = c->constvalue;
 			rangerel = (RangeRelation *)
 				hash_search(range_restrictions, (const void *)&prel->oid, HASH_FIND, NULL);
 			if (rangerel != NULL)
@@ -391,16 +395,19 @@ handle_binary_opexpr(const PartRelationInfo *prel, const OpExpr *expr,
 					if (i >= 0 && i < rangerel->nranges)
 					{
 						re = &rangerel->ranges[i];
-						if (re->min <= value && value < re->max)
+						if (re->min <= value && value <= re->max)
 						{
 							found = true;
 							break;
 						}
 						else if (value < re->min)
 							endidx = i - 1;
-						else if (value >= re->max)
+						// else if (value >= re->max)
+						else if (value > re->max)
 							startidx = i + 1;
 					}
+					else
+						break;
 					/* for debug's sake */
 					Assert(++counter < 100);
 				}
@@ -425,7 +432,7 @@ handle_binary_opexpr(const PartRelationInfo *prel, const OpExpr *expr,
 							endidx = rangerel->nranges-1;
 							break;
 						case OP_STRATEGY_GT:
-							startidx = (re->min == value) ? i+1 : i;
+							startidx = (re->max == value) ? i+1 : i;
 							endidx = rangerel->nranges-1;
 					}
 					for (j=startidx; j<=endidx; j++)
@@ -690,11 +697,7 @@ Datum
 on_partitions_created(PG_FUNCTION_ARGS) {
 	/* Reload config */
 	LWLockAcquire(AddinShmemInitLock, LW_EXCLUSIVE);
-
 	load_part_relations_hashtable();
-	// load_hash_restrictions_hashtable();
-	// load_range_restrictions_hashtable();
-
 	LWLockRelease(AddinShmemInitLock);
 
 	PG_RETURN_NULL();
@@ -708,15 +711,12 @@ on_partitions_updated(PG_FUNCTION_ARGS) {
 	int i;
 
 	LWLockAcquire(AddinShmemInitLock, LW_EXCLUSIVE);
-
 	/* parent relation oid */
 	relid = DatumGetInt32(PG_GETARG_DATUM(0));
-
 	prel = (PartRelationInfo *)
 		hash_search(relations, (const void *) &relid, HASH_FIND, 0);
 	prel->children_count = 0;
 	load_part_relations_hashtable();
-
 	LWLockRelease(AddinShmemInitLock);
 
 	PG_RETURN_NULL();
@@ -733,7 +733,6 @@ on_partitions_removed(PG_FUNCTION_ARGS) {
 
 	/* parent relation oid */
 	relid = DatumGetInt32(PG_GETARG_DATUM(0));
-
 	prel = (PartRelationInfo *)
 		hash_search(relations, (const void *) &relid, HASH_FIND, 0);
 

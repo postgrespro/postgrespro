@@ -92,7 +92,7 @@ DECLARE
 BEGIN
     v_child_relname := format('%s_%s'
                              , v_parent_relname
-                             , to_char(v_start_timestamp, 'YYYY_MM_DD'));
+                             , to_char(v_start_timestamp, 'YYYY_MM_DD_HH24'));
 
     /* Skip existing partitions */
     IF EXISTS (SELECT * FROM pg_tables WHERE tablename = v_child_relname) THEN

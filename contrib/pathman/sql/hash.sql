@@ -82,16 +82,18 @@ BEGIN
     PERFORM drop_hash_triggers(relation);
 
     /* determine fields for INSERT */
-    -- relid := relfilenode FROM pg_class WHERE relname = relation;
-    -- SELECT string_agg('NEW.' || attname, ', '), string_agg('$' || attnum, ', ')
-    -- FROM pg_attribute
-    -- WHERE attrelid=relid AND attnum>0
-    -- INTO fields, fields_format;
+    relid := relfilenode FROM pg_class WHERE relname = relation;
+    SELECT string_agg('NEW.' || attname, ', '), string_agg('$' || attnum, ', ')
+    FROM pg_attribute
+    WHERE attrelid=relid AND attnum>0
+    INTO fields, fields_format;
 
     /* generate INSERT statement for trigger */
-    -- insert_stmt = format('EXECUTE format(''INSERT INTO %s_%%s VALUES (%s)'', hash) USING %s;',
-    --  relation, fields_format, fields);
-    insert_stmt = format('EXECUTE format(''INSERT INTO %s_%%s VALUES (NEW.*)'', hash);', relation);
+    insert_stmt = format('EXECUTE format(''INSERT INTO %s_%%s VALUES (%s)'', hash) USING %s;'
+                         , relation
+                         , fields_format
+                         , fields);
+    -- insert_stmt = format('EXECUTE format(''INSERT INTO %s_%%s VALUES (NEW.*)'', hash);', relation);
 
     /* format and create new trigger for relation */
     func := format(func, relation, attr, partitions_count, insert_stmt);

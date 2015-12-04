@@ -27,8 +27,8 @@ CREATE TABLE IF NOT EXISTS @extschema@.pg_pathman_range_rels (
     parent     VARCHAR(127),
     min_int    INTEGER,
     max_int    INTEGER,
-    min_dt     DATE,
-    max_dt     DATE,
+    min_dt     TIMESTAMPTZ,
+    max_dt     TIMESTAMPTZ,
     child      VARCHAR(127) 
 );
 
@@ -160,7 +160,7 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION pg_pathman_on_create_partitions(relid INTEGER)
 RETURNS VOID AS 'pathman', 'on_partitions_created' LANGUAGE C STRICT;
 
-CREATE OR REPLACE FUNCTION pg_pathman_on_create_partitions(relid INTEGER)
+CREATE OR REPLACE FUNCTION pg_pathman_on_update_partitions(relid INTEGER)
 RETURNS VOID AS 'pathman', 'on_partitions_updated' LANGUAGE C STRICT;
 
 CREATE OR REPLACE FUNCTION pg_pathman_on_remove_partitions(relid INTEGER)
