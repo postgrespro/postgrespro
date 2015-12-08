@@ -55,7 +55,7 @@ typedef struct PartRelationInfo
 	int			children_count;
 	PartType	parttype;
 	Index		attnum;
-	AttType		atttype;
+	Oid			atttype;
 
 } PartRelationInfo;
 

@@ -4,13 +4,14 @@
 CREATE OR REPLACE FUNCTION create_range_partitions(
     v_relation TEXT
     , v_attribute TEXT
-    , v_start_timestamp TIMESTAMPTZ
+    , v_start_timestamp TIMESTAMP
     , v_interval INTERVAL
     , v_premake INTEGER)
 RETURNS VOID AS
 $$
 DECLARE
     v_relid     INTEGER;
+    v_dt TIMESTAMP;
 BEGIN
     SELECT relfilenode INTO v_relid
     FROM pg_class WHERE relname = v_relation;
@@ -19,14 +20,14 @@ BEGIN
         RAISE EXCEPTION 'Reltion "%s" has already been partitioned', v_relation;
     END IF;
 
-    IF v_start_timestamp != NULL THEN
-        v_start_timestamp := v_start_timestamp;
+    IF NOT v_start_timestamp IS NULL THEN
+        v_dt := v_start_timestamp;
     ELSE
-        SELECT current_date INTO v_start_timestamp;
+        SELECT current_date INTO v_dt;
     END IF;
 
     PERFORM create_single_range_partition(v_relation
-                                          , v_start_timestamp
+                                          , v_dt
                                           , v_interval);
 
     INSERT INTO pg_pathman_rels (
@@ -51,28 +52,43 @@ $$ LANGUAGE plpgsql;
  */
 CREATE OR REPLACE FUNCTION append_range_partitions(
     v_relation TEXT
-    , v_interval INTERVAL
+    , v_interval TEXT
     , v_premake INTEGER)
 RETURNS VOID AS
 $$
 DECLARE
-    v_part_timestamp TIMESTAMPTZ;
+    v_part_timestamp TIMESTAMP;
+    v_part_num DOUBLE PRECISION;
     v_partnum INTEGER;
     v_relid INTEGER;
 BEGIN
     SELECT relfilenode INTO v_relid
     FROM pg_class WHERE relname = v_relation;
 
-    SELECT max(max_dt) INTO v_part_timestamp FROM pg_pathman_range_rels;
+    SELECT max(max_dt), max(max_num)
+    INTO v_part_timestamp, v_part_num
+    FROM pg_pathman_range_rels
+    WHERE parent = v_relation;
 
     /* Create partitions and update pg_pathman configuration */
-    FOR v_partnum IN 0..v_premake-1
-    LOOP
-        PERFORM create_single_range_partition(v_relation
-                                              , v_part_timestamp
-                                              , v_interval);
-        v_part_timestamp := v_part_timestamp + v_interval;
-    END LOOP;
+    if NOT v_part_timestamp IS NULL THEN
+        FOR v_partnum IN 0..v_premake-1
+        LOOP
+            PERFORM create_single_range_partition(v_relation
+                                                  , v_part_timestamp
+                                                  , v_interval::INTERVAL);
+            v_part_timestamp := v_part_timestamp + v_interval::INTERVAL;
+        END LOOP;
+    ELSIF NOT v_part_num IS NULL THEN
+        /* Numerical range partitioning */
+        FOR v_partnum IN 0..v_premake-1
+        LOOP
+            PERFORM create_single_range_partition(v_relation
+                                                  , v_part_timestamp
+                                                  , v_interval::INTEGER);
+            v_part_timestamp := v_part_timestamp + v_interval;
+        END LOOP;
+    END IF;
 
     PERFORM pg_pathman_on_update_partitions(v_relid);
 END

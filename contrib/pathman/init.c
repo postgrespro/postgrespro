@@ -31,7 +31,7 @@ load_part_relations_hashtable()
 	ListCell *lc;
 
 	SPI_connect();
-	ret = SPI_exec("SELECT pg_class.relfilenode, pg_attribute.attnum, pg_pathman_rels.parttype "
+	ret = SPI_exec("SELECT pg_class.relfilenode, pg_attribute.attnum, pg_pathman_rels.parttype, pg_attribute.atttypid "
 				   "FROM pg_pathman_rels "
 				   "JOIN pg_class ON pg_class.relname = pg_pathman_rels.relname "
 				   "JOIN pg_attribute ON pg_attribute.attname = pg_pathman_rels.attname "
@@ -48,10 +48,12 @@ load_part_relations_hashtable()
 			HeapTuple tuple = tuptable->vals[i];
 
 			int oid = DatumGetObjectId(SPI_getbinval(tuple, tupdesc, 1, &isnull));
-			prinfo = (PartRelationInfo*)hash_search(relations, (const void *)&oid, HASH_ENTER, NULL);
+			prinfo = (PartRelationInfo*)
+				hash_search(relations, (const void *)&oid, HASH_ENTER, NULL);
 			prinfo->oid = oid;
 			prinfo->attnum = DatumGetInt32(SPI_getbinval(tuple, tupdesc, 2, &isnull));
 			prinfo->parttype = DatumGetInt32(SPI_getbinval(tuple, tupdesc, 3, &isnull));
+			prinfo->atttype = DatumGetObjectId(SPI_getbinval(tuple, tupdesc, 4, &isnull));
 
 			part_oids = lappend_int(part_oids, oid);
 
@@ -204,14 +206,16 @@ load_range_restrictions(Oid parent_oid)
 
 	// SPI_connect();
 	ret = SPI_execute_with_args("SELECT p.relfilenode, c.relfilenode, "
-								"rr.min_int, rr.max_int, "
-								"rr.min_dt - '1 microsecond'::INTERVAL, "
-								"rr.max_dt - '1 microsecond'::INTERVAL "
+								"rr.min_num, rr.max_num, "
+								"rr.min_dt, "
+								"rr.max_dt - '1 microsecond'::INTERVAL, "
+								"rr.min_dt::DATE, "
+								"(rr.max_dt - '1 day'::INTERVAL)::DATE "
 								"FROM pg_pathman_range_rels rr "
 								"JOIN pg_class p ON p.relname = rr.parent "
 								"JOIN pg_class c ON c.relname = rr.child "
 								"WHERE p.relfilenode = $1 "
-								"ORDER BY rr.parent, rr.min_int, rr.min_dt",
+								"ORDER BY rr.parent, rr.min_num, rr.min_dt",
 								1, oids, vals, nulls, true, 0);
 	proc = SPI_processed;
 
@@ -250,19 +254,35 @@ load_range_restrictions(Oid parent_oid)
 			// 		break;
 			// }
 
-			re.min = SPI_getbinval(tuple, tupdesc, 3, &arg1_isnull);
-			re.max = SPI_getbinval(tuple, tupdesc, 4, &arg2_isnull);
-			prel->atttype = AT_INT;
-
-			if (arg1_isnull || arg2_isnull)
+			switch(prel->atttype)
 			{
-				re.min = SPI_getbinval(tuple, tupdesc, 5, &arg1_isnull);
-				re.max = SPI_getbinval(tuple, tupdesc, 6, &arg2_isnull);
-				prel->atttype = AT_DATE;
-
-				if (arg1_isnull || arg2_isnull)
-					ereport(ERROR, (errmsg("Range relation should be of type either INTEGER or DATE")));
+				case DATEOID:
+					re.min = SPI_getbinval(tuple, tupdesc, 7, &arg1_isnull);
+					re.max = SPI_getbinval(tuple, tupdesc, 8, &arg2_isnull);
+					break;
+				case TIMESTAMPOID:
+					re.min = SPI_getbinval(tuple, tupdesc, 5, &arg1_isnull);
+					re.max = SPI_getbinval(tuple, tupdesc, 6, &arg2_isnull);
+					break;
+				default:
+					re.min = SPI_getbinval(tuple, tupdesc, 3, &arg1_isnull);
+					re.max = SPI_getbinval(tuple, tupdesc, 4, &arg2_isnull);
+					break;
 			}
+
+			// re.min = SPI_getbinval(tuple, tupdesc, 3, &arg1_isnull);
+			// re.max = SPI_getbinval(tuple, tupdesc, 4, &arg2_isnull);
+			// // prel->atttype = AT_INT;
+
+			// if (arg1_isnull || arg2_isnull)
+			// {
+			// 	re.min = SPI_getbinval(tuple, tupdesc, 5, &arg1_isnull);
+			// 	re.max = SPI_getbinval(tuple, tupdesc, 6, &arg2_isnull);
+			// 	// prel->atttype = AT_DATE;
+
+			// 	if (arg1_isnull || arg2_isnull)
+			// 		ereport(ERROR, (errmsg("Range relation should be of type either INTEGER or DATE")));
+			// }
 			rangerel->ranges[rangerel->nranges++] = re;
 
 			prel->children[prel->children_count++] = re.child_oid;

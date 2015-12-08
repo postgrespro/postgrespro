@@ -50,6 +50,13 @@ PG_FUNCTION_INFO_V1( on_partitions_updated );
 PG_FUNCTION_INFO_V1( on_partitions_removed );
 
 
+typedef struct
+{
+	Oid old_varno;
+	Oid new_varno;
+} change_varno_context;
+
+
 /*
  * Entry point
  */
@@ -274,6 +281,9 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEnt
 	Index		childRTindex;
 	AppendRelInfo *appinfo;
 
+	Node *node;
+	ListCell *lc;
+
 	/* Create RangeTblEntry for child relation */
 	childrte = copyObject(rte);
 	childrte->relid = childOID;
@@ -285,8 +295,52 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEnt
 
 	/* Create RelOptInfo */
 	childrel = build_simple_rel(root, childRTindex, RELOPT_BASEREL);
-	childrel->reltargetlist = rel->reltargetlist;
-	childrel->baserestrictinfo = list_copy(rel->baserestrictinfo);
+
+	/* copy targetlist */
+	childrel->reltargetlist = NIL;
+	foreach(lc, rel->reltargetlist)
+	{
+		Node *new_target;
+
+		node = (Node *) lfirst(lc);
+		new_target = copyObject(node);
+		change_varnos(new_target, rel->relid, childrel->relid);
+		childrel->reltargetlist = lappend(childrel->reltargetlist, new_target);
+	}
+
+	/* copy restrictions */
+	childrel->baserestrictinfo = NIL;
+	foreach(lc, rel->baserestrictinfo)
+	{
+		RestrictInfo *new_rinfo;
+
+		node = (Node *) lfirst(lc);
+		new_rinfo = copyObject(node);
+
+		/* replace old relids with new ones */
+		change_varnos(new_rinfo->clause, rel->relid, childrel->relid);
+		change_varnos(new_rinfo->left_em->em_expr, rel->relid, childrel->relid);
+		change_varnos(new_rinfo->right_em->em_expr, rel->relid, childrel->relid);
+
+		/* TODO: find some elegant way to do this */
+		if (bms_is_member(rel->relid, new_rinfo->clause_relids))
+		{
+			bms_del_member(new_rinfo->clause_relids, rel->relid);
+			bms_add_member(new_rinfo->clause_relids, childrel->relid);
+		}
+		if (bms_is_member(rel->relid, new_rinfo->left_relids))
+		{
+			bms_del_member(new_rinfo->left_relids, rel->relid);
+			bms_add_member(new_rinfo->left_relids, childrel->relid);
+		}
+		if (bms_is_member(rel->relid, new_rinfo->right_relids))
+		{
+			bms_del_member(new_rinfo->right_relids, rel->relid);
+			bms_add_member(new_rinfo->right_relids, childrel->relid);
+		}
+		childrel->baserestrictinfo = lappend(childrel->baserestrictinfo,
+											 new_rinfo);
+	}
 
 	/* Build an AppendRelInfo for this parent and child */
 	appinfo = makeNode(AppendRelInfo);
@@ -298,6 +352,37 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEnt
 
 	ereport(LOG,
 			(errmsg("Relation %u appended", childOID)));
+}
+
+
+void
+change_varnos(Node *node, Oid old_varno, Oid new_varno)
+{
+	change_varno_context context;
+	context.old_varno = old_varno;
+	context.new_varno = new_varno;
+
+	change_varno_walker(node, &context);
+}
+
+void
+change_varno_walker(Node *node, change_varno_context *context)
+{
+	if (node == NULL)
+		return false;
+	if (IsA(node, Var))
+	{
+		Var		   *var = (Var *) node;
+
+		if (var->varno == context->old_varno)
+			var->varno = context->new_varno;
+		return false;
+	}
+
+	/* Should not find an unplanned subquery */
+	Assert(!IsA(node, Query));
+
+	return expression_tree_walker(node, change_varno_walker, (void *) context);
 }
 
 
@@ -368,10 +453,10 @@ handle_binary_opexpr(const PartRelationInfo *prel, const OpExpr *expr,
 					return ALL;
 			}
 		case PT_RANGE:
-			if (c->consttype == DATEOID)
-				value = TimeTzADTPGetDatum(date2timestamp_no_overflow(c->constvalue));
-			else
-				value = c->constvalue;
+			// if (c->consttype == DATEOID)
+			// 	value = TimeTzADTPGetDatum(date2timestamp_no_overflow(c->constvalue));
+			// else
+			value = c->constvalue;
 			rangerel = (RangeRelation *)
 				hash_search(range_restrictions, (const void *)&prel->oid, HASH_FIND, NULL);
 			if (rangerel != NULL)

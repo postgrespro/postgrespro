@@ -25,10 +25,10 @@ CREATE TABLE IF NOT EXISTS @extschema@.pg_pathman_hash_rels (
 CREATE TABLE IF NOT EXISTS @extschema@.pg_pathman_range_rels (
     id         SERIAL PRIMARY KEY,
     parent     VARCHAR(127),
-    min_int    INTEGER,
-    max_int    INTEGER,
-    min_dt     TIMESTAMPTZ,
-    max_dt     TIMESTAMPTZ,
+    min_num    DOUBLE PRECISION,
+    max_num    DOUBLE PRECISION,
+    min_dt     TIMESTAMP,
+    max_dt     TIMESTAMP,
     child      VARCHAR(127) 
 );
 
