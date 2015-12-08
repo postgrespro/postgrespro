@@ -5,7 +5,7 @@ CREATE OR REPLACE FUNCTION create_range_partitions(
     v_relation TEXT
     , v_attribute TEXT
     , v_start_timestamp TIMESTAMP
-    , v_interval INTERVAL
+    , v_interval TEXT
     , v_premake INTEGER)
 RETURNS VOID AS
 $$
@@ -26,9 +26,13 @@ BEGIN
         SELECT current_date INTO v_dt;
     END IF;
 
+    /* create first partition */
     PERFORM create_single_range_partition(v_relation
                                           , v_dt
                                           , v_interval);
+
+    /* premake further partitions */
+    PERFORM append_range_partitions(v_relation, v_interval, v_premake);
 
     INSERT INTO pg_pathman_rels (
         relname
@@ -76,7 +80,7 @@ BEGIN
         LOOP
             PERFORM create_single_range_partition(v_relation
                                                   , v_part_timestamp
-                                                  , v_interval::INTERVAL);
+                                                  , v_interval);
             v_part_timestamp := v_part_timestamp + v_interval::INTERVAL;
         END LOOP;
     ELSIF NOT v_part_num IS NULL THEN
@@ -85,7 +89,7 @@ BEGIN
         LOOP
             PERFORM create_single_range_partition(v_relation
                                                   , v_part_timestamp
-                                                  , v_interval::INTEGER);
+                                                  , v_interval);
             v_part_timestamp := v_part_timestamp + v_interval;
         END LOOP;
     END IF;
@@ -99,8 +103,8 @@ $$ LANGUAGE plpgsql;
  */
 CREATE OR REPLACE FUNCTION create_single_range_partition(
     v_parent_relname TEXT
-    , v_start_timestamp TIMESTAMPTZ
-    , v_interval INTERVAL)
+    , v_start_timestamp TIMESTAMP
+    , v_interval TEXT)
 RETURNS VOID AS
 $$
 DECLARE
@@ -127,7 +131,7 @@ BEGIN
     INSERT INTO pg_pathman_range_rels (parent, min_dt, max_dt, child)
     VALUES (v_parent_relname
             , v_start_timestamp
-            , v_start_timestamp + v_interval
+            , v_start_timestamp + v_interval::INTERVAL
             , v_child_relname);
 END
 $$ LANGUAGE plpgsql;

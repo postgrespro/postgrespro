@@ -319,8 +319,10 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEnt
 
 		/* replace old relids with new ones */
 		change_varnos(new_rinfo->clause, rel->relid, childrel->relid);
-		change_varnos(new_rinfo->left_em->em_expr, rel->relid, childrel->relid);
-		change_varnos(new_rinfo->right_em->em_expr, rel->relid, childrel->relid);
+		if (new_rinfo->left_em)
+			change_varnos(new_rinfo->left_em->em_expr, rel->relid, childrel->relid);
+		if (new_rinfo->right_em)
+			change_varnos(new_rinfo->right_em->em_expr, rel->relid, childrel->relid);
 
 		/* TODO: find some elegant way to do this */
 		if (bms_is_member(rel->relid, new_rinfo->clause_relids))
@@ -800,8 +802,11 @@ on_partitions_updated(PG_FUNCTION_ARGS) {
 	relid = DatumGetInt32(PG_GETARG_DATUM(0));
 	prel = (PartRelationInfo *)
 		hash_search(relations, (const void *) &relid, HASH_FIND, 0);
-	prel->children_count = 0;
-	load_part_relations_hashtable();
+	if (prel != NULL)
+	{
+		prel->children_count = 0;
+		load_part_relations_hashtable();
+	}
 	LWLockRelease(AddinShmemInitLock);
 
 	PG_RETURN_NULL();
