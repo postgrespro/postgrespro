@@ -9,9 +9,7 @@ DATA = pathman--0.1.sql
 PGFILEDESC = "pathman - partitioning tool"
 
 REGRESS = pathman
-
-$(EXTENSION)--$(EXTVERSION).sql: sql/init.sql sql/hash.sql sql/range.sql
-	cat $^ > $@
+EXTRA_CLEAN = $(EXTENSION)--$(EXTVERSION).sql
 
 ifdef USE_PGXS
 PG_CONFIG = pg_config
@@ -23,3 +21,6 @@ top_builddir = ../..
 include $(top_builddir)/src/Makefile.global
 include $(top_srcdir)/contrib/contrib-global.mk
 endif
+
+$(EXTENSION)--$(EXTVERSION).sql: sql/init.sql sql/hash.sql sql/range.sql
+	cat $^ > $@
