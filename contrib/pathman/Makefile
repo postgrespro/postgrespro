@@ -5,7 +5,8 @@ OBJS = init.o pathman.o $(WIN32RES)
 
 EXTENSION = pathman
 EXTVERSION = 0.1
-DATA = pathman--0.1.sql
+DATA = $(EXTENSION)--$(EXTVERSION).sql
+DATA_built = $(EXTENSION)--$(EXTVERSION).sql
 PGFILEDESC = "pathman - partitioning tool"
 
 REGRESS = pathman
