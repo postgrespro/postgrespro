@@ -18,8 +18,7 @@
 typedef enum PartType
 {
 	PT_HASH = 1,
-	PT_RANGE,
-	PT_LIST
+	PT_RANGE
 } PartType;
 
 /*

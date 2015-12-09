@@ -210,7 +210,9 @@ load_range_restrictions(Oid parent_oid)
 								"rr.min_dt, "
 								"rr.max_dt - '1 microsecond'::INTERVAL, "
 								"rr.min_dt::DATE, "
-								"(rr.max_dt - '1 day'::INTERVAL)::DATE "
+								"(rr.max_dt - '1 day'::INTERVAL)::DATE, "
+								"rr.min_num::INTEGER, "
+								"rr.max_num::INTEGER - 1 "
 								"FROM pg_pathman_range_rels rr "
 								"JOIN pg_class p ON p.relname = rr.parent "
 								"JOIN pg_class c ON c.relname = rr.child "
@@ -224,6 +226,10 @@ load_range_restrictions(Oid parent_oid)
     	TupleDesc tupdesc = SPI_tuptable->tupdesc;
         SPITupleTable *tuptable = SPI_tuptable;
 
+		rangerel = (RangeRelation *)
+			hash_search(range_restrictions, (void *) &parent_oid, HASH_ENTER, &found);
+		rangerel->nranges = 0;
+
         for (i=0; i<proc; i++)
         {
         	Datum min;
@@ -233,9 +239,6 @@ load_range_restrictions(Oid parent_oid)
 
 			// int parent_oid = DatumGetObjectId(SPI_getbinval(tuple, tupdesc, 1, &arg1_isnull));
 			re.child_oid = DatumGetObjectId(SPI_getbinval(tuple, tupdesc, 2, &arg1_isnull));
-
-			rangerel = (RangeRelation *)
-				hash_search(range_restrictions, (void *) &parent_oid, HASH_ENTER, &found);
 
 			/* date */
 			// switch (prinfo->atttype)
@@ -263,6 +266,12 @@ load_range_restrictions(Oid parent_oid)
 				case TIMESTAMPOID:
 					re.min = SPI_getbinval(tuple, tupdesc, 5, &arg1_isnull);
 					re.max = SPI_getbinval(tuple, tupdesc, 6, &arg2_isnull);
+					break;
+				case INT2OID:
+				case INT4OID:
+				case INT8OID:
+					re.min = SPI_getbinval(tuple, tupdesc, 9, &arg1_isnull);
+					re.max = SPI_getbinval(tuple, tupdesc, 10, &arg2_isnull);
 					break;
 				default:
 					re.min = SPI_getbinval(tuple, tupdesc, 3, &arg1_isnull);

@@ -45,20 +45,23 @@ static void set_plain_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblE
 static void set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte);
 static List *accumulate_append_subpath(List *subpaths, Path *path);
 
+PG_FUNCTION_INFO_V1( on_partitions_created );
+PG_FUNCTION_INFO_V1( on_partitions_updated );
+PG_FUNCTION_INFO_V1( on_partitions_removed );
+
 typedef struct
 {
 	Oid old_varno;
 	Oid new_varno;
 } change_varno_context;
 
+static void change_varnos_in_restrinct_info(RestrictInfo *rinfo, Oid old_varno, Oid new_varno);
 static void change_varnos(Node *node, Oid old_varno, Oid new_varno);
 static bool change_varno_walker(Node *node, change_varno_context *context);
-
 
 PG_FUNCTION_INFO_V1( on_partitions_created );
 PG_FUNCTION_INFO_V1( on_partitions_updated );
 PG_FUNCTION_INFO_V1( on_partitions_removed );
-
 
 
 /*
@@ -181,11 +184,11 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 
 		// }
 
-		if (length(children) > 0)
+		if (list_length(children) > 0)
 		{
 			RelOptInfo **new_rel_array;
 			RangeTblEntry **new_rte_array;
-			int len = length(children);
+			int len = list_length(children);
 
 			/* Expand simple_rel_array and simple_rte_array */
 			ereport(LOG, (errmsg("Expanding simple_rel_array")));
@@ -322,28 +325,8 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEnt
 		new_rinfo = copyObject(node);
 
 		/* replace old relids with new ones */
-		change_varnos(new_rinfo->clause, rel->relid, childrel->relid);
-		if (new_rinfo->left_em)
-			change_varnos(new_rinfo->left_em->em_expr, rel->relid, childrel->relid);
-		if (new_rinfo->right_em)
-			change_varnos(new_rinfo->right_em->em_expr, rel->relid, childrel->relid);
+		change_varnos_in_restrinct_info(new_rinfo, rel->relid, childrel->relid);
 
-		/* TODO: find some elegant way to do this */
-		if (bms_is_member(rel->relid, new_rinfo->clause_relids))
-		{
-			bms_del_member(new_rinfo->clause_relids, rel->relid);
-			bms_add_member(new_rinfo->clause_relids, childrel->relid);
-		}
-		if (bms_is_member(rel->relid, new_rinfo->left_relids))
-		{
-			bms_del_member(new_rinfo->left_relids, rel->relid);
-			bms_add_member(new_rinfo->left_relids, childrel->relid);
-		}
-		if (bms_is_member(rel->relid, new_rinfo->right_relids))
-		{
-			bms_del_member(new_rinfo->right_relids, rel->relid);
-			bms_add_member(new_rinfo->right_relids, childrel->relid);
-		}
 		childrel->baserestrictinfo = lappend(childrel->baserestrictinfo,
 											 new_rinfo);
 	}
@@ -371,7 +354,11 @@ change_varnos(Node *node, Oid old_varno, Oid new_varno)
 	change_varno_walker(node, &context);
 }
 
+<<<<<<< HEAD
 static bool
+=======
+bool
+>>>>>>> pathman:
 change_varno_walker(Node *node, change_varno_context *context)
 {
 	if (node == NULL)
@@ -389,6 +376,42 @@ change_varno_walker(Node *node, change_varno_context *context)
 	Assert(!IsA(node, Query));
 
 	return expression_tree_walker(node, change_varno_walker, (void *) context);
+}
+
+
+void
+change_varnos_in_restrinct_info(RestrictInfo *rinfo, Oid old_varno, Oid new_varno)
+{
+	ListCell *lc;
+
+	change_varnos((Node *) rinfo->clause, old_varno, new_varno);
+	if (rinfo->left_em)
+		change_varnos((Node *) rinfo->left_em->em_expr, old_varno, new_varno);
+	if (rinfo->right_em)
+		change_varnos((Node *) rinfo->right_em->em_expr, old_varno, new_varno);
+	if (rinfo->orclause)
+		foreach(lc, ((BoolExpr *) rinfo->orclause)->args)
+		{
+			RestrictInfo *rinfo2 = (RestrictInfo *) lfirst(lc);
+			change_varnos_in_restrinct_info(rinfo2, old_varno, new_varno);
+		}
+
+	/* TODO: find some elegant way to do this */
+	if (bms_is_member(old_varno, rinfo->clause_relids))
+	{
+		bms_del_member(rinfo->clause_relids, old_varno);
+		bms_add_member(rinfo->clause_relids, new_varno);
+	}
+	if (bms_is_member(old_varno, rinfo->left_relids))
+	{
+		bms_del_member(rinfo->left_relids, old_varno);
+		bms_add_member(rinfo->left_relids, new_varno);
+	}
+	if (bms_is_member(old_varno, rinfo->right_relids))
+	{
+		bms_del_member(rinfo->right_relids, old_varno);
+		bms_add_member(rinfo->right_relids, new_varno);
+	}
 }
 
 
@@ -432,7 +455,6 @@ handle_binary_opexpr(const PartRelationInfo *prel, const OpExpr *expr,
 	HashRelation	   *hashrel;
 	RangeRelation	   *rangerel;
 	int					int_value;
-	DateADT				dt_value;
 	Datum				value;
 	int i, j;
 	int startidx, endidx;
@@ -459,9 +481,6 @@ handle_binary_opexpr(const PartRelationInfo *prel, const OpExpr *expr,
 					return ALL;
 			}
 		case PT_RANGE:
-			// if (c->consttype == DATEOID)
-			// 	value = TimeTzADTPGetDatum(date2timestamp_no_overflow(c->constvalue));
-			// else
 			value = c->constvalue;
 			rangerel = (RangeRelation *)
 				hash_search(range_restrictions, (const void *)&prel->oid, HASH_FIND, NULL);
@@ -471,8 +490,9 @@ handle_binary_opexpr(const PartRelationInfo *prel, const OpExpr *expr,
 				List	   *children = NIL;
 				bool		found = false;
 				startidx = 0;
-				endidx = rangerel->nranges-1;
 				int counter = 0;
+
+				endidx = rangerel->nranges-1;
 
 				/* check boundaries */
 				if (rangerel->nranges == 0 || rangerel->ranges[0].min > value ||
@@ -553,7 +573,7 @@ handle_opexpr(const OpExpr *expr, const PartRelationInfo *prel)
 	Node *firstarg = NULL;
 	Node *secondarg = NULL;
 
-	if (length(expr->args) == 2)
+	if (list_length(expr->args) == 2)
 	{
 		firstarg = (Node*) linitial(expr->args);
 		secondarg = (Node*) lsecond(expr->args);
@@ -796,10 +816,8 @@ on_partitions_created(PG_FUNCTION_ARGS) {
 
 Datum
 on_partitions_updated(PG_FUNCTION_ARGS) {
-	HashRelationKey		key;
 	Oid					relid;
 	PartRelationInfo   *prel;
-	int i;
 
 	LWLockAcquire(AddinShmemInitLock, LW_EXCLUSIVE);
 	/* parent relation oid */
