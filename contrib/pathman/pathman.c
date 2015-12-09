@@ -45,16 +45,20 @@ static void set_plain_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblE
 static void set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte);
 static List *accumulate_append_subpath(List *subpaths, Path *path);
 
-PG_FUNCTION_INFO_V1( on_partitions_created );
-PG_FUNCTION_INFO_V1( on_partitions_updated );
-PG_FUNCTION_INFO_V1( on_partitions_removed );
-
-
 typedef struct
 {
 	Oid old_varno;
 	Oid new_varno;
 } change_varno_context;
+
+static void change_varnos(Node *node, Oid old_varno, Oid new_varno);
+static bool change_varno_walker(Node *node, change_varno_context *context);
+
+
+PG_FUNCTION_INFO_V1( on_partitions_created );
+PG_FUNCTION_INFO_V1( on_partitions_updated );
+PG_FUNCTION_INFO_V1( on_partitions_removed );
+
 
 
 /*
@@ -357,7 +361,7 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEnt
 }
 
 
-void
+static void
 change_varnos(Node *node, Oid old_varno, Oid new_varno)
 {
 	change_varno_context context;
@@ -367,7 +371,7 @@ change_varnos(Node *node, Oid old_varno, Oid new_varno)
 	change_varno_walker(node, &context);
 }
 
-void
+static bool
 change_varno_walker(Node *node, change_varno_context *context)
 {
 	if (node == NULL)
