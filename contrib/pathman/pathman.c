@@ -827,6 +827,9 @@ on_partitions_removed(PG_FUNCTION_ARGS) {
 	prel = (PartRelationInfo *)
 		hash_search(relations, (const void *) &relid, HASH_FIND, 0);
 
+	if (!prel)
+		PG_RETURN_NULL();
+
 	/* remove children relations */
 	switch (prel->parttype)
 	{

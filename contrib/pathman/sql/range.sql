@@ -159,7 +159,14 @@ RETURNS VOID AS
 $$
 DECLARE
     v_child_relname TEXT;
+    v_check TEXT;
+    v_min_value TEXT;
+    v_max_value TEXT;
+    v_attname TEXT;
 BEGIN
+    v_attname := attname FROM pg_pathman_rels
+                 WHERE relname = v_parent_relname;
+
     IF v_type = 'time' THEN
         v_child_relname := format('%s_%s'
                                  , v_parent_relname
@@ -190,13 +197,24 @@ BEGIN
                 , v_start_value::TIMESTAMP
                 , v_start_value::TIMESTAMP + v_interval::INTERVAL
                 , v_child_relname);
+        v_min_value := to_char(v_start_value::TIMESTAMP, 'YYYY-MM-DD HH:MI:SS');
+        v_max_value := to_char(v_start_value::TIMESTAMP + v_interval::INTERVAL, 'YYYY-MM-DD HH:MI:SS');
     ELSIF v_type = 'num' THEN
         INSERT INTO pg_pathman_range_rels (parent, min_num, max_num, child)
         VALUES (v_parent_relname
                 , v_start_value::DOUBLE PRECISION
                 , v_start_value::DOUBLE PRECISION + v_interval::DOUBLE PRECISION
                 , v_child_relname);
+        v_min_value := v_start_value::DOUBLE PRECISION;
+        v_max_value := v_start_value::DOUBLE PRECISION + v_interval::DOUBLE PRECISION;
     END IF;
+
+    EXECUTE format('ALTER TABLE %s ADD CHECK (%s >= ''%s'' AND %s < ''%s'')'
+                   , v_child_relname
+                   , v_attname
+                   , v_min_value
+                   , v_attname
+                   , v_max_value);
 END
 $$ LANGUAGE plpgsql;
 
@@ -290,6 +308,24 @@ BEGIN
         EXECUTE format('DROP TABLE %s', v_rec.child);
     END LOOP;
 
+    DELETE FROM pg_pathman_rels WHERE relname = relation;
+    DELETE FROM pg_pathman_range_rels WHERE parent = relation;
+
+    /* Notify backend about changes */
+    PERFORM pg_pathman_on_remove_partitions(v_relid);
+END
+$$ LANGUAGE plpgsql;
+
+/*
+ *
+ */
+CREATE OR REPLACE FUNCTION disable_range_partitions(IN relation TEXT)
+RETURNS VOID AS
+$$
+DECLARE
+    v_relid INTEGER;
+    v_rec   RECORD;
+BEGIN
     DELETE FROM pg_pathman_rels WHERE relname = relation;
     DELETE FROM pg_pathman_range_rels WHERE parent = relation;
 
