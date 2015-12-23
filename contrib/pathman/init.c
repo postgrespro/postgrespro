@@ -14,9 +14,8 @@ void
 init(void)
 {
 	initialization_needed = false;
+	create_dsm_segment(32);
 	load_part_relations_hashtable();
-	// load_hash_restrictions_hashtable();
-	// load_range_restrictions_hashtable();
 }
 
 void
@@ -30,57 +29,65 @@ load_part_relations_hashtable()
 	List *part_oids = NIL;
 	ListCell *lc;
 
-	SPI_connect();
-	ret = SPI_exec("SELECT pg_class.relfilenode, pg_attribute.attnum, pg_pathman_rels.parttype, pg_attribute.atttypid "
-				   "FROM pg_pathman_rels "
-				   "JOIN pg_class ON pg_class.relname = pg_pathman_rels.relname "
-				   "JOIN pg_attribute ON pg_attribute.attname = pg_pathman_rels.attname "
-				   "AND attrelid = pg_class.relfilenode", 0);
-	proc = SPI_processed;
+	LWLockAcquire(load_config_lock, LW_EXCLUSIVE);
 
-	if (ret > 0 && SPI_tuptable != NULL)
+	/* if hashtable is empty */
+	if (hash_get_num_entries(relations) == 0)
 	{
-		TupleDesc tupdesc = SPI_tuptable->tupdesc;
-		SPITupleTable *tuptable = SPI_tuptable;
+		SPI_connect();
+		ret = SPI_exec("SELECT pg_class.relfilenode, pg_attribute.attnum, pg_pathman_rels.parttype, pg_attribute.atttypid "
+					   "FROM pg_pathman_rels "
+					   "JOIN pg_class ON pg_class.relname = pg_pathman_rels.relname "
+					   "JOIN pg_attribute ON pg_attribute.attname = pg_pathman_rels.attname "
+					   "AND attrelid = pg_class.relfilenode", 0);
+		proc = SPI_processed;
 
-		for (i=0; i<proc; i++)
+		if (ret > 0 && SPI_tuptable != NULL)
 		{
-			HeapTuple tuple = tuptable->vals[i];
+			TupleDesc tupdesc = SPI_tuptable->tupdesc;
+			SPITupleTable *tuptable = SPI_tuptable;
 
-			int oid = DatumGetObjectId(SPI_getbinval(tuple, tupdesc, 1, &isnull));
+			for (i=0; i<proc; i++)
+			{
+				HeapTuple tuple = tuptable->vals[i];
+
+				int oid = DatumGetObjectId(SPI_getbinval(tuple, tupdesc, 1, &isnull));
+				prinfo = (PartRelationInfo*)
+					hash_search(relations, (const void *)&oid, HASH_ENTER, NULL);
+				prinfo->oid = oid;
+				prinfo->attnum = DatumGetInt32(SPI_getbinval(tuple, tupdesc, 2, &isnull));
+				prinfo->parttype = DatumGetInt32(SPI_getbinval(tuple, tupdesc, 3, &isnull));
+				prinfo->atttype = DatumGetObjectId(SPI_getbinval(tuple, tupdesc, 4, &isnull));
+
+				part_oids = lappend_int(part_oids, oid);
+
+				/* children will be filled in later */
+				// prinfo->children = NIL;
+			}
+		}
+
+		/* load children information */
+		foreach(lc, part_oids)
+		{
+			Oid oid = (int) lfirst_int(lc);
+
 			prinfo = (PartRelationInfo*)
-				hash_search(relations, (const void *)&oid, HASH_ENTER, NULL);
-			prinfo->oid = oid;
-			prinfo->attnum = DatumGetInt32(SPI_getbinval(tuple, tupdesc, 2, &isnull));
-			prinfo->parttype = DatumGetInt32(SPI_getbinval(tuple, tupdesc, 3, &isnull));
-			prinfo->atttype = DatumGetObjectId(SPI_getbinval(tuple, tupdesc, 4, &isnull));
+				hash_search(relations, (const void *)&oid, HASH_FIND, NULL);	
 
-			part_oids = lappend_int(part_oids, oid);
-
-			/* children will be filled in later */
-			// prinfo->children = NIL;
+			switch(prinfo->parttype)
+			{
+				case PT_RANGE:
+					load_range_restrictions(oid);
+					break;
+				case PT_HASH:
+					load_hash_restrictions(oid);
+					break;
+			}
 		}
+		SPI_finish();
 	}
 
-	/* load children information */
-	foreach(lc, part_oids)
-	{
-		Oid oid = (int) lfirst_int(lc);
-
-		prinfo = (PartRelationInfo*)
-			hash_search(relations, (const void *)&oid, HASH_FIND, NULL);	
-
-		switch(prinfo->parttype)
-		{
-			case PT_RANGE:
-				load_range_restrictions(oid);
-				break;
-			case PT_HASH:
-				load_hash_restrictions(oid);
-				break;
-		}
-	}
-	SPI_finish();
+	LWLockRelease(load_config_lock);
 }
 
 void
@@ -97,8 +104,9 @@ create_part_relations_hashtable()
 		hash_destroy(relations);
 
 	relations = ShmemInitHash("Partitioning relation info",
-							  16, 16,
-							  &ctl, HASH_ELEM | HASH_BLOBS);
+							  32, 32,
+							  &ctl, HASH_ELEM);
+							  // &ctl, HASH_ELEM | HASH_BLOBS);
 }
 
 void
@@ -137,6 +145,11 @@ load_hash_restrictions(Oid parent_oid)
     {
     	TupleDesc tupdesc = SPI_tuptable->tupdesc;
         SPITupleTable *tuptable = SPI_tuptable;
+        Oid *children;
+
+        /* allocate an array of children Oids */
+        alloc_dsm_array(&prel->children, sizeof(Oid), proc);
+        children = (Oid *) dsm_array_get_pointer(&prel->children);
 
         for (i=0; i<proc; i++)
         {
@@ -151,7 +164,8 @@ load_hash_restrictions(Oid parent_oid)
 			hashrel->child_oid = child_oid;
 
 			/* appending children to PartRelationInfo */
-			prel->children[prel->children_count++] = child_oid;
+			// prel->children[prel->children_count++] = child_oid;
+			children[prel->children_count++] = child_oid;
         }
     }
 
@@ -225,10 +239,18 @@ load_range_restrictions(Oid parent_oid)
     {
     	TupleDesc tupdesc = SPI_tuptable->tupdesc;
         SPITupleTable *tuptable = SPI_tuptable;
+        Oid *children;
+        RangeEntry *ranges;
 
 		rangerel = (RangeRelation *)
 			hash_search(range_restrictions, (void *) &parent_oid, HASH_ENTER, &found);
 		rangerel->nranges = 0;
+
+        alloc_dsm_array(&prel->children, sizeof(Oid), proc);
+        children = (Oid *) dsm_array_get_pointer(&prel->children);
+
+        alloc_dsm_array(&rangerel->ranges, sizeof(RangeEntry), proc);
+        ranges = (RangeEntry *) dsm_array_get_pointer(&rangerel->ranges);
 
         for (i=0; i<proc; i++)
         {
@@ -279,22 +301,9 @@ load_range_restrictions(Oid parent_oid)
 					break;
 			}
 
-			// re.min = SPI_getbinval(tuple, tupdesc, 3, &arg1_isnull);
-			// re.max = SPI_getbinval(tuple, tupdesc, 4, &arg2_isnull);
-			// // prel->atttype = AT_INT;
-
-			// if (arg1_isnull || arg2_isnull)
-			// {
-			// 	re.min = SPI_getbinval(tuple, tupdesc, 5, &arg1_isnull);
-			// 	re.max = SPI_getbinval(tuple, tupdesc, 6, &arg2_isnull);
-			// 	// prel->atttype = AT_DATE;
-
-			// 	if (arg1_isnull || arg2_isnull)
-			// 		ereport(ERROR, (errmsg("Range relation should be of type either INTEGER or DATE")));
-			// }
-			rangerel->ranges[rangerel->nranges++] = re;
-
-			prel->children[prel->children_count++] = re.child_oid;
+			ranges[rangerel->nranges++] = re;
+			// prel->children[prel->children_count++] = re.child_oid;
+			children[prel->children_count++] = re.child_oid;
         }
     }
 

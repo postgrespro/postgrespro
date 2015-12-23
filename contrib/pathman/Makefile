@@ -1,7 +1,7 @@
 # contrib/pathman/Makefile
 
 MODULE_big = pathman
-OBJS = init.o pathman.o $(WIN32RES)
+OBJS = init.o pathman.o dsm_array.o $(WIN32RES)
 
 EXTENSION = pathman
 EXTVERSION = 0.1

@@ -1,6 +1,8 @@
 #include "postgres.h"
 #include "utils/date.h"
 #include "utils/hsearch.h"
+#include "storage/dsm.h"
+#include "storage/lwlock.h"
 
 
 #define ALL NIL
@@ -11,6 +13,8 @@
 #define OP_STRATEGY_EQ 3
 #define OP_STRATEGY_GE 4
 #define OP_STRATEGY_GT 5
+
+#define BLOCKS_COUNT 1024
 
 /*
  * Partitioning type
@@ -36,6 +40,33 @@ typedef union rng_type
 	DateADT	date;
 } rng_type;
 
+
+/*
+ * Dynamic shared memory array
+ */
+typedef struct DsmArray
+{
+	dsm_handle	segment;
+	size_t		offset;
+	size_t		length;
+} DsmArray;
+
+typedef struct Block
+{
+	dsm_handle	segment;
+	size_t		offset;
+	bool		is_free;
+} Block;
+
+typedef struct Table
+{
+	dsm_handle	segment;
+	Block	blocks[BLOCKS_COUNT];
+	size_t	block_size;
+	size_t	first_free;
+} Table;
+
+
 /*
  * PartRelationInfo
  *		Per-relation partitioning information
@@ -50,7 +81,8 @@ typedef struct PartRelationInfo
 	Oid			oid;
 	// List	   *children;
 	/* TODO: is there any better solution to store children in shared memory? */
-	Oid			children[MAX_PARTITIONS];
+	// Oid			children[MAX_PARTITIONS];
+	DsmArray    children;
 	int			children_count;
 	PartType	parttype;
 	Index		attnum;
@@ -94,8 +126,27 @@ typedef struct RangeRelation
 {
 	Oid			parent_oid;
 	int			nranges;
-	RangeEntry	ranges[64];
+	// RangeEntry	ranges[64];
+	DsmArray    ranges;
 } RangeRelation;
+
+
+LWLock *load_config_lock;
+LWLock *dsm_init_lock;
+
+
+// Table *init_dsm_table(size_t block_size);
+// DsmArray *alloc_dsm_array(size_t entry_size, size_t length);
+// void free_dsm_array(DsmArray *array);
+// void *get_dsm_array(const ArrayPtr* ptr);
+
+void alloc_dsm_table();
+void create_dsm_segment(size_t block_size);
+void init_dsm_table(Table *tbl, dsm_handle h, size_t block_size);
+void alloc_dsm_array(DsmArray *arr, size_t entry_size, size_t length);
+void free_dsm_array(DsmArray *arr);
+void *dsm_array_get_pointer(const DsmArray* arr);
+
 
 HTAB *relations;
 HTAB *hash_restrictions;

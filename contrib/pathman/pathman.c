@@ -125,8 +125,15 @@ my_planner_hook(Query *parse, int cursorOptions, ParamListInfo boundParams)
 static void
 my_shmem_startup(void)
 {
+	/* initialize locks */
+	RequestAddinLWLocks(2);
+	load_config_lock = LWLockAssign();
+	dsm_init_lock    = LWLockAssign();
+
 	LWLockAcquire(AddinShmemInitLock, LW_EXCLUSIVE);
 
+	/* allocate shared memory objects */
+	alloc_dsm_table();
 	create_part_relations_hashtable();
 	create_hash_restrictions_hashtable();
 	create_range_restrictions_hashtable();
@@ -156,11 +163,14 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 		ListCell	   *lc;
 		int	childOID = -1;
 		int	i;
+		Oid *dsm_arr;
 
 		rte->inh = true;
 
+		dsm_arr = (Oid *) dsm_array_get_pointer(&prel->children);
 		for (i=0; i<prel->children_count; i++)
-			children = lappend_int(children, prel->children[i]);
+			// children = lappend_int(children, prel->children[i]);
+			children = lappend_int(children, dsm_arr[i]);
 
 		/* Run over restrictions and collect children partitions */
 		ereport(LOG, (errmsg("Checking restrictions")));
@@ -487,13 +497,28 @@ handle_binary_opexpr(const PartRelationInfo *prel, const OpExpr *expr,
 				bool		found = false;
 				startidx = 0;
 				int counter = 0;
+				RangeEntry *ranges = dsm_array_get_pointer(&rangerel->ranges);
 
 				endidx = rangerel->nranges-1;
 
 				/* check boundaries */
-				if (rangerel->nranges == 0 || rangerel->ranges[0].min > value ||
-					rangerel->ranges[rangerel->nranges-1].max < value)
-					return ALL;
+				if (rangerel->nranges == 0)
+				{
+					*all = true;
+					return NIL;
+				}
+				else if ((check_gt(cmp_func, ranges[0].min, value) && (strategy == BTGreaterStrategyNumber || strategy == BTGreaterEqualStrategyNumber)) ||
+						 (check_lt(cmp_func, ranges[rangerel->nranges-1].max, value) && (strategy == BTLessStrategyNumber || strategy == BTLessEqualStrategyNumber)))
+				{
+					*all = true;
+					return NIL;
+				}
+				else if (check_gt(cmp_func, ranges[0].min, value) ||
+						 check_lt(cmp_func, ranges[rangerel->nranges-1].max, value))
+				{
+					*all = false;
+					return NIL;
+				}
 
 				/* binary search */
 				while (true)
@@ -501,8 +526,8 @@ handle_binary_opexpr(const PartRelationInfo *prel, const OpExpr *expr,
 					i = startidx + (endidx - startidx) / 2;
 					if (i >= 0 && i < rangerel->nranges)
 					{
-						re = &rangerel->ranges[i];
-						if (re->min <= value && value <= re->max)
+						re = &ranges[i];
+						if (check_le(cmp_func, re->min, value) && check_le(cmp_func, value, re->max))
 						{
 							found = true;
 							break;
@@ -543,7 +568,9 @@ handle_binary_opexpr(const PartRelationInfo *prel, const OpExpr *expr,
 							endidx = rangerel->nranges-1;
 					}
 					for (j=startidx; j<=endidx; j++)
-						children = lappend_int(children, rangerel->ranges[j].child_oid);
+						children = lappend_int(children, ranges[j].child_oid);
+
+					*all = false;
 					return children;
 				}
 			}
