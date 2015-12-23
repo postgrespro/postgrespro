@@ -121,16 +121,17 @@ BEGIN
     relid := relfilenode FROM pg_class WHERE relname = relation;
     partitions_count := COUNT(*) FROM pg_pathman_hash_rels WHERE parent = relation;
 
+    DELETE FROM pg_pathman_rels WHERE relname = relation;
+    DELETE FROM pg_pathman_hash_rels WHERE parent = relation;
+
     IF partitions_count > 0 THEN
-        RETURN
+        RETURN;
+    END IF;
 
     FOR partnum IN 0..partitions_count-1
     LOOP
         EXECUTE format(q, relation, partnum);
     END LOOP;
-
-    DELETE FROM pg_pathman_rels WHERE relname = relation;
-    DELETE FROM pg_pathman_hash_rels WHERE parent = relation;
 
     /* Notify backend about changes */
     PERFORM pg_pathman_on_remove_partitions(relid);

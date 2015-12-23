@@ -829,9 +829,15 @@ accumulate_append_subpath(List *subpaths, Path *path)
  */
 Datum
 on_partitions_created(PG_FUNCTION_ARGS) {
-	/* Reload config */
+	Oid relid;
+
 	LWLockAcquire(load_config_lock, LW_EXCLUSIVE);
+
+	/* Reload config */
+	/* TODO: reload just the specified relation */
+	// relid = DatumGetInt32(PG_GETARG_DATUM(0))
 	load_part_relations_hashtable();
+
 	LWLockRelease(load_config_lock);
 
 	PG_RETURN_NULL();

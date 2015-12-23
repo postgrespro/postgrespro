@@ -1,0 +1,79 @@
+CREATE EXTENSION pathman;
+CREATE TABLE hash_rel (
+    id      SERIAL PRIMARY KEY,
+    value   INTEGER);
+SELECT create_hash_partitions('hash_rel', 'value', 3);
+NOTICE:  trigger "hash_rel_insert_trigger" for relation "hash_rel" does not exist, skipping
+NOTICE:  function hash_rel_hash_insert_trigger_func() does not exist, skipping
+NOTICE:  trigger "hash_rel_update_trigger" for relation "hash_rel" does not exist, skipping
+NOTICE:  function hash_rel_hash_update_trigger_func() does not exist, skipping
+ create_hash_partitions 
+------------------------
+ 
+(1 row)
+
+INSERT INTO hash_rel VALUES (1, 1);
+INSERT INTO hash_rel VALUES (2, 2);
+INSERT INTO hash_rel VALUES (3, 3);
+INSERT INTO hash_rel VALUES (4, 4);
+INSERT INTO hash_rel VALUES (5, 5);
+INSERT INTO hash_rel VALUES (6, 6);
+EXPLAIN SELECT * FROM hash_rel;
+                           QUERY PLAN                            
+-----------------------------------------------------------------
+ Append  (cost=0.00..97.80 rows=0 width=0)
+   ->  Seq Scan on hash_rel_0  (cost=0.00..32.60 rows=0 width=0)
+   ->  Seq Scan on hash_rel_1  (cost=0.00..32.60 rows=0 width=0)
+   ->  Seq Scan on hash_rel_2  (cost=0.00..32.60 rows=0 width=0)
+(4 rows)
+
+EXPLAIN SELECT * FROM hash_rel WHERE value = 2;
+                           QUERY PLAN                            
+-----------------------------------------------------------------
+ Append  (cost=0.00..32.60 rows=0 width=0)
+   ->  Seq Scan on hash_rel_2  (cost=0.00..32.60 rows=0 width=0)
+         Filter: (value = 2)
+(3 rows)
+
+SELECT drop_hash_partitions('hash_rel');
+NOTICE:  trigger "hash_rel_update_trigger" for relation "hash_rel" does not exist, skipping
+NOTICE:  function hash_rel_hash_update_trigger_func() does not exist, skipping
+ drop_hash_partitions 
+----------------------
+ 
+(1 row)
+
+DROP TABLE hash_rel CASCADE;
+NOTICE:  drop cascades to 3 other objects
+DETAIL:  drop cascades to table hash_rel_0
+drop cascades to table hash_rel_1
+drop cascades to table hash_rel_2
+CREATE TABLE num_range_rel (
+    id SERIAL PRIMARY KEY,
+    txt TEXT);
+SELECT create_range_partitions('num_range_rel', 'id', 'num', '0', '1000', 3);
+ create_range_partitions 
+-------------------------
+ 
+(1 row)
+
+INSERT INTO num_range_rel SELECT g, md5(g::TEXT) FROM generate_series(1, 3000) as g;
+VACUUM;
+EXPLAIN SELECT * FROM num_range_rel WHERE id > 2500;
+                               QUERY PLAN                                
+-------------------------------------------------------------------------
+ Append  (cost=0.00..20.01 rows=0 width=0)
+   ->  Seq Scan on num_range_rel_2000  (cost=0.00..19.00 rows=0 width=0)
+         Filter: (id > 2500)
+   ->  Seq Scan on num_range_rel_3000  (cost=0.00..1.01 rows=0 width=0)
+         Filter: (id > 2500)
+(5 rows)
+
+SELECT drop_range_partitions('num_range_rel');
+ drop_range_partitions 
+-----------------------
+ 
+(1 row)
+
+DROP TABLE num_range_rel CASCADE;
+DROP EXTENSION pathman;

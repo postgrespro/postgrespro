@@ -33,8 +33,8 @@ load_part_relations_hashtable()
 	ListCell *lc;
 
 	/* if hashtable is empty */
-	if (hash_get_num_entries(relations) == 0)
-	{
+	// if (hash_get_num_entries(relations) == 0)
+	// {
 		SPI_connect();
 		ret = SPI_exec("SELECT pg_class.relfilenode, pg_attribute.attnum, pg_pathman_rels.parttype, pg_attribute.atttypid "
 					   "FROM pg_pathman_rels "
@@ -86,7 +86,7 @@ load_part_relations_hashtable()
 			}
 		}
 		SPI_finish();
-	}
+	// }
 }
 
 void

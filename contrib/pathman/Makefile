@@ -5,7 +5,6 @@ OBJS = init.o pathman.o dsm_array.o $(WIN32RES)
 
 EXTENSION = pathman
 EXTVERSION = 0.1
-DATA = $(EXTENSION)--$(EXTVERSION).sql
 DATA_built = $(EXTENSION)--$(EXTVERSION).sql
 PGFILEDESC = "pathman - partitioning tool"
 
