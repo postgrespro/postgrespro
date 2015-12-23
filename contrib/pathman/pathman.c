@@ -830,9 +830,9 @@ accumulate_append_subpath(List *subpaths, Path *path)
 Datum
 on_partitions_created(PG_FUNCTION_ARGS) {
 	/* Reload config */
-	LWLockAcquire(AddinShmemInitLock, LW_EXCLUSIVE);
+	LWLockAcquire(load_config_lock, LW_EXCLUSIVE);
 	load_part_relations_hashtable();
-	LWLockRelease(AddinShmemInitLock);
+	LWLockRelease(load_config_lock);
 
 	PG_RETURN_NULL();
 }
@@ -842,53 +842,33 @@ on_partitions_updated(PG_FUNCTION_ARGS) {
 	Oid					relid;
 	PartRelationInfo   *prel;
 
-	LWLockAcquire(AddinShmemInitLock, LW_EXCLUSIVE);
 	/* parent relation oid */
 	relid = DatumGetInt32(PG_GETARG_DATUM(0));
 	prel = (PartRelationInfo *)
 		hash_search(relations, (const void *) &relid, HASH_FIND, 0);
 	if (prel != NULL)
 	{
-		prel->children_count = 0;
+		LWLockAcquire(load_config_lock, LW_EXCLUSIVE);
+		remove_relation_info(relid);
 		load_part_relations_hashtable();
+		LWLockRelease(load_config_lock);
 	}
-	LWLockRelease(AddinShmemInitLock);
 
 	PG_RETURN_NULL();
 }
 
 Datum
 on_partitions_removed(PG_FUNCTION_ARGS) {
-	HashRelationKey		key;
 	Oid					relid;
-	PartRelationInfo   *prel;
 	int i;
 
-	LWLockAcquire(AddinShmemInitLock, LW_EXCLUSIVE);
+	LWLockAcquire(load_config_lock, LW_EXCLUSIVE);
 
 	/* parent relation oid */
 	relid = DatumGetInt32(PG_GETARG_DATUM(0));
-	prel = (PartRelationInfo *)
-		hash_search(relations, (const void *) &relid, HASH_FIND, 0);
+	remove_relation_info(relid);
 
-	/* remove children relations */
-	switch (prel->parttype)
-	{
-		case PT_HASH:
-			for (i=0; i<prel->children_count; i++)
-			{
-				key.parent_oid = relid;
-				key.hash = i;
-				hash_search(hash_restrictions, (const void *) &key, HASH_REMOVE, 0);
-			}
-			break;
-		case PT_RANGE:
-			hash_search(range_restrictions, (const void *) &relid, HASH_REMOVE, 0);
-	}
-	prel->children_count = 0;
-	hash_search(relations, (const void *) &relid, HASH_REMOVE, 0);
-
-	LWLockRelease(AddinShmemInitLock);
+	LWLockRelease(load_config_lock);
 
 	PG_RETURN_NULL();
 }

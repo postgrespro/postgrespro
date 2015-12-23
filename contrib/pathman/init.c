@@ -15,7 +15,10 @@ init(void)
 {
 	initialization_needed = false;
 	create_dsm_segment(32);
+
+	LWLockAcquire(load_config_lock, LW_EXCLUSIVE);
 	load_part_relations_hashtable();
+	LWLockRelease(load_config_lock);
 }
 
 void
@@ -28,8 +31,6 @@ load_part_relations_hashtable()
 	bool isnull;
 	List *part_oids = NIL;
 	ListCell *lc;
-
-	LWLockAcquire(load_config_lock, LW_EXCLUSIVE);
 
 	/* if hashtable is empty */
 	if (hash_get_num_entries(relations) == 0)
@@ -86,8 +87,6 @@ load_part_relations_hashtable()
 		}
 		SPI_finish();
 	}
-
-	LWLockRelease(load_config_lock);
 }
 
 void
@@ -324,4 +323,46 @@ create_range_restrictions_hashtable()
 	range_restrictions = ShmemInitHash("pg_pathman range restrictions",
 									   512, 512,
 									   &ctl, HASH_ELEM | HASH_BLOBS);
+}
+
+/*
+ * Remove partitions
+ */
+void
+remove_relation_info(Oid relid)
+{
+	PartRelationInfo   *prel;
+	HashRelationKey		key;
+	RangeRelation	   *rangerel;
+	int i;
+
+	prel = (PartRelationInfo *)
+		hash_search(relations, (const void *) &relid, HASH_FIND, 0);
+
+	/* if there is nothing to remove then just return */
+	if (!prel)
+		return;
+
+	/* remove children relations */
+	switch (prel->parttype)
+	{
+		case PT_HASH:
+			for (i=0; i<prel->children_count; i++)
+			{
+				key.parent_oid = relid;
+				key.hash = i;
+				hash_search(hash_restrictions, (const void *) &key, HASH_REMOVE, 0);
+			}
+			free_dsm_array(&prel->children);
+			break;
+		case PT_RANGE:
+			rangerel = (RangeRelation *)
+				hash_search(range_restrictions, (const void *) &relid, HASH_FIND, 0);
+			free_dsm_array(&rangerel->ranges);
+			free_dsm_array(&prel->children);
+			hash_search(range_restrictions, (const void *) &relid, HASH_REMOVE, 0);
+			break;
+	}
+	prel->children_count = 0;
+	hash_search(relations, (const void *) &relid, HASH_REMOVE, 0);
 }

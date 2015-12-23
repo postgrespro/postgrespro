@@ -161,3 +161,4 @@ void create_range_restrictions_hashtable(void);
 void load_part_relations_hashtable(void);
 void load_hash_restrictions(Oid relid);
 void load_range_restrictions(Oid relid);
+void remove_relation_info(Oid relid);
