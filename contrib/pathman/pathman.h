@@ -14,7 +14,7 @@
 #define OP_STRATEGY_GE 4
 #define OP_STRATEGY_GT 5
 
-#define BLOCKS_COUNT 1024
+#define BLOCKS_COUNT 10240
 
 /*
  * Partitioning type
