@@ -21,6 +21,13 @@ init(void)
 	LWLockRelease(load_config_lock);
 }
 
+static bool
+check_extension()
+{
+	SPI_exec("SELECT * FROM pg_extension WHERE extname = 'pathman'", 0);
+	return SPI_processed > 0;
+}
+
 void
 load_part_relations_hashtable()
 {
@@ -32,61 +39,65 @@ load_part_relations_hashtable()
 	List *part_oids = NIL;
 	ListCell *lc;
 
-	/* if hashtable is empty */
-	// if (hash_get_num_entries(relations) == 0)
-	// {
-		SPI_connect();
-		ret = SPI_exec("SELECT pg_class.relfilenode, pg_attribute.attnum, pg_pathman_rels.parttype, pg_attribute.atttypid "
-					   "FROM pg_pathman_rels "
-					   "JOIN pg_class ON pg_class.relname = pg_pathman_rels.relname "
-					   "JOIN pg_attribute ON pg_attribute.attname = pg_pathman_rels.attname "
-					   "AND attrelid = pg_class.relfilenode", 0);
-		proc = SPI_processed;
+	SPI_connect();
 
-		if (ret > 0 && SPI_tuptable != NULL)
-		{
-			TupleDesc tupdesc = SPI_tuptable->tupdesc;
-			SPITupleTable *tuptable = SPI_tuptable;
-
-			for (i=0; i<proc; i++)
-			{
-				HeapTuple tuple = tuptable->vals[i];
-
-				int oid = DatumGetObjectId(SPI_getbinval(tuple, tupdesc, 1, &isnull));
-				prinfo = (PartRelationInfo*)
-					hash_search(relations, (const void *)&oid, HASH_ENTER, NULL);
-				prinfo->oid = oid;
-				prinfo->attnum = DatumGetInt32(SPI_getbinval(tuple, tupdesc, 2, &isnull));
-				prinfo->parttype = DatumGetInt32(SPI_getbinval(tuple, tupdesc, 3, &isnull));
-				prinfo->atttype = DatumGetObjectId(SPI_getbinval(tuple, tupdesc, 4, &isnull));
-
-				part_oids = lappend_int(part_oids, oid);
-
-				/* children will be filled in later */
-				// prinfo->children = NIL;
-			}
-		}
-
-		/* load children information */
-		foreach(lc, part_oids)
-		{
-			Oid oid = (int) lfirst_int(lc);
-
-			prinfo = (PartRelationInfo*)
-				hash_search(relations, (const void *)&oid, HASH_FIND, NULL);	
-
-			switch(prinfo->parttype)
-			{
-				case PT_RANGE:
-					load_range_restrictions(oid);
-					break;
-				case PT_HASH:
-					load_hash_restrictions(oid);
-					break;
-			}
-		}
+	/* if extension wasn't created then just quit */
+	if (!check_extension())
+	{
 		SPI_finish();
-	// }
+		return;
+	}
+
+	ret = SPI_exec("SELECT pg_class.relfilenode, pg_attribute.attnum, pg_pathman_rels.parttype, pg_attribute.atttypid "
+				   "FROM pg_pathman_rels "
+				   "JOIN pg_class ON pg_class.relname = pg_pathman_rels.relname "
+				   "JOIN pg_attribute ON pg_attribute.attname = pg_pathman_rels.attname "
+				   "AND attrelid = pg_class.relfilenode", 0);
+	proc = SPI_processed;
+
+	if (ret > 0 && SPI_tuptable != NULL)
+	{
+		TupleDesc tupdesc = SPI_tuptable->tupdesc;
+		SPITupleTable *tuptable = SPI_tuptable;
+
+		for (i=0; i<proc; i++)
+		{
+			HeapTuple tuple = tuptable->vals[i];
+
+			int oid = DatumGetObjectId(SPI_getbinval(tuple, tupdesc, 1, &isnull));
+			prinfo = (PartRelationInfo*)
+				hash_search(relations, (const void *)&oid, HASH_ENTER, NULL);
+			prinfo->oid = oid;
+			prinfo->attnum = DatumGetInt32(SPI_getbinval(tuple, tupdesc, 2, &isnull));
+			prinfo->parttype = DatumGetInt32(SPI_getbinval(tuple, tupdesc, 3, &isnull));
+			prinfo->atttype = DatumGetObjectId(SPI_getbinval(tuple, tupdesc, 4, &isnull));
+
+			part_oids = lappend_int(part_oids, oid);
+
+			/* children will be filled in later */
+			// prinfo->children = NIL;
+		}
+	}
+
+	/* load children information */
+	foreach(lc, part_oids)
+	{
+		Oid oid = (int) lfirst_int(lc);
+
+		prinfo = (PartRelationInfo*)
+			hash_search(relations, (const void *)&oid, HASH_FIND, NULL);	
+
+		switch(prinfo->parttype)
+		{
+			case PT_RANGE:
+				load_range_restrictions(oid);
+				break;
+			case PT_HASH:
+				load_hash_restrictions(oid);
+				break;
+		}
+	}
+	SPI_finish();
 }
 
 void
