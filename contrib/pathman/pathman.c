@@ -160,6 +160,7 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 	if (prel != NULL)
 	{
 		List *children = NIL;
+		List *ranges;
 		ListCell	   *lc;
 		int	childOID = -1;
 		int	i;
@@ -168,22 +169,33 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 		rte->inh = true;
 
 		dsm_arr = (Oid *) dsm_array_get_pointer(&prel->children);
-		for (i=0; i<prel->children_count; i++)
-			// children = lappend_int(children, prel->children[i]);
-			children = lappend_int(children, dsm_arr[i]);
+		// for (i=0; i<prel->children_count; i++)
+		// 	// children = lappend_int(children, prel->children[i]);
+		// 	children = lappend_int(children, dsm_arr[i]);
+
+		ranges = list_make1_int(make_range(0, prel->children_count-1));
 
 		/* Run over restrictions and collect children partitions */
 		ereport(LOG, (errmsg("Checking restrictions")));
 		foreach(lc, rel->baserestrictinfo)
 		{
 			RestrictInfo *rinfo = (RestrictInfo*) lfirst(lc);
-			List *ret = walk_expr_tree(rinfo->clause, prel);
+			List *ret = walk_expr_tree(rinfo->clause, prel, &all);
+			ranges = intersect_ranges(ranges, ret);
 
-			if (ret != ALL)
-			{
-				children = list_intersection_int(children, ret);
-				list_free(ret);
-			}
+			// if (!all)
+			// {
+			// 	children = list_intersection_int(children, ret);
+			// 	list_free(ret);
+			// }
+		}
+
+		foreach(lc, ranges)
+		{
+			int i;
+			IndexRange range = (IndexRange) lfirst(lc);
+			for (i=range_min(range); i<=range_max(range); i++)
+				children = lappend_int(children, dsm_arr[i]);
 		}
 
 		// if (children == NIL)
@@ -339,6 +351,9 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEnt
 
 		childrel->baserestrictinfo = lappend(childrel->baserestrictinfo,
 											 new_rinfo);
+
+		/* TODO: temporarily commented out */
+		// reconstruct_restrictinfo((Node *) new_rinfo, prel, childOID);
 	}
 
 	/* Build an AppendRelInfo for this parent and child */
@@ -477,14 +492,20 @@ handle_binary_opexpr(const PartRelationInfo *prel, const OpExpr *expr,
 			{
 				int_value = DatumGetInt32(c->constvalue);
 				key.hash = make_hash(prel, int_value);
-				key.parent_oid = prel->oid;
-				hashrel = (HashRelation *)
-					hash_search(hash_restrictions, (const void *)&key, HASH_FIND, NULL);
 
-				if (hashrel != NULL)
-					return list_make1_int(hashrel->child_oid);
-				else
-					return ALL;
+				return list_make1_int(make_range(key.hash, key.hash));
+
+				// key.parent_oid = prel->oid;
+				// hashrel = (HashRelation *)
+				// 	hash_search(hash_restrictions, (const void *)&key, HASH_FIND, NULL);
+
+				// if (hashrel != NULL)
+				// 	return list_make1_int(hashrel->child_oid);
+				// else
+				// {
+				// 	*all = true;
+				// 	return NIL;
+				// }
 			}
 		case PT_RANGE:
 			value = c->constvalue;
@@ -493,7 +514,7 @@ handle_binary_opexpr(const PartRelationInfo *prel, const OpExpr *expr,
 			if (rangerel != NULL)
 			{
 				RangeEntry *re;
-				List	   *children = NIL;
+				// List	   *children = NIL;
 				bool		found = false;
 				startidx = 0;
 				int counter = 0;
@@ -557,9 +578,11 @@ handle_binary_opexpr(const PartRelationInfo *prel, const OpExpr *expr,
 							startidx = 0;
 							endidx = i;
 							break;
-						case OP_STRATEGY_EQ:
-							return list_make1_int(re->child_oid);
-						case OP_STRATEGY_GE:
+						case BTEqualStrategyNumber:
+							// return list_make1_int(re->child_oid);
+							// return list_make1_int(make_range(prel->oid, prel->oid));
+							return list_make1_int(make_range(i, i));
+						case BTGreaterEqualStrategyNumber:
 							startidx = i;
 							endidx = rangerel->nranges-1;
 							break;
@@ -567,11 +590,12 @@ handle_binary_opexpr(const PartRelationInfo *prel, const OpExpr *expr,
 							startidx = (re->max == value) ? i+1 : i;
 							endidx = rangerel->nranges-1;
 					}
-					for (j=startidx; j<=endidx; j++)
-						children = lappend_int(children, ranges[j].child_oid);
-
+					// for (j=startidx; j<=endidx; j++)
+					// 	children = lappend_int(children, ranges[j].child_oid);
 					*all = false;
-					return children;
+					return list_make1_int(make_range(startidx, endidx));
+
+					// return children;
 				}
 			}
 	}
@@ -630,22 +654,46 @@ handle_boolexpr(const BoolExpr *expr, const PartRelationInfo *prel)
 		b = walk_expr_tree((Expr*)lfirst(lc), prel);
 		switch(expr->boolop)
 		{
+			// case OR_EXPR:
+			// 	if (sub_all)
+			// 	{
+			// 		list_free(ret);
+			// 		ret = NIL;
+
+			// 		/*
+			// 		 * if at least one subexpr returns all partitions then
+			// 		 * the whole OR-expression does
+			// 		 */
+			// 		*all = true;
+
+			// 		/* so we just could return here */
+			// 		return ret;
+			// 	}
+			// 	else
+			// 	{
+			// 		ret = list_concat_unique_int(ret, b);
+			// 		list_free(b);
+			// 	}
+			// 	break;
+			// case AND_EXPR:
+			// 	ret = list_intersection_int(ret, b);
+			// 	list_free(b);
+
+			// 	/*
+			// 	 * if even one subexpr doesn't return all partitions then
+			// 	 * the whole AND-expression doesn't.
+			// 	 */
+			// 	if (!sub_all)
+			// 		all = false;
+			// 	break;
+
 			case OR_EXPR:
-				if (b == ALL)
-				{
-					list_free(ret);
-					ret = ALL;
-				}
-				else
-				{
-					ret = list_concat_unique_int(ret, b);
-					list_free(b);
-					b = ALL;
-				}
+				ret = unite_ranges(ret, b);
+				// list_free(b);
 				break;
 			case AND_EXPR:
-				ret = list_intersection_int(ret, b);
-				list_free(b);
+				ret = intersect_ranges(ret, b);
+				// list_free(b);
 				break;
 			default:
 				break;
@@ -695,13 +743,14 @@ handle_arrexpr(const ScalarArrayOpExpr *expr, const PartRelationInfo *prel)
 		for (i=0; i<num_elems; i++)
 		{
 			key.hash = make_hash(prel, elem_values[i]);
-			key.parent_oid = prel->oid;
-			hashrel = (HashRelation *)
-				hash_search(hash_restrictions, (const void *)&key, HASH_FIND, NULL);
+			// key.parent_oid = prel->oid;
+			// hashrel = (HashRelation *)
+			// 	hash_search(hash_restrictions, (const void *)&key, HASH_FIND, NULL);
 
-			if (hashrel != NULL)
-				oids = list_append_unique_int(oids, hashrel->child_oid);
+			// if (hashrel != NULL)
+			// 	oids = list_append_unique_int(oids, hashrel->child_oid);
 
+			oids = list_append_unique_int(oids, make_range(key.hash, key.hash));
 		}
 
 		/* free resources */
@@ -829,7 +878,7 @@ accumulate_append_subpath(List *subpaths, Path *path)
  */
 Datum
 on_partitions_created(PG_FUNCTION_ARGS) {
-	Oid relid;
+	// Oid relid;
 
 	LWLockAcquire(load_config_lock, LW_EXCLUSIVE);
 
@@ -866,7 +915,6 @@ on_partitions_updated(PG_FUNCTION_ARGS) {
 Datum
 on_partitions_removed(PG_FUNCTION_ARGS) {
 	Oid					relid;
-	int i;
 
 	LWLockAcquire(load_config_lock, LW_EXCLUSIVE);
 

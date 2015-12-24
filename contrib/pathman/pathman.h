@@ -1,6 +1,7 @@
 #include "postgres.h"
 #include "utils/date.h"
 #include "utils/hsearch.h"
+#include "nodes/pg_list.h"
 #include "storage/dsm.h"
 #include "storage/lwlock.h"
 
@@ -130,6 +131,25 @@ typedef struct RangeRelation
 	DsmArray    ranges;
 } RangeRelation;
 
+
+typedef int IndexRange;
+#define RANGE_INFINITY 0xFFFF
+
+#define make_range(min, max) \
+	((min) << 16 | ((max) & 0x0000FFFF))
+
+#define range_min(range) \
+	((range) >> 16)
+
+#define range_max(range) \
+	((range) & 0x0000FFFF)
+
+// Range make_range(int min, int max);
+// int range_min(Range range);
+// int range_max(Range range);
+List *append_range(List *a_lst, IndexRange b);
+List *intersect_ranges(List *a, List *b);
+List *unite_ranges(List *a, List *b);
 
 LWLock *load_config_lock;
 LWLock *dsm_init_lock;

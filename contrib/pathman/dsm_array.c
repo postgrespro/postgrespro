@@ -19,7 +19,7 @@ alloc_dsm_table()
 
 void create_dsm_segment(size_t block_size)
 {
-	bool foundPtr;
+	// bool foundPtr;
 	dsm_handle handle;
 
 	/* lock here */
