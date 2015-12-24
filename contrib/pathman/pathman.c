@@ -649,6 +649,9 @@ handle_boolexpr(const BoolExpr *expr, const PartRelationInfo *prel)
 	List *ret = ALL;
 	List *b = ALL;
 
+	if (expr->boolop == AND_EXPR)
+		ret = list_make1_int(make_range(0, RANGE_INFINITY));
+
 	foreach (lc, expr->args)
 	{
 		b = walk_expr_tree((Expr*)lfirst(lc), prel);

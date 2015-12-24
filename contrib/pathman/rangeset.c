@@ -70,13 +70,23 @@ intersect_ranges(List *a, List *b)
 	List *new_list = NIL;
 	int low, high;
 
+	/* if a or b (or both) are empty then intersections is also empty */
+	if (!a || !b)
+	{
+		if (a)
+			pfree(a);
+		if (b)
+			pfree(b);
+		return NIL;
+	}
+
 	foreach(lcb, b)
 	{
 		IndexRange rb = (IndexRange)lfirst_int(lcb);
 
 		/* if "a" is empty then initialize it with infinite range */
-		if (a == NIL)
-			a = list_make1_int(make_range(0, RANGE_INFINITY));
+		// if (a == NIL)
+		// 	a = list_make1_int(make_range(0, RANGE_INFINITY));
 
 		/* intersect entry from "b" and every entry in "a" */
 		foreach(lca, a)
