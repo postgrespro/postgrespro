@@ -163,6 +163,7 @@ IndexRange irange_union(IndexRange a, IndexRange b);
 IndexRange irange_intersect(IndexRange a, IndexRange b);
 List *irange_list_union(List *a, List *b);
 List *irange_list_intersect(List *a, List *b);
+int irange_list_length(List *rangeset);
 
 
 LWLock *load_config_lock;

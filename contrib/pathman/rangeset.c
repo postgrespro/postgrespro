@@ -155,3 +155,17 @@ irange_list_intersect(List *a, List *b)
 	}
 	return result;
 }
+
+int
+irange_list_length(List *rangeset)
+{
+	ListCell   *lc;
+	int			result = 0;
+
+	foreach (lc, rangeset)
+	{
+		IndexRange irange = lfirst_irange(lc);
+		result = irange_upper(irange) - irange_lower(irange) + 1;
+	}
+	return result;
+}

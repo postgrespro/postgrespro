@@ -46,7 +46,10 @@ static void my_shmem_startup(void);
 static void my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte);
 static PlannedStmt * my_planner_hook(Query *parse, int cursorOptions, ParamListInfo boundParams);
 
-static void append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte, int childOID);
+static void append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti,
+					RangeTblEntry *rte, int index, int childOID, List *wrappers);
+static void set_pathkeys(PlannerInfo *root, RelOptInfo *childrel, Path *path);
+static void disable_inheritance(Query *parse);
 
 static WrapperNode *walk_expr_tree(Expr *expr, const PartRelationInfo *prel);
 static int make_hash(const PartRelationInfo *prel, int value);
@@ -59,17 +62,7 @@ static void set_plain_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblE
 static void set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte);
 static List *accumulate_append_subpath(List *subpaths, Path *path);
 
-PG_FUNCTION_INFO_V1( on_partitions_created );
-PG_FUNCTION_INFO_V1( on_partitions_updated );
-PG_FUNCTION_INFO_V1( on_partitions_removed );
-
-typedef struct
-{
-	Oid old_varno;
-	Oid new_varno;
-} change_varno_context;
-
-static void change_varnos_in_restrinct_info(RestrictInfo *rinfo, Oid old_varno, Oid new_varno);
+static void change_varnos_in_restrinct_info(RestrictInfo *rinfo, change_varno_context *context);
 static void change_varnos(Node *node, Oid old_varno, Oid new_varno);
 static bool change_varno_walker(Node *node, change_varno_context *context);
 
@@ -77,6 +70,24 @@ static bool change_varno_walker(Node *node, change_varno_context *context);
 PG_FUNCTION_INFO_V1( on_partitions_created );
 PG_FUNCTION_INFO_V1( on_partitions_updated );
 PG_FUNCTION_INFO_V1( on_partitions_removed );
+
+
+/*
+ * Compare two Datums with the given comarison function
+ *
+ * flinfo is a pointer to an instance of FmgrInfo
+ * arg1, arg2 are Datum instances
+ */
+#define check_lt(flinfo, arg1, arg2) \
+	((int) FunctionCall2(cmp_func, arg1, arg2) < 0)
+#define check_le(flinfo, arg1, arg2) \
+	((int) FunctionCall2(cmp_func, arg1, arg2) <= 0)
+#define check_eq(flinfo, arg1, arg2) \
+	((int) FunctionCall2(cmp_func, arg1, arg2) == 0)
+#define check_ge(flinfo, arg1, arg2) \
+	((int) FunctionCall2(cmp_func, arg1, arg2) >= 0)
+#define check_gt(flinfo, arg1, arg2) \
+	((int) FunctionCall2(cmp_func, arg1, arg2) > 0)
 
 
 /*
@@ -108,34 +119,52 @@ PlannedStmt *
 my_planner_hook(Query *parse, int cursorOptions, ParamListInfo boundParams)
 {
 	PlannedStmt	  *result;
-	RangeTblEntry *rte;
-	ListCell	  *lc;
-	PartRelationInfo *prel;
 
 	if (initialization_needed)
 		init();
 
-	/* Disable inheritance for relations covered by pathman (only for SELECT for now) */
-	if (parse->commandType == CMD_SELECT)
-	{
-		foreach(lc, parse->rtable)
-		{
-			rte = (RangeTblEntry*) lfirst(lc);
-			if (rte->inh)
-			{
-				/* look up this relation in pathman relations */
-				prel = (PartRelationInfo *)
-					hash_search(relations, (const void *) &rte->relid, HASH_FIND, 0);
-				if (prel != NULL)
-					rte->inh = false;
-			}
-		}
-	}
-
+	disable_inheritance(parse);
 	result = standard_planner(parse, cursorOptions, boundParams);
 	return result;
 }
 
+/*
+ *
+ */
+static void
+disable_inheritance(Query *parse)
+{
+	RangeTblEntry *rte;
+	ListCell	  *lc;
+	PartRelationInfo *prel;
+
+	if (parse->commandType != CMD_SELECT)
+		return;
+
+	foreach(lc, parse->rtable)
+	{
+		rte = (RangeTblEntry*) lfirst(lc);
+		switch(rte->rtekind)
+		{
+			case RTE_RELATION:
+				if (rte->inh)
+				{
+					/* look up this relation in pathman relations */
+					prel = (PartRelationInfo *)
+						hash_search(relations, (const void *) &rte->relid, HASH_FIND, 0);
+					if (prel != NULL)
+						rte->inh = false;
+				}
+				break;
+			case RTE_SUBQUERY:
+				/* recursively disable inheritance for subqueries */
+				disable_inheritance(rte->subquery);
+				break;
+			default:
+				break;
+		}
+	}
+}
 
 static void
 my_shmem_startup(void)
@@ -174,8 +203,8 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 
 	if (prel != NULL)
 	{
-		List *children = NIL;
-		List *ranges;
+		List		   *ranges,
+					   *wrappers;
 		ListCell	   *lc;
 		int	childOID = -1;
 		int	i;
@@ -191,7 +220,7 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 		ranges = list_make1_int(make_irange(0, prel->children_count - 1, false));
 
 		/* Run over restrictions and collect children partitions */
-		ereport(LOG, (errmsg("Checking restrictions")));
+		wrappers = NIL;
 		foreach(lc, rel->baserestrictinfo)
 		{
 			WrapperNode *wrap;
@@ -199,36 +228,16 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 			RestrictInfo *rinfo = (RestrictInfo*) lfirst(lc);
 
 			wrap = walk_expr_tree(rinfo->clause, prel);
+			wrappers = lappend(wrappers, wrap);
 			ranges = irange_list_intersect(ranges, wrap->rangeset);
-
-			// if (!all)
-			// {
-			// 	children = list_intersection_int(children, ret);
-			// 	list_free(ret);
-			// }
 		}
 
-		foreach(lc, ranges)
-		{
-			int i;
-			IndexRange range = (IndexRange) lfirst(lc);
-			for (i = irange_lower(range); i <= irange_upper(range); i++)
-				children = lappend_int(children, dsm_arr[i]);
-		}
-
-		// if (children == NIL)
-		// {
-		// 	ereport(LOG, (errmsg("Restrictions empty. Copy children from partrel")));
-		// 	// children = get_children_oids(partrel);
-		// 	// children = list_copy(partrel->children);
-
-		// }
-
-		if (list_length(children) > 0)
+		/* expand simple_rte_array and simple_rel_array */
+		if (list_length(ranges) > 0)
 		{
 			RelOptInfo **new_rel_array;
 			RangeTblEntry **new_rte_array;
-			int len = list_length(children);
+			int len = irange_list_length(ranges);
 
 			/* Expand simple_rel_array and simple_rte_array */
 			ereport(LOG, (errmsg("Expanding simple_rel_array")));
@@ -252,65 +261,23 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 			root->simple_rte_array = new_rte_array;
 			/* TODO: free old arrays */
 		}
-		else
-		{
-			ereport(LOG, (errmsg("Children count is 0")));
-		}
 
-		ereport(LOG, (errmsg("Appending children")));
-		// Добавляем самого себя
-		// append_child_relation(root, rel, rti, rte, partrel->oid);
-		// {
-		// 	AppendRelInfo *appinfo;
-		// 	appinfo = makeNode(AppendRelInfo);
-		// 	appinfo->parent_relid = rti;
-		// 	appinfo->child_relid = rti;
-		// 	appinfo->parent_reloid = rte->relid;
-		// 	root->append_rel_list = lappend(root->append_rel_list, appinfo);
-		// }
-		// root->hasInheritedTarget = true;
-
-		foreach(lc, children)
+		foreach(lc, ranges)
 		{
-			childOID = (Oid) lfirst_int(lc);
-			append_child_relation(root, rel, rti, rte, childOID);
-			// root->simple_rel_array_size += 1;
+			IndexRange	irange = lfirst_irange(lc);
+			int			i;
+			Oid			childOid;
+
+			for (i = irange_lower(irange); i <= irange_upper(irange); i++)
+			{
+				childOid = dsm_arr[i];
+				append_child_relation(root, rel, rti, rte, i, childOID, wrappers);
+			}
 		}
 
 		/* TODO: clear old path list */
 		rel->pathlist = NIL;
-		// if (root->parse->commandType == CMD_SELECT)
 		set_append_rel_pathlist(root, rel, rti, rte);
-		// else
-		// {
-		// 	set_plain_rel_pathlist(root, rel, rte);
-		// 	/* Set plin pathlist for each child relation */
-		// 	int			parentRTindex = rti;
-		// 	ListCell   *l;
-		// 	foreach(l, root->append_rel_list)
-		// 	{
-		// 		AppendRelInfo *appinfo = (AppendRelInfo *) lfirst(l);
-		// 		int			childRTindex;
-		// 		RangeTblEntry *childRTE;
-		// 		RelOptInfo *childrel;
-
-		// 		/* append_rel_list contains all append rels; ignore others */
-		// 		if (appinfo->parent_relid != parentRTindex || appinfo->parent_relid == rti)
-		// 			continue;
-
-		// 		/* Re-locate the child RTE and RelOptInfo */
-		// 		childRTindex = appinfo->child_relid;
-		// 		// childRTE = root->simple_rte_array[childRTindex];
-		// 		// childrel = root->simple_rel_array[childRTindex];
-		// 		root->simple_rel_array[childRTindex] = NULL;
-
-		// 		/*
-		// 		 * Compute the child's access paths.
-		// 		 */
-		// 		// set_plain_rel_pathlist(root, childrel, childRTE);
-		// 		// set_cheapest(childrel);
-		// 	}
-		// }
 	}
 
 	/* Invoke original hook if needed */
@@ -320,16 +287,21 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 	}
 }
 
-void
-append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte, int childOID)
+static void
+append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti,
+	RangeTblEntry *rte, int index, int childOID, List *wrappers)
 {
 	RangeTblEntry *childrte;
 	RelOptInfo    *childrel;
 	Index		childRTindex;
 	AppendRelInfo *appinfo;
+	PartRelationInfo *prel;
 
 	Node *node;
 	ListCell *lc;
+
+	prel = (PartRelationInfo *)
+			hash_search(relations, (const void *) &rte->relid, HASH_FIND, 0);
 
 	/* Create RangeTblEntry for child relation */
 	childrte = copyObject(rte);
@@ -365,7 +337,8 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEnt
 		new_rinfo = copyObject(node);
 
 		/* replace old relids with new ones */
-		change_varnos_in_restrinct_info(new_rinfo, rel->relid, childrel->relid);
+		// change_varnos_in_restrinct_info(new_rinfo, rel->relid, childrel->relid);
+		change_varnos(new_rinfo, rel->relid, childrel->relid);
 
 		childrel->baserestrictinfo = lappend(childrel->baserestrictinfo,
 											 new_rinfo);
@@ -407,6 +380,19 @@ change_varno_walker(Node *node, change_varno_context *context)
 			var->varno = context->new_varno;
 		return false;
 	}
+	if (IsA(node, RestrictInfo))
+	{
+		change_varnos_in_restrinct_info((RestrictInfo *) node, context);
+		return false;
+	}
+	if (IsA(node, List))
+	{
+		ListCell *lc;
+
+		foreach(lc, (List *) node)
+			change_varno_walker((Node *) lfirst(lc), context);
+		return false;
+	}
 
 	/* Should not find an unplanned subquery */
 	Assert(!IsA(node, Query));
@@ -414,39 +400,45 @@ change_varno_walker(Node *node, change_varno_context *context)
 	return expression_tree_walker(node, change_varno_walker, (void *) context);
 }
 
-
-void
-change_varnos_in_restrinct_info(RestrictInfo *rinfo, Oid old_varno, Oid new_varno)
+static void
+change_varnos_in_restrinct_info(RestrictInfo *rinfo, change_varno_context *context)
 {
 	ListCell *lc;
 
-	change_varnos((Node *) rinfo->clause, old_varno, new_varno);
+	// change_varnos((Node *) rinfo->clause, old_varno, new_varno);
+	change_varno_walker((Node *) rinfo->clause, context);
 	if (rinfo->left_em)
-		change_varnos((Node *) rinfo->left_em->em_expr, old_varno, new_varno);
+		// change_varnos((Node *) rinfo->left_em->em_expr, old_varno, new_varno);
+		change_varno_walker((Node *) rinfo->left_em->em_expr, context);
 	if (rinfo->right_em)
-		change_varnos((Node *) rinfo->right_em->em_expr, old_varno, new_varno);
+		// change_varnos((Node *) rinfo->right_em->em_expr, old_varno, new_varno);
+		change_varno_walker((Node *) rinfo->right_em->em_expr, context);
 	if (rinfo->orclause)
 		foreach(lc, ((BoolExpr *) rinfo->orclause)->args)
 		{
-			RestrictInfo *rinfo2 = (RestrictInfo *) lfirst(lc);
-			change_varnos_in_restrinct_info(rinfo2, old_varno, new_varno);
+			// RestrictInfo *rinfo2 = (RestrictInfo *) lfirst(lc);
+			Node *node = (Node *) lfirst(lc);
+			// if (IsA(node, BoolExpr))
+			// {}
+			// change_varnos_in_restrinct_info(node, context);
+			change_varno_walker(node, context);
 		}
 
 	/* TODO: find some elegant way to do this */
-	if (bms_is_member(old_varno, rinfo->clause_relids))
+	if (bms_is_member(context->old_varno, rinfo->clause_relids))
 	{
-		bms_del_member(rinfo->clause_relids, old_varno);
-		bms_add_member(rinfo->clause_relids, new_varno);
+		bms_del_member(rinfo->clause_relids, context->old_varno);
+		bms_add_member(rinfo->clause_relids, context->new_varno);
 	}
-	if (bms_is_member(old_varno, rinfo->left_relids))
+	if (bms_is_member(context->old_varno, rinfo->left_relids))
 	{
-		bms_del_member(rinfo->left_relids, old_varno);
-		bms_add_member(rinfo->left_relids, new_varno);
+		bms_del_member(rinfo->left_relids, context->old_varno);
+		bms_add_member(rinfo->left_relids, context->new_varno);
 	}
-	if (bms_is_member(old_varno, rinfo->right_relids))
+	if (bms_is_member(context->old_varno, rinfo->right_relids))
 	{
-		bms_del_member(rinfo->right_relids, old_varno);
-		bms_add_member(rinfo->right_relids, new_varno);
+		bms_del_member(rinfo->right_relids, context->old_varno);
+		bms_add_member(rinfo->right_relids, context->new_varno);
 	}
 }
 
@@ -534,6 +526,8 @@ handle_binary_opexpr(const PartRelationInfo *prel, WrapperNode *result,
 				int counter = 0;
 				RangeEntry *ranges = dsm_array_get_pointer(&rangerel->ranges);
 
+				// int res = (int) FunctionCall2(cmp_func, rangerel->ranges[0].min, value);
+
 				endidx = rangerel->nranges-1;
 
 				/* check boundaries */
@@ -567,10 +561,9 @@ handle_binary_opexpr(const PartRelationInfo *prel, WrapperNode *result,
 							found = true;
 							break;
 						}
-						else if (value < re->min)
+						else if (check_lt(cmp_func, value, re->min))
 							endidx = i - 1;
-						// else if (value >= re->max)
-						else if (value > re->max)
+						else if (check_gt(cmp_func, value, re->max))
 							startidx = i + 1;
 					}
 					else
@@ -584,11 +577,11 @@ handle_binary_opexpr(const PartRelationInfo *prel, WrapperNode *result,
 				{
 					switch(strategy)
 					{
-						case OP_STRATEGY_LT:
+						case BTLessStrategyNumber:
 							startidx = 0;
 							endidx = check_eq(cmp_func, re->min, value) ? i - 1 : i;
 							break;
-						case OP_STRATEGY_LE:
+						case BTLessEqualStrategyNumber:
 							startidx = 0;
 							endidx = i;
 							break;
@@ -772,6 +765,7 @@ static void
 set_plain_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
 {
 	Relids		required_outer;
+	Path *path;
 
 	/*
 	 * We don't support pushing join clauses into the quals of a seqscan, but
@@ -781,7 +775,9 @@ set_plain_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
 	required_outer = rel->lateral_relids;
 
 	/* Consider sequential scan */
-	add_path(rel, create_seqscan_path(root, rel, required_outer, 0));
+	path = create_seqscan_path(root, rel, required_outer, 0);
+	add_path(rel, path);
+	set_pathkeys(root, rel, path);
 
 	/* Consider index scans */
 	create_index_paths(root, rel);
@@ -864,6 +860,19 @@ set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
 	if (subpaths_valid)
 		add_path(rel, (Path *) create_append_path(rel, subpaths, NULL));
 
+}
+
+void
+set_pathkeys(PlannerInfo *root, RelOptInfo *childrel, Path *path)
+{
+	ListCell *lc;
+	PathKey *pathkey;
+
+	foreach (lc, root->sort_pathkeys)
+	{
+		pathkey = (PathKey *) lfirst(lc);
+		path->pathkeys = lappend(path->pathkeys, pathkey);
+	}
 }
 
 static List *
