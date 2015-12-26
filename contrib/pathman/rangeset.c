@@ -125,7 +125,28 @@ irange_list_intersect(List *a, List *b)
 		ra = lfirst_irange(ca);
 		rb = lfirst_irange(cb);
 		if (irange_intersects(ra, rb))
-			result = lappend_irange(result, irange_intersect(ra, rb));
+		{
+			IndexRange	intersect, last;
+
+			intersect = irange_intersect(ra, rb);
+			if (result != NIL)
+			{
+				last = llast_irange(result);
+				if (irange_conjuncted(last, intersent) && 
+					irange_is_lossy(last) == irange_is_lossy(intersect))
+				{
+					llast_int(result) = irange_union(last, intersect);
+				}
+				else
+				{
+					result = lappend_irange(result, intersect);
+				}
+			}
+			else
+			{
+				result = lappend_irange(result, intersect);
+			}
+		}
 
 		if (irange_lower(ra) <= irange_lower(rb))
 			ca = lnext(ca);
