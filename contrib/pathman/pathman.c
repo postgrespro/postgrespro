@@ -47,7 +47,8 @@ static void my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry
 static PlannedStmt * my_planner_hook(Query *parse, int cursorOptions, ParamListInfo boundParams);
 
 static void append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti,
-					RangeTblEntry *rte, int index, int childOID, List *wrappers);
+				RangeTblEntry *rte, int index, Oid childOID, List *wrappers);
+static Node *wrapper_make_expression(WrapperNode *wrap, int index, bool *alwaysTrue);
 static void set_pathkeys(PlannerInfo *root, RelOptInfo *childrel, Path *path);
 static void disable_inheritance(Query *parse);
 
@@ -206,7 +207,6 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 		List		   *ranges,
 					   *wrappers;
 		ListCell	   *lc;
-		int	childOID = -1;
 		int	i;
 		Oid *dsm_arr;
 
@@ -265,13 +265,12 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 		foreach(lc, ranges)
 		{
 			IndexRange	irange = lfirst_irange(lc);
-			int			i;
 			Oid			childOid;
 
 			for (i = irange_lower(irange); i <= irange_upper(irange); i++)
 			{
 				childOid = dsm_arr[i];
-				append_child_relation(root, rel, rti, rte, i, childOID, wrappers);
+				append_child_relation(root, rel, rti, rte, i, childOid, wrappers);
 			}
 		}
 
@@ -289,7 +288,7 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 
 static void
 append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti,
-	RangeTblEntry *rte, int index, int childOID, List *wrappers)
+	RangeTblEntry *rte, int index, Oid childOid, List *wrappers)
 {
 	RangeTblEntry *childrte;
 	RelOptInfo    *childrel;
@@ -305,7 +304,7 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti,
 
 	/* Create RangeTblEntry for child relation */
 	childrte = copyObject(rte);
-	childrte->relid = childOID;
+	childrte->relid = childOid;
 	childrte->inh = false;
 	childrte->requiredPerms = 0;
 	root->parse->rtable = lappend(root->parse->rtable, childrte);
@@ -329,15 +328,17 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti,
 
 	/* copy restrictions */
 	childrel->baserestrictinfo = NIL;
-	foreach(lc, rel->baserestrictinfo)
+	foreach(lc, wrappers)
 	{
-		Node *new_rinfo;
+		bool alwaysTrue;
+		WrapperNode *wrap = (WrapperNode *) lfirst(lc);
+		Node *new_rinfo = wrapper_make_expression(wrap, index, &alwaysTrue);
 
-		node = (Node *) lfirst(lc);
-		new_rinfo = copyObject(node);
+		if (alwaysTrue)
+			continue;
+		Assert(new_rinfo);
 
 		/* replace old relids with new ones */
-		// change_varnos_in_restrinct_info(new_rinfo, rel->relid, childrel->relid);
 		change_varnos(new_rinfo, rel->relid, childrel->relid);
 
 		childrel->baserestrictinfo = lappend(childrel->baserestrictinfo,
@@ -353,7 +354,65 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti,
 	root->total_table_pages += (double) childrel->pages;
 
 	ereport(LOG,
-			(errmsg("Relation %u appended", childOID)));
+			(errmsg("Relation %u appended", childOid)));
+}
+
+static Node *
+wrapper_make_expression(WrapperNode *wrap, int index, bool *alwaysTrue)
+{
+	bool	lossy, found;
+
+	*alwaysTrue = false;
+	found = irange_list_find(wrap->rangeset, index, &lossy);
+	if (!found)
+		return NULL;
+	if (!lossy)
+	{
+		*alwaysTrue = true;
+		return NULL;
+	}
+
+	if (IsA(wrap->orig, BoolExpr))
+	{
+		const BoolExpr *expr = (const BoolExpr *) wrap->orig;
+		BoolExpr *result;
+
+		if (expr->boolop == OR_EXPR || expr->boolop == AND_EXPR)
+		{
+			ListCell *lc;
+			List *args;
+
+			foreach (lc, wrap->args)
+			{
+				Node *arg;
+
+				arg = wrapper_make_expression((WrapperNode *)lfirst(lc), index, alwaysTrue);
+				Assert(!(*alwaysTrue));
+				Assert(arg || *alwaysTrue);
+				if (arg)
+					args = lappend(args, arg);
+			}
+
+			Assert(list_length(args) > 1);
+			if (list_length(args) == 1)
+				return (Node *) linitial(args);
+
+			result = (BoolExpr *) palloc(sizeof(BoolExpr));
+			result->xpr.type = T_BoolExpr;
+			result->args = args;
+			result->boolop = expr->boolop;
+			result->location = expr->location;
+			return (Node *)result;
+		}
+		else
+		{
+			return copyObject(wrap->orig);
+		}
+	}
+	else
+	{
+		return copyObject(wrap->orig);
+	}
 }
 
 
@@ -686,6 +745,7 @@ handle_boolexpr(const BoolExpr *expr, const PartRelationInfo *prel)
 				result->rangeset = irange_list_intersect(result->rangeset, arg->rangeset);
 				break;
 			default:
+				result->rangeset = list_make1_irange(make_irange(0, prel->children_count - 1, false));
 				break;
 		}
 	}

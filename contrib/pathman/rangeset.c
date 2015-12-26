@@ -169,3 +169,21 @@ irange_list_length(List *rangeset)
 	}
 	return result;
 }
+
+bool
+irange_list_find(List *rangeset, int index, bool *lossy)
+{
+	ListCell   *lc;
+
+	foreach (lc, rangeset)
+	{
+		IndexRange irange = lfirst_irange(lc);
+		if (index >= irange_lower(irange) && index <= irange_upper(irange))
+		{
+			if (lossy)
+				*lossy = irange_is_lossy(irange);
+			return true;
+		}
+	}
+	return false;
+}

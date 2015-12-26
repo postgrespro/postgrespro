@@ -164,6 +164,7 @@ IndexRange irange_intersect(IndexRange a, IndexRange b);
 List *irange_list_union(List *a, List *b);
 List *irange_list_intersect(List *a, List *b);
 int irange_list_length(List *rangeset);
+bool irange_list_find(List *rangeset, int index, bool *lossy);
 
 
 LWLock *load_config_lock;
@@ -175,7 +176,7 @@ LWLock *dsm_init_lock;
 // void free_dsm_array(DsmArray *array);
 // void *get_dsm_array(const ArrayPtr* ptr);
 
-void alloc_dsm_table();
+void alloc_dsm_table(void);
 void create_dsm_segment(size_t block_size);
 void init_dsm_table(Table *tbl, dsm_handle h, size_t block_size);
 void alloc_dsm_array(DsmArray *arr, size_t entry_size, size_t length);
