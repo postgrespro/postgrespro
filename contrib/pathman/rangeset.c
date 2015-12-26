@@ -132,7 +132,7 @@ irange_list_intersect(List *a, List *b)
 			if (result != NIL)
 			{
 				last = llast_irange(result);
-				if (irange_conjuncted(last, intersent) && 
+				if (irange_conjuncted(last, intersect) && 
 					irange_is_lossy(last) == irange_is_lossy(intersect))
 				{
 					llast_int(result) = irange_union(last, intersect);
@@ -148,9 +148,9 @@ irange_list_intersect(List *a, List *b)
 			}
 		}
 
-		if (irange_lower(ra) <= irange_lower(rb))
+		if (irange_upper(ra) <= irange_upper(rb))
 			ca = lnext(ca);
-		else
+		if (irange_upper(ra) >= irange_upper(rb))
 			cb = lnext(cb);
 	}
 	return result;

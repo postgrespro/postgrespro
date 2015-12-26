@@ -23,6 +23,19 @@
 
 PG_MODULE_MAGIC;
 
+typedef struct
+{
+	Oid old_varno;
+	Oid new_varno;
+} change_varno_context;
+
+typedef struct
+{
+	const Node	   *orig;
+	List		   *args;
+	List		   *rangeset;
+} WrapperNode;
+
 /* Original hooks */
 static set_rel_pathlist_hook_type set_rel_pathlist_hook_original = NULL;
 static shmem_startup_hook_type shmem_startup_hook_original = NULL;
@@ -35,12 +48,12 @@ static PlannedStmt * my_planner_hook(Query *parse, int cursorOptions, ParamListI
 
 static void append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte, int childOID);
 
-static List *walk_expr_tree(Expr *expr, const PartRelationInfo *prel);
+static WrapperNode *walk_expr_tree(Expr *expr, const PartRelationInfo *prel);
 static int make_hash(const PartRelationInfo *prel, int value);
-static List *handle_binary_opexpr(const PartRelationInfo *partrel, const OpExpr *expr, const Var *v, const Const *c);
-static List *handle_opexpr(const OpExpr *expr, const PartRelationInfo *prel);
-static List *handle_boolexpr(const BoolExpr *expr, const PartRelationInfo *prel);
-static List *handle_arrexpr(const ScalarArrayOpExpr *expr, const PartRelationInfo *prel);
+static void handle_binary_opexpr(const PartRelationInfo *prel, WrapperNode *result, const Var *v, const Const *c);
+static WrapperNode *handle_opexpr(const OpExpr *expr, const PartRelationInfo *prel);
+static WrapperNode *handle_boolexpr(const BoolExpr *expr, const PartRelationInfo *prel);
+static WrapperNode *handle_arrexpr(const ScalarArrayOpExpr *expr, const PartRelationInfo *prel);
 
 static void set_plain_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte);
 static void set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte);
@@ -181,9 +194,12 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 		ereport(LOG, (errmsg("Checking restrictions")));
 		foreach(lc, rel->baserestrictinfo)
 		{
+			WrapperNode *wrap;
+
 			RestrictInfo *rinfo = (RestrictInfo*) lfirst(lc);
-			List *ret = walk_expr_tree(rinfo->clause, prel, &all);
-			ranges = irange_list_intersect(ranges, ret);
+
+			wrap = walk_expr_tree(rinfo->clause, prel);
+			ranges = irange_list_intersect(ranges, wrap->rangeset);
 
 			// if (!all)
 			// {
@@ -225,7 +241,7 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 				palloc0((root->simple_rel_array_size + len) * sizeof(RangeTblEntry *));
 
 			/* TODO: use memcpy */
-			for (i=0; i<root->simple_rel_array_size; i++)
+			for (i = 0; i < root->simple_rel_array_size; i++)
 			{
 				new_rel_array[i] = root->simple_rel_array[i];
 				new_rte_array[i] = root->simple_rte_array[i];
@@ -437,12 +453,13 @@ change_varnos_in_restrinct_info(RestrictInfo *rinfo, Oid old_varno, Oid new_varn
 /*
  * Recursive function to walk through conditions tree
  */
-static List *
+static WrapperNode *
 walk_expr_tree(Expr *expr, const PartRelationInfo *prel)
 {
-	BoolExpr		  *boolexpr;
-	OpExpr			  *opexpr;
-	ScalarArrayOpExpr *arrexpr;
+	BoolExpr		   *boolexpr;
+	OpExpr			   *opexpr;
+	ScalarArrayOpExpr  *arrexpr;
+	WrapperNode		   *result;
 
 	switch (expr->type)
 	{
@@ -459,54 +476,50 @@ walk_expr_tree(Expr *expr, const PartRelationInfo *prel)
 			arrexpr = (ScalarArrayOpExpr *) expr;
 			return handle_arrexpr(arrexpr, prel);
 		default:
-			return ALL;
+			result = (WrapperNode *)palloc(sizeof(WrapperNode));
+			result->orig = (const Node *)expr;
+			result->args = NIL;
+			result->rangeset = list_make1_irange(make_irange(0, prel->children_count - 1, true));
+			return result;
 	}
 }
 
 /*
  *	This function determines which partitions should appear in query plan
  */
-static List *
-handle_binary_opexpr(const PartRelationInfo *prel, const OpExpr *expr,
+static void
+handle_binary_opexpr(const PartRelationInfo *prel, WrapperNode *result,
 					 const Var *v, const Const *c)
 {
 	HashRelationKey		key;
 	RangeRelation	   *rangerel;
-	int					int_value;
 	Datum				value;
 	int					i,
 						startidx,
-						endidx;
+						endidx,
+						int_value,
+						strategy;
 	FmgrInfo		   *cmp_func;
+	const OpExpr	   *expr = (const OpExpr *)result->orig;
+	TypeCacheEntry	   *tce;
 
-	*all = false;
 
 	/* determine operator type */
-	TypeCacheEntry *tce = lookup_type_cache(v->vartype,
-		TYPECACHE_EQ_OPR | TYPECACHE_LT_OPR | TYPECACHE_GT_OPR);
-	int strategy = get_op_opfamily_strategy(expr->opno, tce->btree_opf);
+	tce = lookup_type_cache(v->vartype,
+		TYPECACHE_EQ_OPR | TYPECACHE_LT_OPR | TYPECACHE_GT_OPR | TYPECACHE_CMP_PROC | TYPECACHE_CMP_PROC_FINFO);
+	strategy = get_op_opfamily_strategy(expr->opno, tce->btree_opf);
+	cmp_func = &tce->cmp_proc_finfo;
 
 	switch (prel->parttype)
 	{
 		case PT_HASH:
-			if (expr->opno == Int4EqualOperator)
+			if (strategy == BTEqualStrategyNumber)
 			{
 				int_value = DatumGetInt32(c->constvalue);
 				key.hash = make_hash(prel, int_value);
 
-				return list_make1_irange(make_irange(key.hash, key.hash, true));
-
-				// key.parent_oid = prel->oid;
-				// hashrel = (HashRelation *)
-				// 	hash_search(hash_restrictions, (const void *)&key, HASH_FIND, NULL);
-
-				// if (hashrel != NULL)
-				// 	return list_make1_int(hashrel->child_oid);
-				// else
-				// {
-				// 	*all = true;
-				// 	return NIL;
-				// }
+				result->rangeset = list_make1_irange(make_irange(key.hash, key.hash, true));
+				return;
 			}
 		case PT_RANGE:
 			value = c->constvalue;
@@ -526,20 +539,20 @@ handle_binary_opexpr(const PartRelationInfo *prel, const OpExpr *expr,
 				/* check boundaries */
 				if (rangerel->nranges == 0)
 				{
-					*all = true;
-					return NIL;
+					result->rangeset = list_make1_irange(make_irange(startidx, endidx, true));
+					return;
 				}
 				else if ((check_gt(cmp_func, ranges[0].min, value) && (strategy == BTGreaterStrategyNumber || strategy == BTGreaterEqualStrategyNumber)) ||
 						 (check_lt(cmp_func, ranges[rangerel->nranges-1].max, value) && (strategy == BTLessStrategyNumber || strategy == BTLessEqualStrategyNumber)))
 				{
-					*all = true;
-					return NIL;
+					result->rangeset = list_make1_irange(make_irange(startidx, endidx, true));
+					return;
 				}
 				else if (check_gt(cmp_func, ranges[0].min, value) ||
 						 check_lt(cmp_func, ranges[rangerel->nranges-1].max, value))
 				{
-					*all = false;
-					return NIL;
+					result->rangeset = list_make1_irange(make_irange(startidx, endidx, true));
+					return;
 				}
 
 				/* binary search */
@@ -582,7 +595,8 @@ handle_binary_opexpr(const PartRelationInfo *prel, const OpExpr *expr,
 						case BTEqualStrategyNumber:
 							// return list_make1_int(re->child_oid);
 							// return list_make1_int(make_range(prel->oid, prel->oid));
-							return list_make1_irange(make_irange(i, i, true));
+							result->rangeset = list_make1_irange(make_irange(i, i, true));
+							return;
 						case BTGreaterEqualStrategyNumber:
 							startidx = i;
 							endidx = rangerel->nranges-1;
@@ -591,134 +605,120 @@ handle_binary_opexpr(const PartRelationInfo *prel, const OpExpr *expr,
 							startidx = check_eq(cmp_func, re->max, value) ? i + 1 : i;
 							endidx = rangerel->nranges-1;
 					}
-					// for (j=startidx; j<=endidx; j++)
-					// 	children = lappend_int(children, ranges[j].child_oid);
-					*all = false;
-					return list_make1_irange(make_irange(startidx, endidx, true));
-
-					// return children;
+					result->rangeset = list_make1_irange(make_irange(startidx, endidx, true));
+					return;
 				}
 			}
 	}
 
-	return ALL;
+	result->rangeset = list_make1_irange(make_irange(0, prel->children_count - 1, true));
 }
 
 /*
  * Calculates hash value
  */
 static int
-make_hash(const PartRelationInfo *prel, int value) {
+make_hash(const PartRelationInfo *prel, int value)
+{
 	return value % prel->children_count;
 }
 
 /*
  *
  */
-static List *
+static WrapperNode *
 handle_opexpr(const OpExpr *expr, const PartRelationInfo *prel)
 {
-	Node *firstarg = NULL;
-	Node *secondarg = NULL;
+	WrapperNode	*result = (WrapperNode *)palloc(sizeof(WrapperNode));
+	Node		*firstarg = NULL,
+				*secondarg = NULL;
+
+	result->orig = (const Node *)expr;
+	result->args = NIL;
 
 	if (list_length(expr->args) == 2)
 	{
-		firstarg = (Node*) linitial(expr->args);
-		secondarg = (Node*) lsecond(expr->args);
-		if (firstarg->type == T_Var && secondarg->type == T_Const &&
-			((Var*)firstarg)->varattno == prel->attnum)
+		firstarg = (Node *) linitial(expr->args);
+		secondarg = (Node *) lsecond(expr->args);
+
+		if (firstarg->type == T_Var &&
+			secondarg->type == T_Const &&
+			((Var *)firstarg)->varattno == prel->attnum)
 		{
-			return handle_binary_opexpr(prel, expr, (Var*)firstarg, (Const*)secondarg);
+			handle_binary_opexpr(prel, result, (Var *)firstarg, (Const *)secondarg);
+			return result;
 		}
-		else if (secondarg->type == T_Var && firstarg->type == T_Const &&
-			((Var*)secondarg)->varattno == prel->attnum)
+		else if (secondarg->type == T_Var &&
+			firstarg->type == T_Const &&
+			((Var *)secondarg)->varattno == prel->attnum)
 		{
-			return handle_binary_opexpr(prel, expr, (Var*)secondarg, (Const*)firstarg);
+			handle_binary_opexpr(prel, result, (Var *)secondarg, (Const *)firstarg);
+			return result;
 		}
 	}
 
-	return ALL;
+	result->rangeset = list_make1_irange(make_irange(0, prel->children_count - 1, true));
+	return result;
 }
 
 /*
  *
  */
-static List *
+static WrapperNode *
 handle_boolexpr(const BoolExpr *expr, const PartRelationInfo *prel)
 {
-	ListCell *lc;
-	List *ret = ALL;
-	List *b = ALL;
+	WrapperNode	*result = (WrapperNode *)palloc(sizeof(WrapperNode));
+	ListCell	*lc;
+
+	result->orig = (const Node *)expr;
+	result->args = NIL;
 
 	if (expr->boolop == AND_EXPR)
-		ret = list_make1_irange(make_irange(0, RANGE_INFINITY, false));
+		result->rangeset = list_make1_irange(make_irange(0, prel->children_count - 1, false));
+	else
+		result->rangeset = NIL;
 
 	foreach (lc, expr->args)
 	{
-		b = walk_expr_tree((Expr*)lfirst(lc), prel);
+		WrapperNode *arg;
+
+		arg = walk_expr_tree((Expr *)lfirst(lc), prel);
+		result->args = lappend(result->args, arg);
 		switch(expr->boolop)
 		{
-			// case OR_EXPR:
-			// 	if (sub_all)
-			// 	{
-			// 		list_free(ret);
-			// 		ret = NIL;
-
-			// 		/*
-			// 		 * if at least one subexpr returns all partitions then
-			// 		 * the whole OR-expression does
-			// 		 */
-			// 		*all = true;
-
-			// 		/* so we just could return here */
-			// 		return ret;
-			// 	}
-			// 	else
-			// 	{
-			// 		ret = list_concat_unique_int(ret, b);
-			// 		list_free(b);
-			// 	}
-			// 	break;
-			// case AND_EXPR:
-			// 	ret = list_intersection_int(ret, b);
-			// 	list_free(b);
-
-			// 	/*
-			// 	 * if even one subexpr doesn't return all partitions then
-			// 	 * the whole AND-expression doesn't.
-			// 	 */
-			// 	if (!sub_all)
-			// 		all = false;
-			// 	break;
-
 			case OR_EXPR:
-				ret = irange_list_union(ret, b);
-				// list_free(b);
+				result->rangeset = irange_list_union(result->rangeset, arg->rangeset);
 				break;
 			case AND_EXPR:
-				ret = irange_list_intersect(ret, b);
-				// list_free(b);
+				result->rangeset = irange_list_intersect(result->rangeset, arg->rangeset);
 				break;
 			default:
 				break;
 		}
 	}
 
-	return ret;
+	return result;
 }
 
 /*
  *
  */
-static List *
+static WrapperNode *
 handle_arrexpr(const ScalarArrayOpExpr *expr, const PartRelationInfo *prel)
 {
-	Node	   *varnode = (Node *) linitial(expr->args);
-	Node	   *arraynode = (Node *) lsecond(expr->args);
+	WrapperNode		   *result = (WrapperNode *)palloc(sizeof(WrapperNode));
+	Node			   *varnode = (Node *) linitial(expr->args);
+	Node			   *arraynode = (Node *) lsecond(expr->args);
 	HashRelationKey		key;
-	
+
+	result->orig = (const Node *)expr;
+	result->args = NIL;
+
 	if (varnode == NULL || !IsA(varnode, Var))
-		return ALL;
+	{
+		result->rangeset = list_make1_irange(make_irange(0, prel->children_count - 1, true));
+		return result;
+	}
 
 	if (arraynode && IsA(arraynode, Const) &&
 		!((Const *) arraynode)->constisnull)
@@ -731,7 +731,6 @@ handle_arrexpr(const ScalarArrayOpExpr *expr, const PartRelationInfo *prel)
 		Datum	   *elem_values;
 		bool	   *elem_nulls;
 		int			i;
-		List	   *ret = NIL;
 
 		/* extract values from array */
 		arrayval = DatumGetArrayTypeP(((Const *) arraynode)->constvalue);
@@ -742,28 +741,25 @@ handle_arrexpr(const ScalarArrayOpExpr *expr, const PartRelationInfo *prel)
 						  elmlen, elmbyval, elmalign,
 						  &elem_values, &elem_nulls, &num_elems);
 
+		result->rangeset = NIL;
+
 		/* construct OIDs list */
 		for (i = 0; i < num_elems; i++)
 		{
 			key.hash = make_hash(prel, elem_values[i]);
-			// key.parent_oid = prel->oid;
-			// hashrel = (HashRelation *)
-			// 	hash_search(hash_restrictions, (const void *)&key, HASH_FIND, NULL);
-
-			// if (hashrel != NULL)
-			// 	oids = list_append_unique_int(oids, hashrel->child_oid);
-
-			ret = list_append_unique_int(ret, make_irange(key.hash, key.hash, true));
+			result->rangeset = irange_list_union(result->rangeset,
+						list_make1_irange(make_irange(key.hash, key.hash, true)));
 		}
 
 		/* free resources */
 		pfree(elem_values);
 		pfree(elem_nulls);
 
-		*all = false;
-		return ret;
+		return result;
 	}
-	return ALL;
+
+	result->rangeset = list_make1_irange(make_irange(0, prel->children_count - 1, true));
+	return result;
 }
 
 /* copy-past from allpaths.c with modifications */
