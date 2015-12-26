@@ -181,7 +181,7 @@ irange_list_find(List *rangeset, int index, bool *lossy)
 		if (index >= irange_lower(irange) && index <= irange_upper(irange))
 		{
 			if (lossy)
-				*lossy = irange_is_lossy(irange);
+				*lossy = irange_is_lossy(irange) ? true : false;
 			return true;
 		}
 	}
