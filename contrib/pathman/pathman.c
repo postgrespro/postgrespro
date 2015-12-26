@@ -297,7 +297,7 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti,
 	PartRelationInfo *prel;
 
 	Node *node;
-	ListCell *lc;
+	ListCell *lc, *lc2;
 
 	prel = (PartRelationInfo *)
 			hash_search(relations, (const void *) &rte->relid, HASH_FIND, 0);
@@ -328,18 +328,24 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti,
 
 	/* copy restrictions */
 	childrel->baserestrictinfo = NIL;
-	foreach(lc, wrappers)
+	forboth(lc, wrappers, lc2, rel->baserestrictinfo)
 	{
 		bool alwaysTrue;
 		WrapperNode *wrap = (WrapperNode *) lfirst(lc);
-		Node *new_rinfo = wrapper_make_expression(wrap, index, &alwaysTrue);
+		Node *new_clause = wrapper_make_expression(wrap, index, &alwaysTrue);
+		RestrictInfo *new_rinfo;
 
 		if (alwaysTrue)
 			continue;
-		Assert(new_rinfo);
+		Assert(new_clause);
+
+		/* TODO: evade double copy of clause */
+
+		new_rinfo = copyObject((Node *) lfirst(lc2));
+		new_rinfo->clause = (Expr *)new_clause;
 
 		/* replace old relids with new ones */
-		change_varnos(new_rinfo, rel->relid, childrel->relid);
+		change_varnos((Node *)new_rinfo, rel->relid, childrel->relid);
 
 		childrel->baserestrictinfo = lappend(childrel->baserestrictinfo,
 											 new_rinfo);
@@ -380,20 +386,24 @@ wrapper_make_expression(WrapperNode *wrap, int index, bool *alwaysTrue)
 		if (expr->boolop == OR_EXPR || expr->boolop == AND_EXPR)
 		{
 			ListCell *lc;
-			List *args;
+			List *args = NIL;
 
 			foreach (lc, wrap->args)
 			{
 				Node *arg;
 
 				arg = wrapper_make_expression((WrapperNode *)lfirst(lc), index, alwaysTrue);
-				Assert(!(*alwaysTrue));
-				Assert(arg || *alwaysTrue);
+#ifdef USE_ASSERT_CHECKING
+				if (expr->boolop == OR_EXPR)
+					Assert(!(*alwaysTrue));
+				if (expr->boolop == AND_EXPR)
+					Assert(arg || *alwaysTrue);
+#endif
 				if (arg)
 					args = lappend(args, arg);
 			}
 
-			Assert(list_length(args) > 1);
+			Assert(list_length(args) >= 1);
 			if (list_length(args) == 1)
 				return (Node *) linitial(args);
 

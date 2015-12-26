@@ -50,17 +50,25 @@ irange_list_union(List *a, List *b)
 		if (ca && cb)
 		{
 			if (irange_lower(lfirst_irange(ca)) <= irange_lower(lfirst_irange(cb)))
+			{
 				next = lfirst_irange(ca);
+				ca = lnext(ca);
+			}
 			else
+			{
 				next = lfirst_irange(cb);
+				cb = lnext(cb);
+			}
 		}
 		else if (ca)
 		{
 			next = lfirst_irange(ca);
+			ca = lnext(ca);
 		}
 		else if (cb)
 		{
 			next = lfirst_irange(cb);
+			cb = lnext(cb);
 		}
 
 		if (!have_cur)
