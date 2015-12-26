@@ -1,3 +1,6 @@
+#ifndef PATHMAN_H
+#define PATHMAN_H
+
 #include "postgres.h"
 #include "utils/date.h"
 #include "utils/hsearch.h"
@@ -133,23 +136,34 @@ typedef struct RangeRelation
 
 
 typedef int IndexRange;
-#define RANGE_INFINITY 0xFFFF
+#define RANGE_INFINITY 0x7FFF
+#define RANGE_LOSSY 0x80000000
 
-#define make_range(min, max) \
-	((min) << 16 | ((max) & 0x0000FFFF))
+#define make_irange(lower, upper, lossy) \
+	(((lower) & RANGE_INFINITY) << 15 | ((upper) & RANGE_INFINITY) | ((lossy) ? RANGE_LOSSY : 0))
 
-#define range_min(range) \
-	((range) >> 16)
+#define irange_lower(irange) \
+	(((irange) >> 15) & RANGE_INFINITY)
 
-#define range_max(range) \
-	((range) & 0x0000FFFF)
+#define irange_upper(irange) \
+	((irange) & RANGE_INFINITY)
 
-// Range make_range(int min, int max);
-// int range_min(Range range);
-// int range_max(Range range);
-List *append_range(List *a_lst, IndexRange b);
-List *intersect_ranges(List *a, List *b);
-List *unite_ranges(List *a, List *b);
+#define irange_is_lossy(irange) \
+	((irange) & RANGE_LOSSY)
+
+#define lfirst_irange(lc)				((IndexRange)(lc)->data.int_value)
+#define lappend_irange(list, irange)	(lappend_int((list), (int)(irange)))
+#define list_make1_irange(irange)		lcons_int((int)(irange), NIL)
+
+
+/* rangeset.c */
+bool irange_intersects(IndexRange a, IndexRange b);
+bool irange_conjuncted(IndexRange a, IndexRange b);
+IndexRange irange_union(IndexRange a, IndexRange b);
+IndexRange irange_intersect(IndexRange a, IndexRange b);
+List *irange_list_union(List *a, List *b);
+List *irange_list_intersect(List *a, List *b);
+
 
 LWLock *load_config_lock;
 LWLock *dsm_init_lock;
@@ -182,3 +196,5 @@ void load_part_relations_hashtable(void);
 void load_hash_restrictions(Oid relid);
 void load_range_restrictions(Oid relid);
 void remove_relation_info(Oid relid);
+
+#endif   /* PATHMAN_H */

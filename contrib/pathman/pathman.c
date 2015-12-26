@@ -1,6 +1,7 @@
 #include "pathman.h"
 #include "postgres.h"
 #include "fmgr.h"
+#include "nodes/nodeFuncs.h"
 #include "nodes/pg_list.h"
 #include "nodes/relation.h"
 #include "nodes/primnodes.h"
@@ -59,6 +60,7 @@ static void change_varnos_in_restrinct_info(RestrictInfo *rinfo, Oid old_varno, 
 static void change_varnos(Node *node, Oid old_varno, Oid new_varno);
 static bool change_varno_walker(Node *node, change_varno_context *context);
 
+/* callbacks */
 PG_FUNCTION_INFO_V1( on_partitions_created );
 PG_FUNCTION_INFO_V1( on_partitions_updated );
 PG_FUNCTION_INFO_V1( on_partitions_removed );
@@ -173,7 +175,7 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 		// 	// children = lappend_int(children, prel->children[i]);
 		// 	children = lappend_int(children, dsm_arr[i]);
 
-		ranges = list_make1_int(make_range(0, prel->children_count-1));
+		ranges = list_make1_int(make_irange(0, prel->children_count - 1, false));
 
 		/* Run over restrictions and collect children partitions */
 		ereport(LOG, (errmsg("Checking restrictions")));
@@ -181,7 +183,7 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 		{
 			RestrictInfo *rinfo = (RestrictInfo*) lfirst(lc);
 			List *ret = walk_expr_tree(rinfo->clause, prel, &all);
-			ranges = intersect_ranges(ranges, ret);
+			ranges = irange_list_intersect(ranges, ret);
 
 			// if (!all)
 			// {
@@ -194,7 +196,7 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 		{
 			int i;
 			IndexRange range = (IndexRange) lfirst(lc);
-			for (i=range_min(range); i<=range_max(range); i++)
+			for (i = irange_lower(range); i <= irange_upper(range); i++)
 				children = lappend_int(children, dsm_arr[i]);
 		}
 
@@ -341,7 +343,7 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEnt
 	childrel->baserestrictinfo = NIL;
 	foreach(lc, rel->baserestrictinfo)
 	{
-		RestrictInfo *new_rinfo;
+		Node *new_rinfo;
 
 		node = (Node *) lfirst(lc);
 		new_rinfo = copyObject(node);
@@ -351,9 +353,6 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEnt
 
 		childrel->baserestrictinfo = lappend(childrel->baserestrictinfo,
 											 new_rinfo);
-
-		/* TODO: temporarily commented out */
-		// reconstruct_restrictinfo((Node *) new_rinfo, prel, childOID);
 	}
 
 	/* Build an AppendRelInfo for this parent and child */
@@ -435,7 +434,6 @@ change_varnos_in_restrinct_info(RestrictInfo *rinfo, Oid old_varno, Oid new_varn
 	}
 }
 
-
 /*
  * Recursive function to walk through conditions tree
  */
@@ -473,12 +471,15 @@ handle_binary_opexpr(const PartRelationInfo *prel, const OpExpr *expr,
 					 const Var *v, const Const *c)
 {
 	HashRelationKey		key;
-	HashRelation	   *hashrel;
 	RangeRelation	   *rangerel;
 	int					int_value;
 	Datum				value;
-	int i, j;
-	int startidx, endidx;
+	int					i,
+						startidx,
+						endidx;
+	FmgrInfo		   *cmp_func;
+
+	*all = false;
 
 	/* determine operator type */
 	TypeCacheEntry *tce = lookup_type_cache(v->vartype,
@@ -493,7 +494,7 @@ handle_binary_opexpr(const PartRelationInfo *prel, const OpExpr *expr,
 				int_value = DatumGetInt32(c->constvalue);
 				key.hash = make_hash(prel, int_value);
 
-				return list_make1_int(make_range(key.hash, key.hash));
+				return list_make1_irange(make_irange(key.hash, key.hash, true));
 
 				// key.parent_oid = prel->oid;
 				// hashrel = (HashRelation *)
@@ -572,7 +573,7 @@ handle_binary_opexpr(const PartRelationInfo *prel, const OpExpr *expr,
 					{
 						case OP_STRATEGY_LT:
 							startidx = 0;
-							endidx = (re->min == value) ? i-1 : i;
+							endidx = check_eq(cmp_func, re->min, value) ? i - 1 : i;
 							break;
 						case OP_STRATEGY_LE:
 							startidx = 0;
@@ -581,19 +582,19 @@ handle_binary_opexpr(const PartRelationInfo *prel, const OpExpr *expr,
 						case BTEqualStrategyNumber:
 							// return list_make1_int(re->child_oid);
 							// return list_make1_int(make_range(prel->oid, prel->oid));
-							return list_make1_int(make_range(i, i));
+							return list_make1_irange(make_irange(i, i, true));
 						case BTGreaterEqualStrategyNumber:
 							startidx = i;
 							endidx = rangerel->nranges-1;
 							break;
-						case OP_STRATEGY_GT:
-							startidx = (re->max == value) ? i+1 : i;
+						case BTGreaterStrategyNumber:
+							startidx = check_eq(cmp_func, re->max, value) ? i + 1 : i;
 							endidx = rangerel->nranges-1;
 					}
 					// for (j=startidx; j<=endidx; j++)
 					// 	children = lappend_int(children, ranges[j].child_oid);
 					*all = false;
-					return list_make1_int(make_range(startidx, endidx));
+					return list_make1_irange(make_irange(startidx, endidx, true));
 
 					// return children;
 				}
@@ -650,7 +651,7 @@ handle_boolexpr(const BoolExpr *expr, const PartRelationInfo *prel)
 	List *b = ALL;
 
 	if (expr->boolop == AND_EXPR)
-		ret = list_make1_int(make_range(0, RANGE_INFINITY));
+		ret = list_make1_irange(make_irange(0, RANGE_INFINITY, false));
 
 	foreach (lc, expr->args)
 	{
@@ -691,11 +692,11 @@ handle_boolexpr(const BoolExpr *expr, const PartRelationInfo *prel)
 			// 	break;
 
 			case OR_EXPR:
-				ret = unite_ranges(ret, b);
+				ret = irange_list_union(ret, b);
 				// list_free(b);
 				break;
 			case AND_EXPR:
-				ret = intersect_ranges(ret, b);
+				ret = irange_list_intersect(ret, b);
 				// list_free(b);
 				break;
 			default:
@@ -715,7 +716,6 @@ handle_arrexpr(const ScalarArrayOpExpr *expr, const PartRelationInfo *prel)
 	Node	   *varnode = (Node *) linitial(expr->args);
 	Node	   *arraynode = (Node *) lsecond(expr->args);
 	HashRelationKey		key;
-	HashRelation	   *hashrel;
 	
 	if (varnode == NULL || !IsA(varnode, Var))
 		return ALL;
@@ -730,8 +730,8 @@ handle_arrexpr(const ScalarArrayOpExpr *expr, const PartRelationInfo *prel)
 		int			num_elems;
 		Datum	   *elem_values;
 		bool	   *elem_nulls;
-		int i;
-		List *oids = NIL;
+		int			i;
+		List	   *ret = NIL;
 
 		/* extract values from array */
 		arrayval = DatumGetArrayTypeP(((Const *) arraynode)->constvalue);
@@ -743,7 +743,7 @@ handle_arrexpr(const ScalarArrayOpExpr *expr, const PartRelationInfo *prel)
 						  &elem_values, &elem_nulls, &num_elems);
 
 		/* construct OIDs list */
-		for (i=0; i<num_elems; i++)
+		for (i = 0; i < num_elems; i++)
 		{
 			key.hash = make_hash(prel, elem_values[i]);
 			// key.parent_oid = prel->oid;
@@ -753,14 +753,15 @@ handle_arrexpr(const ScalarArrayOpExpr *expr, const PartRelationInfo *prel)
 			// if (hashrel != NULL)
 			// 	oids = list_append_unique_int(oids, hashrel->child_oid);
 
-			oids = list_append_unique_int(oids, make_range(key.hash, key.hash));
+			ret = list_append_unique_int(ret, make_irange(key.hash, key.hash, true));
 		}
 
 		/* free resources */
 		pfree(elem_values);
 		pfree(elem_nulls);
 
-		return oids;
+		*all = false;
+		return ret;
 	}
 	return ALL;
 }
