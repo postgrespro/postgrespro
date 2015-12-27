@@ -239,8 +239,6 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 			RangeTblEntry **new_rte_array;
 			int len = irange_list_length(ranges);
 
-			elog(NOTICE, "%d", len);
-
 			/* Expand simple_rel_array and simple_rte_array */
 			ereport(LOG, (errmsg("Expanding simple_rel_array")));
 
@@ -627,14 +625,14 @@ handle_binary_opexpr(const PartRelationInfo *prel, WrapperNode *result,
 					if ((cmp_min < 0 && strategy == BTGreaterStrategyNumber) || 
 						(cmp_min <= 0 && strategy == BTGreaterEqualStrategyNumber))
 					{
-						result->rangeset = list_make1_irange(make_irange(startidx, endidx, true));
+						result->rangeset = list_make1_irange(make_irange(startidx, endidx, false));
 						return;
 					}
 
 					if (cmp_max >= 0 && (strategy == BTLessEqualStrategyNumber || 
 						strategy == BTLessStrategyNumber))
 					{
-						result->rangeset = list_make1_irange(make_irange(startidx, endidx, true));
+						result->rangeset = list_make1_irange(make_irange(startidx, endidx, false));
 						return;
 					}
 				}
