@@ -153,6 +153,7 @@ typedef int IndexRange;
 
 #define lfirst_irange(lc)				((IndexRange)(lc)->data.int_value)
 #define lappend_irange(list, irange)	(lappend_int((list), (int)(irange)))
+#define lcons_irange(irange, list)		lcons_int((int)(irange), (list))
 #define list_make1_irange(irange)		lcons_int((int)(irange), NIL)
 #define llast_irange(l)					(IndexRange)lfirst_int(list_tail(l))
 

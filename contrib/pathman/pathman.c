@@ -239,6 +239,8 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 			RangeTblEntry **new_rte_array;
 			int len = irange_list_length(ranges);
 
+			elog(NOTICE, "%d", len);
+
 			/* Expand simple_rel_array and simple_rte_array */
 			ereport(LOG, (errmsg("Expanding simple_rel_array")));
 
@@ -556,8 +558,6 @@ handle_binary_opexpr(const PartRelationInfo *prel, WrapperNode *result,
 	RangeRelation	   *rangerel;
 	Datum				value;
 	int					i,
-						startidx,
-						endidx,
 						int_value,
 						strategy;
 	FmgrInfo		   *cmp_func;
@@ -589,87 +589,128 @@ handle_binary_opexpr(const PartRelationInfo *prel, WrapperNode *result,
 			if (rangerel != NULL)
 			{
 				RangeEntry *re;
-				// List	   *children = NIL;
-				bool		found = false;
-				startidx = 0;
-				int counter = 0;
+				bool		found = false,
+							lossy = false;
+				int			counter = 0,
+							startidx = 0,
+							cmp_min,
+							cmp_max,
+							endidx = rangerel->nranges - 1;
 				RangeEntry *ranges = dsm_array_get_pointer(&rangerel->ranges);
-
-				// int res = (int) FunctionCall2(cmp_func, rangerel->ranges[0].min, value);
-
-				endidx = rangerel->nranges-1;
 
 				/* check boundaries */
 				if (rangerel->nranges == 0)
 				{
-					result->rangeset = list_make1_irange(make_irange(startidx, endidx, true));
+					result->rangeset = NIL;
 					return;
 				}
-				else if ((check_gt(cmp_func, ranges[0].min, value) && (strategy == BTGreaterStrategyNumber || strategy == BTGreaterEqualStrategyNumber)) ||
-						 (check_lt(cmp_func, ranges[rangerel->nranges-1].max, value) && (strategy == BTLessStrategyNumber || strategy == BTLessEqualStrategyNumber)))
+				else
 				{
-					result->rangeset = list_make1_irange(make_irange(startidx, endidx, true));
-					return;
-				}
-				else if (check_gt(cmp_func, ranges[0].min, value) ||
-						 check_lt(cmp_func, ranges[rangerel->nranges-1].max, value))
-				{
-					result->rangeset = list_make1_irange(make_irange(startidx, endidx, true));
-					return;
+					/* Corner cases */
+					cmp_min = FunctionCall2(cmp_func, value, ranges[0].min),
+					cmp_max = FunctionCall2(cmp_func, value, ranges[rangerel->nranges - 1].max);
+
+					if ((cmp_min < 0 && strategy == BTLessEqualStrategyNumber) || 
+						(cmp_min <= 0 && strategy == BTLessStrategyNumber))
+					{
+						result->rangeset = NIL;
+						return;
+					}
+
+					if (cmp_max >= 0 && (strategy == BTGreaterEqualStrategyNumber || 
+						strategy == BTGreaterStrategyNumber))
+					{
+						result->rangeset = NIL;
+						return;
+					}
+
+					if ((cmp_min < 0 && strategy == BTGreaterStrategyNumber) || 
+						(cmp_min <= 0 && strategy == BTGreaterEqualStrategyNumber))
+					{
+						result->rangeset = list_make1_irange(make_irange(startidx, endidx, true));
+						return;
+					}
+
+					if (cmp_max >= 0 && (strategy == BTLessEqualStrategyNumber || 
+						strategy == BTLessStrategyNumber))
+					{
+						result->rangeset = list_make1_irange(make_irange(startidx, endidx, true));
+						return;
+					}
 				}
 
 				/* binary search */
 				while (true)
 				{
 					i = startidx + (endidx - startidx) / 2;
-					if (i >= 0 && i < rangerel->nranges)
+					Assert(i >= 0 && i < rangerel->nranges);
+					re = &ranges[i];
+					cmp_min = FunctionCall2(cmp_func, value, re->min);
+					cmp_max = FunctionCall2(cmp_func, value, re->max);
+					if (cmp_min < 0 || (cmp_min == 0 && strategy == BTLessStrategyNumber))
 					{
-						re = &ranges[i];
-						if (check_le(cmp_func, re->min, value) && check_le(cmp_func, value, re->max))
-						{
-							found = true;
-							break;
-						}
-						else if (check_lt(cmp_func, value, re->min))
-							endidx = i - 1;
-						else if (check_gt(cmp_func, value, re->max))
-							startidx = i + 1;
+						endidx = i - 1;
+					}
+					else if (cmp_max > 0 || (cmp_max >= 0 && strategy != BTLessStrategyNumber))
+					{
+						startidx = i + 1;
 					}
 					else
+					{
+						if (strategy == BTGreaterEqualStrategyNumber && cmp_min == 0)
+							lossy = false;
+						else if (strategy == BTLessStrategyNumber && cmp_max == 0)
+							lossy = false;
+						else
+							lossy = true;
+						found = true;
 						break;
+					}
 					/* for debug's sake */
 					Assert(++counter < 100);
 				}
 
+				Assert(found);
+
 				/* filter partitions */
-				if (found)
+				switch(strategy)
 				{
-					switch(strategy)
-					{
-						case BTLessStrategyNumber:
-							startidx = 0;
-							endidx = check_eq(cmp_func, re->min, value) ? i - 1 : i;
-							break;
-						case BTLessEqualStrategyNumber:
-							startidx = 0;
-							endidx = i;
-							break;
-						case BTEqualStrategyNumber:
-							// return list_make1_int(re->child_oid);
-							// return list_make1_int(make_range(prel->oid, prel->oid));
+					case BTLessStrategyNumber:
+					case BTLessEqualStrategyNumber:
+						if (lossy)
+						{
 							result->rangeset = list_make1_irange(make_irange(i, i, true));
-							return;
-						case BTGreaterEqualStrategyNumber:
-							startidx = i;
-							endidx = rangerel->nranges-1;
-							break;
-						case BTGreaterStrategyNumber:
-							startidx = check_eq(cmp_func, re->max, value) ? i + 1 : i;
-							endidx = rangerel->nranges-1;
-					}
-					result->rangeset = list_make1_irange(make_irange(startidx, endidx, true));
-					return;
+							if (i > 0)
+								result->rangeset = lcons_irange(
+									make_irange(0, i - 1, false), result->rangeset);
+						}
+						else
+						{
+							result->rangeset = list_make1_irange(
+								make_irange(0, i, false));
+						}
+						return;
+					case BTEqualStrategyNumber:
+						result->rangeset = list_make1_irange(make_irange(i, i, true));
+						return;
+					case BTGreaterEqualStrategyNumber:
+					case BTGreaterStrategyNumber:
+						if (lossy)
+						{
+							result->rangeset = list_make1_irange(make_irange(i, i, true));
+							if (i < prel->children_count - 1)
+								result->rangeset = lappend_irange(result->rangeset,
+									make_irange(i + 1, prel->children_count - 1, false));
+						}
+						else
+						{
+							result->rangeset = list_make1_irange(
+								make_irange(i, prel->children_count - 1, false));
+						}
+						return;
 				}
+				result->rangeset = list_make1_irange(make_irange(startidx, endidx, true));
+				return;
 			}
 	}
 

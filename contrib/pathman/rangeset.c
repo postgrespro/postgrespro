@@ -173,7 +173,7 @@ irange_list_length(List *rangeset)
 	foreach (lc, rangeset)
 	{
 		IndexRange irange = lfirst_irange(lc);
-		result = irange_upper(irange) - irange_lower(irange) + 1;
+		result += irange_upper(irange) - irange_lower(irange) + 1;
 	}
 	return result;
 }
