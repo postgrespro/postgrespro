@@ -22,15 +22,15 @@ CREATE TABLE IF NOT EXISTS @extschema@.pg_pathman_hash_rels (
 /*
  * Relations using range strategy
  */
-CREATE TABLE IF NOT EXISTS @extschema@.pg_pathman_range_rels (
-    id         SERIAL PRIMARY KEY,
-    parent     VARCHAR(127),
-    min_num    DOUBLE PRECISION,
-    max_num    DOUBLE PRECISION,
-    min_dt     TIMESTAMP,
-    max_dt     TIMESTAMP,
-    child      VARCHAR(127) 
-);
+-- CREATE TABLE IF NOT EXISTS @extschema@.pg_pathman_range_rels (
+--     id         SERIAL PRIMARY KEY,
+--     parent     VARCHAR(127),
+--     min_num    DOUBLE PRECISION,
+--     max_num    DOUBLE PRECISION,
+--     min_dt     TIMESTAMP,
+--     max_dt     TIMESTAMP,
+--     child      VARCHAR(127) 
+-- );
 
 
 CREATE OR REPLACE FUNCTION public.create_hash_partitions(
@@ -166,6 +166,8 @@ RETURNS VOID AS 'pathman', 'on_partitions_updated' LANGUAGE C STRICT;
 CREATE OR REPLACE FUNCTION pg_pathman_on_remove_partitions(relid INTEGER)
 RETURNS VOID AS 'pathman', 'on_partitions_removed' LANGUAGE C STRICT;
 
+CREATE OR REPLACE FUNCTION find_range_partition(relid OID, value ANYELEMENT)
+RETURNS OID AS 'pathman', 'find_range_partition' LANGUAGE C STRICT;
 
 -- CREATE OR REPLACE FUNCTION sample_rel_trigger_func()
 -- RETURNS TRIGGER AS $$

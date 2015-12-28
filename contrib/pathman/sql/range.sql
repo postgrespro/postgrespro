@@ -222,64 +222,104 @@ $$ LANGUAGE plpgsql;
 /*
  * Creates range partitioning insert trigger
  */
+-- CREATE OR REPLACE FUNCTION create_range_insert_trigger(
+--     v_relation    TEXT
+--     , v_attname   TEXT
+--     , v_type      TEXT)
+-- RETURNS VOID AS
+-- $$
+-- DECLARE
+--     v_func TEXT :=
+--            'CREATE OR REPLACE FUNCTION %s_range_insert_trigger_func()
+--             RETURNS TRIGGER
+--             AS $body$
+--             DECLARE
+--                 v_partition_timestamp   timestamptz;
+--             BEGIN
+--             IF TG_OP = ''INSERT'' THEN
+--             ';
+--     v_trigger TEXT :=
+--            'CREATE TRIGGER %s_insert_trigger
+--             BEFORE INSERT ON %1$s
+--             FOR EACH ROW EXECUTE PROCEDURE %1$s_range_insert_trigger_func();';
+--     v_rec     RECORD;
+--     v_cnt     INTEGER := 0;
+--     v_min_value TEXT;
+--     v_max_value TEXT;
+-- BEGIN
+--     v_func = format(v_func, v_relation);
+--     FOR v_rec IN SELECT * 
+--                  FROM pg_pathman_range_rels
+--                  WHERE parent = v_relation
+--                  ORDER BY min_dt, min_num DESC
+--     LOOP
+--         IF v_type = 'time' THEN
+--             v_min_value = to_char(v_rec.min_dt, 'YYYY-MM-DD HH:MI:SS');
+--             v_max_value = to_char(v_rec.max_dt, 'YYYY-MM-DD HH:MI:SS');
+--         ELSIF v_type = 'num' THEN
+--             v_min_value = v_rec.min_num;
+--             v_max_value = v_rec.max_num;
+--         END IF;
+--         v_func = v_func || format('
+--                 %s NEW.%s >= ''%s'' AND NEW.%s < ''%s'' THEN 
+--                     INSERT INTO %s VALUES (NEW.*);'
+--                 , CASE WHEN v_cnt = 0 THEN 'IF' ELSE 'ELSIF' END
+--                 , v_attname
+--                 , v_min_value
+--                 , v_attname
+--                 , v_max_value
+--                 , v_rec.child);
+--         v_cnt := v_cnt + 1;
+--     END LOOP;
+--     v_func := v_func || '
+--             ELSE
+--                 RAISE EXCEPTION ''ERROR: Cannot determine approprite partition'';
+--             END IF;
+--         END IF;
+--         RETURN NULL;
+--         END;
+--         $body$ LANGUAGE plpgsql;';
+
+--     v_trigger := format(v_trigger, v_relation);
+
+--     EXECUTE v_func;
+--     EXECUTE v_trigger;
+--     RETURN;
+-- END
+-- $$ LANGUAGE plpgsql;
+
+
 CREATE OR REPLACE FUNCTION create_range_insert_trigger(
     v_relation    TEXT
-    , v_attname   TEXT
-    , v_type      TEXT)
+    , v_attname   TEXT)
 RETURNS VOID AS
 $$
 DECLARE
-    v_func TEXT :=
-           'CREATE OR REPLACE FUNCTION %s_range_insert_trigger_func()
-            RETURNS TRIGGER
-            AS $body$
-            DECLARE
-                v_partition_timestamp   timestamptz;
-            BEGIN
+    v_func TEXT := '
+        CREATE OR REPLACE FUNCTION %s_range_insert_trigger_func()
+        RETURNS TRIGGER
+        AS $body$
+        DECLARE
+            v_part_relid OID;
+        BEGIN
             IF TG_OP = ''INSERT'' THEN
-            ';
-    v_trigger TEXT :=
-           'CREATE TRIGGER %s_insert_trigger
-            BEFORE INSERT ON %1$s
-            FOR EACH ROW EXECUTE PROCEDURE %1$s_range_insert_trigger_func();';
-    v_rec     RECORD;
-    v_cnt     INTEGER := 0;
-    v_min_value TEXT;
-    v_max_value TEXT;
-BEGIN
-    v_func = format(v_func, v_relation);
-    FOR v_rec IN SELECT * 
-                 FROM pg_pathman_range_rels
-                 WHERE parent = v_relation
-                 ORDER BY min_dt, min_num DESC
-    LOOP
-        IF v_type = 'time' THEN
-            v_min_value = to_char(v_rec.min_dt, 'YYYY-MM-DD HH:MI:SS');
-            v_max_value = to_char(v_rec.max_dt, 'YYYY-MM-DD HH:MI:SS');
-        ELSIF v_type = 'num' THEN
-            v_min_value = v_rec.min_num;
-            v_max_value = v_rec.max_num;
-        END IF;
-        v_func = v_func || format('
-                %s NEW.%s >= ''%s'' AND NEW.%s < ''%s'' THEN 
-                    INSERT INTO %s VALUES (NEW.*);'
-                , CASE WHEN v_cnt = 0 THEN 'IF' ELSE 'ELSIF' END
-                , v_attname
-                , v_min_value
-                , v_attname
-                , v_max_value
-                , v_rec.child);
-        v_cnt := v_cnt + 1;
-    END LOOP;
-    v_func := v_func || '
-            ELSE
-                RAISE EXCEPTION ''ERROR: Cannot determine approprite partition'';
+                v_part_relid := find_range_partition(TG_RELID, NEW.%s);
+                IF NOT v_part_relid IS NULL THEN
+                    EXECUTE format(''INSERT INTO %%s SELECT $1.*'', v_part_relid::regclass)
+                    USING NEW;
+                ELSE
+                    RAISE EXCEPTION ''ERROR: Cannot determine approprite partition'';
+                END IF;
             END IF;
-        END IF;
-        RETURN NULL;
-        END;
+            RETURN NULL;
+        END
         $body$ LANGUAGE plpgsql;';
-
+    v_trigger TEXT := '
+        CREATE TRIGGER %s_insert_trigger
+        BEFORE INSERT ON %1$s
+        FOR EACH ROW EXECUTE PROCEDURE %1$s_range_insert_trigger_func();';
+BEGIN
+    v_func := format(v_func, v_relation, v_attname);
     v_trigger := format(v_trigger, v_relation);
 
     EXECUTE v_func;
@@ -287,6 +327,7 @@ BEGIN
     RETURN;
 END
 $$ LANGUAGE plpgsql;
+
 
 /*
  * Drop partitions

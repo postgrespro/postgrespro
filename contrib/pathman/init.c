@@ -2,10 +2,23 @@
 #include "executor/spi.h"
 #include "catalog/pg_type.h"
 
+#include "catalog/pg_class.h"
+#include "catalog/pg_constraint.h"
+#include "utils/syscache.h"
+#include "access/htup_details.h"
+#include "utils/builtins.h"
+#include "utils/typcache.h"
+
+
 HTAB   *relations = NULL;
 HTAB   *hash_restrictions = NULL;
 HTAB   *range_restrictions = NULL;
 bool	initialization_needed = true;
+
+
+static bool validate_range_constraint(Expr *, PartRelationInfo *, Datum *, Datum *);
+static int cmp_range_entries(const void *p1, const void *p2);
+
 
 /*
  * Initialize hashtables
@@ -63,8 +76,8 @@ load_part_relations_hashtable()
 		for (i=0; i<proc; i++)
 		{
 			HeapTuple tuple = tuptable->vals[i];
-
 			int oid = DatumGetObjectId(SPI_getbinval(tuple, tupdesc, 1, &isnull));
+
 			prinfo = (PartRelationInfo*)
 				hash_search(relations, (const void *)&oid, HASH_ENTER, NULL);
 			prinfo->oid = oid;
@@ -87,10 +100,13 @@ load_part_relations_hashtable()
 		prinfo = (PartRelationInfo*)
 			hash_search(relations, (const void *)&oid, HASH_FIND, NULL);	
 
+		// load_check_constraints(oid);
+
 		switch(prinfo->parttype)
 		{
 			case PT_RANGE:
-				load_range_restrictions(oid);
+				// load_range_restrictions(oid);
+				load_check_constraints(oid);
 				break;
 			case PT_HASH:
 				load_hash_restrictions(oid);
@@ -203,14 +219,16 @@ create_hash_restrictions_hashtable()
 									  &ctl, HASH_ELEM | HASH_BLOBS);
 }
 
+/*
+ * Load and validate constraints
+ * TODO: make it work for HASH partitioning
+ */
 void
-load_range_restrictions(Oid parent_oid)
+load_check_constraints(Oid parent_oid)
 {
 	bool		found;
 	PartRelationInfo *prel;
 	RangeRelation *rangerel;
-	// HashRelation *hashrel;
-	// HashRelationKey key;
 	int ret;
 	int i;
 	int proc;
@@ -224,24 +242,15 @@ load_range_restrictions(Oid parent_oid)
 	prel = (PartRelationInfo*)
 		hash_search(relations, (const void *) &parent_oid, HASH_FIND, &found);
 
-	/* if already loaded then quit */
-	if (prel->children_count > 0)
-		return;
+	// /* if already loaded then quit */
+	// if (prel->children_count > 0)
+	// 	return;
 
 	// SPI_connect();
-	ret = SPI_execute_with_args("SELECT p.relfilenode, c.relfilenode, "
-								"rr.min_num, rr.max_num, "
-								"rr.min_dt, "
-								"rr.max_dt, "
-								"rr.min_dt::DATE, "
-								"rr.max_dt::DATE, "
-								"rr.min_num::INTEGER, "
-								"rr.max_num::INTEGER "
-								"FROM pg_pathman_range_rels rr "
-								"JOIN pg_class p ON p.relname = rr.parent "
-								"JOIN pg_class c ON c.relname = rr.child "
-								"WHERE p.relfilenode = $1 "
-								"ORDER BY rr.parent, rr.min_num, rr.min_dt",
+	ret = SPI_execute_with_args("select pg_constraint.* "
+								"from pg_constraint "
+								"join pg_inherits on inhrelid = conrelid "
+								"where inhparent = $1 and contype='c';",
 								1, oids, vals, nulls, true, 0);
 	proc = SPI_processed;
 
@@ -251,6 +260,8 @@ load_range_restrictions(Oid parent_oid)
         SPITupleTable *tuptable = SPI_tuptable;
         Oid *children;
         RangeEntry *ranges;
+        Datum min;
+        Datum max;
 
 		rangerel = (RangeRelation *)
 			hash_search(range_restrictions, (void *) &parent_oid, HASH_ENTER, &found);
@@ -264,60 +275,115 @@ load_range_restrictions(Oid parent_oid)
 
         for (i=0; i<proc; i++)
         {
-        	Datum min;
-        	Datum max;
-			RangeEntry re;
-            HeapTuple tuple = tuptable->vals[i];
+			RangeEntry	re;
+            HeapTuple	tuple = tuptable->vals[i];
+            bool		isnull;
+            Datum		val;
+            char	   *conbin;
+            Expr	   *expr;
 
-			// int parent_oid = DatumGetObjectId(SPI_getbinval(tuple, tupdesc, 1, &arg1_isnull));
-			re.child_oid = DatumGetObjectId(SPI_getbinval(tuple, tupdesc, 2, &arg1_isnull));
+			// HeapTuple	reltuple;
+			// Form_pg_class pg_class_tuple;
+			Form_pg_constraint con;
 
-			/* date */
-			// switch (prinfo->atttype)
-			// {
-			// 	case AT_INT:
-			// 		min = SPI_getbinval(tuple, tupdesc, 3, &isnull);
-			// 		max = SPI_getbinval(tuple, tupdesc, 4, &isnull);
-			// 		re.min.integer = DatumGetInt32(min);
-			// 		re.max.integer = DatumGetInt32(max);
-			// 		break;
-			// 	case AT_DATE:
-					// min = SPI_getbinval(tuple, tupdesc, 5, &isnull);
-					// max = SPI_getbinval(tuple, tupdesc, 6, &isnull);
-					// re.min.date = DatumGetDateADT(min);
-					// re.max.date = DatumGetDateADT(max);
-			// 		break;
-			// }
+			con = (Form_pg_constraint) GETSTRUCT(tuple);
 
-			switch(prel->atttype)
-			{
-				case DATEOID:
-					re.min = SPI_getbinval(tuple, tupdesc, 7, &arg1_isnull);
-					re.max = SPI_getbinval(tuple, tupdesc, 8, &arg2_isnull);
-					break;
-				case TIMESTAMPOID:
-					re.min = SPI_getbinval(tuple, tupdesc, 5, &arg1_isnull);
-					re.max = SPI_getbinval(tuple, tupdesc, 6, &arg2_isnull);
-					break;
-				case INT2OID:
-				case INT4OID:
-				case INT8OID:
-					re.min = SPI_getbinval(tuple, tupdesc, 9, &arg1_isnull);
-					re.max = SPI_getbinval(tuple, tupdesc, 10, &arg2_isnull);
-					break;
-				default:
-					re.min = SPI_getbinval(tuple, tupdesc, 3, &arg1_isnull);
-					re.max = SPI_getbinval(tuple, tupdesc, 4, &arg2_isnull);
-					break;
-			}
+			val = SysCacheGetAttr(CONSTROID, tuple, Anum_pg_constraint_conbin,
+								  &isnull);
+			if (isnull)
+				elog(ERROR, "null conbin for constraint %u",
+					 HeapTupleGetOid(tuple));
+			conbin = TextDatumGetCString(val);
+			expr = (Expr *) stringToNode(conbin);
+			
+			if (prel->parttype == PT_RANGE)
+				validate_range_constraint(expr, prel, &min, &max);
+
+			// re.child_oid = DatumGetObjectId(SPI_getbinval(tuple, tupdesc, 2, &arg1_isnull));
+			re.child_oid = con->conrelid;
+			re.min = min;
+			re.max = max;
 
 			ranges[rangerel->nranges++] = re;
-			// prel->children[prel->children_count++] = re.child_oid;
-			children[prel->children_count++] = re.child_oid;
-        }
-    }
+			// children[prel->children_count++] = re.child_oid;
+		}
 
-	// SPI_finish();
+		/* sort ascending */
+		qsort(ranges, rangerel->nranges, sizeof(RangeEntry), cmp_range_entries);
+
+		/* copy oids to prel */
+		for(i=0; i < rangerel->nranges; i++, prel->children_count++)
+			children[i] = ranges[i].child_oid;
+
+		/* TODO: check if some ranges overlap! */
+    }
+}
+
+
+/* qsort comparison function for oids */
+static int
+cmp_range_entries(const void *p1, const void *p2)
+{
+	RangeEntry		*v1 = (const RangeEntry *) p1;
+	RangeEntry		*v2 = (const RangeEntry *) p2;
+
+	if (v1->min < v2->min)
+		return -1;
+	if (v1->min > v2->min)
+		return 1;
+	return 0;
+}
+
+
+static bool
+validate_range_constraint(Expr *expr, PartRelationInfo *prel, Datum *min, Datum *max)
+{
+	TypeCacheEntry *tce;
+	int strategy;
+	BoolExpr *boolexpr = (BoolExpr *) expr;
+	OpExpr *opexpr;
+
+	/* it should be an AND operator on top */
+	if ( !(IsA(expr, BoolExpr) && boolexpr->boolop == AND_EXPR) )
+		return false;
+
+	/* and it should have exactly two operands */
+	if (list_length(boolexpr->args) != 2)
+		return false;
+
+	tce = lookup_type_cache(prel->atttype, TYPECACHE_EQ_OPR | TYPECACHE_LT_OPR | TYPECACHE_GT_OPR);
+	// strategy = get_op_opfamily_strategy(boolexpr->opno, tce->btree_opf);
+
+	/* check that left operand is >= operator */
+	opexpr = (OpExpr *) linitial(boolexpr->args);
+	if (get_op_opfamily_strategy(opexpr->opno, tce->btree_opf) == BTGreaterEqualStrategyNumber)
+	{
+		Node *left = linitial(opexpr->args);
+		Node *right = lsecond(opexpr->args);
+		if ( !IsA(left, Var) || !IsA(right, Const) )
+			return false;
+		if ( ((Var*) left)->varattno != prel->attnum )
+			return false;
+		*min = ((Const*) right)->constvalue;
+	}
+	else
+		return false;
+
+	/* TODO: rewrite this */
+	/* check that right operand is < operator */
+	opexpr = (OpExpr *) lsecond(boolexpr->args);
+	if (get_op_opfamily_strategy(opexpr->opno, tce->btree_opf) == BTLessStrategyNumber)
+	{
+		Node *left = linitial(opexpr->args);
+		Node *right = lsecond(opexpr->args);
+		if ( !IsA(left, Var) || !IsA(right, Const) )
+			return false;
+		if ( ((Var*) left)->varattno != prel->attnum )
+			return false;
+		*max = ((Const*) right)->constvalue;
+	}
+	else
+		return false;
 }
 
 /*
