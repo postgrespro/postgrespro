@@ -20,8 +20,11 @@
 #include "port/pg_crc32c.h"
 
 
-/* Version identifier for this pg_control format */
-#define PG_CONTROL_VERSION	942
+/* 
+ * Version identifier for this pg_control format. We use "PP" prefix in higher
+ * bits to identify PostgresPro fork of PostgreSQL.
+ */
+#define PG_CONTROL_VERSION	(0x50500000 + 942)
 
 /*
  * Body of CheckPoint XLOG records.  This is declared here because we keep
