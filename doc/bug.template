@@ -1,15 +1,11 @@
 If PostgreSQL failed to compile on your computer or you found a bug,
-please fill out this form and e-mail it to pgsql-bugs@postgresql.org.
+please fill out this form and e-mail it to pgsql-bugs@postgrespro.com.
 
 If your bug report has security implications and you'd prefer that it not
 become immediately visible in public archives, don't send it to pgsql-bugs.
-Security issues can be reported privately to security@postgresql.org.
+Security issues can be reported privately to security@postgrespro.com.
 
-If you not only found the problem but solved it and generated a patch
-then e-mail it to pgsql-hackers@postgresql.org instead.  Please use the
-command "diff -c" to generate the patch.
-
-You may also enter a bug report at http://www.postgresql.org/ instead of
+You may also enter a bug report at http://www.postgrespro.com/ instead of
 e-mailing this form.
 
 ============================================================================
@@ -27,7 +23,7 @@ System Configuration:
 
   Operating System (example: Linux 2.4.18)	:
 
-  PostgreSQL version (example: PostgreSQL 9.5.0):  PostgreSQL 9.5.0
+  PostgreSQL version (example: PostgresPro 9.5.0.1):  PostgresPro 9.5.0.1
 
   Compiler used (example: gcc 3.3.5)		:
 
