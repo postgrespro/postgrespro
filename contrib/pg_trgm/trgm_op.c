@@ -15,13 +15,19 @@
 PG_MODULE_MAGIC;
 
 float4		trgm_limit = 0.3f;
+float4		trgm_substring_limit = 0.6f;
 
 PG_FUNCTION_INFO_V1(set_limit);
 PG_FUNCTION_INFO_V1(show_limit);
 PG_FUNCTION_INFO_V1(show_trgm);
 PG_FUNCTION_INFO_V1(similarity);
+PG_FUNCTION_INFO_V1(substring_similarity);
 PG_FUNCTION_INFO_V1(similarity_dist);
 PG_FUNCTION_INFO_V1(similarity_op);
+PG_FUNCTION_INFO_V1(set_substring_limit);
+PG_FUNCTION_INFO_V1(show_substring_limit);
+PG_FUNCTION_INFO_V1(substring_similarity_op);
+PG_FUNCTION_INFO_V1(substring_similarity_commutator_op);
 
 
 Datum
@@ -39,6 +45,23 @@ Datum
 show_limit(PG_FUNCTION_ARGS)
 {
 	PG_RETURN_FLOAT4(trgm_limit);
+}
+
+Datum
+set_substring_limit(PG_FUNCTION_ARGS)
+{
+	float4		nlimit = PG_GETARG_FLOAT4(0);
+
+	if (nlimit < 0 || nlimit > 1.0)
+		elog(ERROR, "wrong limit, should be between 0 and 1");
+	trgm_substring_limit = nlimit;
+	PG_RETURN_FLOAT4(trgm_substring_limit);
+}
+
+Datum
+show_substring_limit(PG_FUNCTION_ARGS)
+{
+	PG_RETURN_FLOAT4(trgm_substring_limit);
 }
 
 static int
@@ -166,38 +189,20 @@ make_trigrams(trgm *tptr, char *str, int bytelen, int charlen)
 	return tptr;
 }
 
-TRGM *
-generate_trgm(char *str, int slen)
+static int
+generate_trgm_only(trgm *trg, char *str, int slen)
 {
-	TRGM	   *trg;
-	char	   *buf;
 	trgm	   *tptr;
-	int			len,
-				charlen,
+	char	   *buf;
+	int			charlen,
 				bytelen;
 	char	   *bword,
 			   *eword;
 
-	/*
-	 * Guard against possible overflow in the palloc requests below.  (We
-	 * don't worry about the additive constants, since palloc can detect
-	 * requests that are a little above MaxAllocSize --- we just need to
-	 * prevent integer overflow in the multiplications.)
-	 */
-	if ((Size) (slen / 2) >= (MaxAllocSize / (sizeof(trgm) * 3)) ||
-		(Size) slen >= (MaxAllocSize / pg_database_encoding_max_length()))
-		ereport(ERROR,
-				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
-				 errmsg("out of memory")));
-
-	trg = (TRGM *) palloc(TRGMHDRSIZE + sizeof(trgm) * (slen / 2 + 1) *3);
-	trg->flag = ARRKEY;
-	SET_VARSIZE(trg, TRGMHDRSIZE);
-
 	if (slen + LPADDING + RPADDING < 3 || slen == 0)
-		return trg;
+		return 0;
 
-	tptr = GETARR(trg);
+	tptr = trg;
 
 	/* Allocate a buffer for case-folded, blank-padded words */
 	buf = (char *) palloc(slen * pg_database_encoding_max_length() + 4);
@@ -237,7 +242,40 @@ generate_trgm(char *str, int slen)
 
 	pfree(buf);
 
-	if ((len = tptr - GETARR(trg)) == 0)
+	return tptr - trg;
+}
+
+static void
+protect_out_of_mem(int slen)
+{
+	/*
+	 * Guard against possible overflow in the palloc requests below.  (We
+	 * don't worry about the additive constants, since palloc can detect
+	 * requests that are a little above MaxAllocSize --- we just need to
+	 * prevent integer overflow in the multiplications.)
+	 */
+	if ((Size) (slen / 2) >= (MaxAllocSize / (sizeof(trgm) * 3)) ||
+		(Size) slen >= (MaxAllocSize / pg_database_encoding_max_length()))
+		ereport(ERROR,
+				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
+				 errmsg("out of memory")));
+}
+
+TRGM *
+generate_trgm(char *str, int slen)
+{
+	TRGM	   *trg;
+	int			len;
+
+	protect_out_of_mem(slen);
+
+	trg = (TRGM *) palloc(TRGMHDRSIZE + sizeof(trgm) * (slen / 2 + 1) *3);
+	trg->flag = ARRKEY;
+
+	len = generate_trgm_only(GETARR(trg), str, slen);
+	SET_VARSIZE(trg, CALCGTSIZE(ARRKEY, len));
+
+	if (len == 0)
 		return trg;
 
 	/*
@@ -253,6 +291,243 @@ generate_trgm(char *str, int slen)
 
 	return trg;
 }
+
+/* Trigram with position */
+typedef struct
+{
+	trgm	t;
+	int		i;
+} ptrgm;
+
+/*
+ * Make array of positional trigrams from two trigram arrays. The first array
+ * is required substing which positions don't matter and replaced with -1.
+ * The second array is haystack where we search and have to store its
+ * positions.
+ */
+static ptrgm *
+make_positional_trgm(trgm *trg1, int len1, trgm *trg2, int len2)
+{
+	ptrgm *result;
+	int i, len = len1 + len2;
+
+	result = (ptrgm *) palloc(sizeof(ptrgm) * len);
+
+	for (i = 0; i < len1; i++)
+	{
+		memcpy(&result[i].t, &trg1[i], sizeof(trgm));
+		result[i].i = -1;
+	}
+
+	for (i = 0; i < len2; i++)
+	{
+		memcpy(&result[i + len1].t, &trg2[i], sizeof(trgm));
+		result[i + len1].i = i;
+	}
+
+	return result;
+}
+
+/*
+ * Compare position trigrams: compare trigrams first and position second.
+ */
+static int
+comp_ptrgm(const void *v1, const void *v2)
+{
+	const ptrgm	   *p1 = (const ptrgm *)v1;
+	const ptrgm	   *p2 = (const ptrgm *)v2;
+	int				cmp;
+
+	cmp = CMPTRGM(p1->t, p2->t);
+	if (cmp != 0)
+		return cmp;
+
+	if (p1->i < p2->i)
+		return -1;
+	else if (p1->i == p2->i)
+		return 0;
+	else
+		return 1;
+}
+
+/*
+ * Iterative procedure if finding maximum similarity with substring.
+ */
+static float4
+iterate_substring_similarity(int *trg2indexes,
+							 bool *found,
+							 int ulen1,
+							 int len2,
+							 int len)
+{
+	int		   *lastpos,
+				i,
+				ulen2 = 0,
+				count = 0,
+				upper = -1,
+				lower = -1;
+	float4		smlr_cur,
+				smlr_max = 0.0f;
+
+	/* Memorise last position of each trigram */
+	lastpos = (int *) palloc(sizeof(int) * len);
+	memset(lastpos, -1, sizeof(int) * len);
+
+	for (i = 0; i < len2; i++)
+	{
+		/* Get index of next trigram */
+		int	trgindex = trg2indexes[i];
+
+		/* Update last position of this trigram */
+		if (lower >= 0 || found[trgindex])
+		{
+			if (lastpos[trgindex] < 0)
+			{
+				ulen2++;
+				if (found[trgindex])
+					count++;
+			}
+			lastpos[trgindex] = i;
+		}
+
+		/* Adjust lower bound if this trigram is present in required substing */
+		if (found[trgindex])
+		{
+			int		prev_lower,
+					tmp_ulen2,
+					tmp_lower,
+					tmp_count;
+
+			upper = i;
+			if (lower == -1)
+			{
+				lower = i;
+				ulen2 = 1;
+			}
+
+			smlr_cur = CALCSML(count, ulen1, ulen2);
+
+			/* Also try to adjust upper bound for greater similarity */
+			tmp_count = count;
+			tmp_ulen2 = ulen2;
+			prev_lower = lower;
+			for (tmp_lower = lower; tmp_lower <= upper; tmp_lower++)
+			{
+				float	smlr_tmp = CALCSML(tmp_count, ulen1, tmp_ulen2);
+				int		tmp_trgindex;
+
+				if (smlr_tmp > smlr_cur)
+				{
+					smlr_cur = smlr_tmp;
+					ulen2 = tmp_ulen2;
+					lower = tmp_lower;
+					count = tmp_count;
+				}
+				tmp_trgindex = trg2indexes[tmp_lower];
+				if (lastpos[tmp_trgindex] == tmp_lower)
+				{
+					tmp_ulen2--;
+					if (found[tmp_trgindex])
+						tmp_count--;
+				}
+			}
+
+			for (tmp_lower = prev_lower; tmp_lower < lower; tmp_lower++)
+			{
+				int		tmp_trgindex;
+				tmp_trgindex = trg2indexes[tmp_lower];
+				if (lastpos[tmp_trgindex] == tmp_lower)
+					lastpos[tmp_trgindex] = -1;
+			}
+
+			smlr_max = Max(smlr_max, smlr_cur);
+		}
+	}
+
+	pfree(lastpos);
+
+	return smlr_max;
+}
+
+/*
+ * Calculate substring similarity.
+ */
+static float4
+calc_substring_similarity(char *str1, int slen1, char *str2, int slen2)
+{
+	bool   *found;
+	ptrgm  *ptrg;
+	trgm   *trg1;
+	trgm   *trg2;
+	int		len1,
+			len2,
+			len,
+			i,
+			j,
+			ulen1;
+	int	   *trg2indexes;
+	float4	result;
+
+	protect_out_of_mem(slen1 + slen2);
+
+	/* Make positional trigrams */
+	trg1 = (trgm *) palloc(sizeof(trgm) * (slen1 / 2 + 1) * 3);
+	trg2 = (trgm *) palloc(sizeof(trgm) * (slen2 / 2 + 1) * 3);
+
+	len1 = generate_trgm_only(trg1, str1, slen1);
+	len2 = generate_trgm_only(trg2, str2, slen2);
+
+	ptrg = make_positional_trgm(trg1, len1, trg2, len2);
+	len = len1 + len2;
+	qsort(ptrg, len, sizeof(ptrgm), comp_ptrgm);
+
+	pfree(trg1);
+	pfree(trg2);
+
+	/*
+	 * Merge positional trigrams array: enumerate each trigram and find its
+	 * presence in required substring.
+	 */
+	trg2indexes = (int *) palloc(sizeof(int) * len2);
+	found = (bool *) palloc0(sizeof(bool) * len);
+
+	ulen1 = 0;
+	j = 0;
+	for (i = 0; i < len; i++)
+	{
+		if (i > 0)
+		{
+			int cmp = CMPTRGM(ptrg[i - 1].t, ptrg[i].t);
+			if (cmp != 0)
+			{
+				if (found[j])
+					ulen1++;
+				j++;
+			}
+		}
+
+		if (ptrg[i].i >= 0)
+		{
+			trg2indexes[ptrg[i].i] = j;
+		}
+		else
+		{
+			found[j] = true;
+		}
+	}
+	if (found[j])
+		ulen1++;
+
+	/* Run iterative procedure to find maximum similarity with substring */
+	result = iterate_substring_similarity(trg2indexes, found, ulen1, len2, len);
+
+	pfree(trg2indexes);
+	pfree(found);
+	pfree(ptrg);
+
+	return result;
+}
+
 
 /*
  * Extract the next non-wildcard part of a search string, ie, a word bounded
@@ -426,17 +701,7 @@ generate_wildcard_trgm(const char *str, int slen)
 				bytelen;
 	const char *eword;
 
-	/*
-	 * Guard against possible overflow in the palloc requests below.  (We
-	 * don't worry about the additive constants, since palloc can detect
-	 * requests that are a little above MaxAllocSize --- we just need to
-	 * prevent integer overflow in the multiplications.)
-	 */
-	if ((Size) (slen / 2) >= (MaxAllocSize / (sizeof(trgm) * 3)) ||
-		(Size) slen >= (MaxAllocSize / pg_database_encoding_max_length()))
-		ereport(ERROR,
-				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
-				 errmsg("out of memory")));
+	protect_out_of_mem(slen);
 
 	trg = (TRGM *) palloc(TRGMHDRSIZE + sizeof(trgm) * (slen / 2 + 1) *3);
 	trg->flag = ARRKEY;
@@ -557,7 +822,7 @@ show_trgm(PG_FUNCTION_ARGS)
 }
 
 float4
-cnt_sml(TRGM *trg1, TRGM *trg2)
+cnt_sml(TRGM *trg1, TRGM *trg2, bool inexact)
 {
 	trgm	   *ptr1,
 			   *ptr2;
@@ -591,13 +856,13 @@ cnt_sml(TRGM *trg1, TRGM *trg2)
 		}
 	}
 
-#ifdef DIVUNION
-	return ((float4) count) / ((float4) (len1 + len2 - count));
-#else
-	return ((float4) count) / ((float4) ((len1 > len2) ? len1 : len2));
-#endif
-
+	/* if inexact then len2 is equal to count */
+	if (inexact)
+		return CALCSML(count, len1, count);
+	else
+		return CALCSML(count, len1, len2);
 }
+
 
 /*
  * Returns whether trg2 contains all trigrams in trg1.
@@ -693,10 +958,26 @@ similarity(PG_FUNCTION_ARGS)
 	trg1 = generate_trgm(VARDATA(in1), VARSIZE(in1) - VARHDRSZ);
 	trg2 = generate_trgm(VARDATA(in2), VARSIZE(in2) - VARHDRSZ);
 
-	res = cnt_sml(trg1, trg2);
+	res = cnt_sml(trg1, trg2, false);
 
 	pfree(trg1);
 	pfree(trg2);
+	PG_FREE_IF_COPY(in1, 0);
+	PG_FREE_IF_COPY(in2, 1);
+
+	PG_RETURN_FLOAT4(res);
+}
+
+Datum
+substring_similarity(PG_FUNCTION_ARGS)
+{
+	text	   *in1 = PG_GETARG_TEXT_PP(0);
+	text	   *in2 = PG_GETARG_TEXT_PP(1);
+	float4		res;
+
+	res = calc_substring_similarity(VARDATA_ANY(in1), VARSIZE_ANY_EXHDR(in1),
+									VARDATA_ANY(in2), VARSIZE_ANY_EXHDR(in2));
+
 	PG_FREE_IF_COPY(in1, 0);
 	PG_FREE_IF_COPY(in2, 1);
 
@@ -721,4 +1002,24 @@ similarity_op(PG_FUNCTION_ARGS)
 														 PG_GETARG_DATUM(1)));
 
 	PG_RETURN_BOOL(res >= trgm_limit);
+}
+
+Datum
+substring_similarity_op(PG_FUNCTION_ARGS)
+{
+	float4		res = DatumGetFloat4(DirectFunctionCall2(substring_similarity,
+														 PG_GETARG_DATUM(0),
+														 PG_GETARG_DATUM(1)));
+
+	PG_RETURN_BOOL(res >= trgm_substring_limit);
+}
+
+Datum
+substring_similarity_commutator_op(PG_FUNCTION_ARGS)
+{
+	float4		res = DatumGetFloat4(DirectFunctionCall2(substring_similarity,
+														 PG_GETARG_DATUM(1),
+														 PG_GETARG_DATUM(0)));
+
+	PG_RETURN_BOOL(res >= trgm_substring_limit);
 }
