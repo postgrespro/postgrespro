@@ -219,7 +219,7 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 
 		ranges = list_make1_int(make_irange(0, prel->children_count - 1, false));
 
-		/* Run over restrictions and collect children partitions */
+		/* Make wrappers over restrictions and collect final rangeset */
 		wrappers = NIL;
 		foreach(lc, rel->baserestrictinfo)
 		{
@@ -262,6 +262,10 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 			/* TODO: free old arrays */
 		}
 
+		/*
+		 * Iterate all indexes in rangeset and append corresponding child
+		 * relations.
+		 */
 		foreach(lc, ranges)
 		{
 			IndexRange	irange = lfirst_irange(lc);
@@ -363,13 +367,19 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti,
 			(errmsg("Relation %u appended", childOid)));
 }
 
+/* Conver wrapper into expression for given index */
 static Node *
 wrapper_make_expression(WrapperNode *wrap, int index, bool *alwaysTrue)
 {
 	bool	lossy, found;
 
 	*alwaysTrue = false;
+	/*
+	 * TODO: use faster algorithm using knowledge than we enumerate indexes
+	 * sequntially.
+	 */
 	found = irange_list_find(wrap->rangeset, index, &lossy);
+	/* Return NULL for always true and always false. */
 	if (!found)
 		return NULL;
 	if (!lossy)
@@ -390,20 +400,27 @@ wrapper_make_expression(WrapperNode *wrap, int index, bool *alwaysTrue)
 
 			foreach (lc, wrap->args)
 			{
-				Node *arg;
+				Node   *arg;
+				bool	childAlwaysTrue;
 
-				arg = wrapper_make_expression((WrapperNode *)lfirst(lc), index, alwaysTrue);
+				arg = wrapper_make_expression((WrapperNode *)lfirst(lc), index, &childAlwaysTrue);
 #ifdef USE_ASSERT_CHECKING
+				/*
+				 * We shouldn't get there for always true clause under OR and
+				 * always false clause under AND.
+				 */
 				if (expr->boolop == OR_EXPR)
-					Assert(!(*alwaysTrue));
+					Assert(!childAlwaysTrue);
 				if (expr->boolop == AND_EXPR)
-					Assert(arg || *alwaysTrue);
+					Assert(arg || childAlwaysTrue);
 #endif
 				if (arg)
 					args = lappend(args, arg);
 			}
 
 			Assert(list_length(args) >= 1);
+
+			/* Remove redundant OR/AND when child is single. */
 			if (list_length(args) == 1)
 				return (Node *) linitial(args);
 

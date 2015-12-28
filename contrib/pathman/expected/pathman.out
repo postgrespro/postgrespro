@@ -1,4 +1,6 @@
 CREATE EXTENSION pathman;
+SET enable_indexscan = OFF;
+SET enable_bitmapscan = OFF;
 CREATE TABLE hash_rel (
     id      SERIAL PRIMARY KEY,
     value   INTEGER);
@@ -18,22 +20,32 @@ INSERT INTO hash_rel VALUES (3, 3);
 INSERT INTO hash_rel VALUES (4, 4);
 INSERT INTO hash_rel VALUES (5, 5);
 INSERT INTO hash_rel VALUES (6, 6);
-EXPLAIN SELECT * FROM hash_rel;
-                           QUERY PLAN                            
------------------------------------------------------------------
- Append  (cost=0.00..97.80 rows=0 width=0)
-   ->  Seq Scan on hash_rel_0  (cost=0.00..32.60 rows=0 width=0)
-   ->  Seq Scan on hash_rel_1  (cost=0.00..32.60 rows=0 width=0)
-   ->  Seq Scan on hash_rel_2  (cost=0.00..32.60 rows=0 width=0)
+EXPLAIN (COSTS OFF) SELECT * FROM hash_rel;
+          QUERY PLAN          
+------------------------------
+ Append
+   ->  Seq Scan on hash_rel_0
+   ->  Seq Scan on hash_rel_1
+   ->  Seq Scan on hash_rel_2
 (4 rows)
 
-EXPLAIN SELECT * FROM hash_rel WHERE value = 2;
-                           QUERY PLAN                            
------------------------------------------------------------------
- Append  (cost=0.00..32.60 rows=0 width=0)
-   ->  Seq Scan on hash_rel_2  (cost=0.00..32.60 rows=0 width=0)
+EXPLAIN (COSTS OFF) SELECT * FROM hash_rel WHERE value = 2;
+          QUERY PLAN          
+------------------------------
+ Append
+   ->  Seq Scan on hash_rel_2
          Filter: (value = 2)
 (3 rows)
+
+EXPLAIN (COSTS OFF) SELECT * FROM hash_rel WHERE value = 2 OR value = 1;
+          QUERY PLAN          
+------------------------------
+ Append
+   ->  Seq Scan on hash_rel_1
+         Filter: (value = 1)
+   ->  Seq Scan on hash_rel_2
+         Filter: (value = 2)
+(5 rows)
 
 SELECT drop_hash_partitions('hash_rel');
 NOTICE:  trigger "hash_rel_update_trigger" for relation "hash_rel" does not exist, skipping
@@ -59,15 +71,45 @@ SELECT create_range_partitions('num_range_rel', 'id', 'num', '0', '1000', 3);
 
 INSERT INTO num_range_rel SELECT g, md5(g::TEXT) FROM generate_series(1, 3000) as g;
 VACUUM;
-EXPLAIN SELECT * FROM num_range_rel WHERE id > 2500;
-                               QUERY PLAN                                
--------------------------------------------------------------------------
- Append  (cost=0.00..20.01 rows=0 width=0)
-   ->  Seq Scan on num_range_rel_2000  (cost=0.00..19.00 rows=0 width=0)
+EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE id > 2500;
+              QUERY PLAN              
+--------------------------------------
+ Append
+   ->  Seq Scan on num_range_rel_2000
          Filter: (id > 2500)
-   ->  Seq Scan on num_range_rel_3000  (cost=0.00..1.01 rows=0 width=0)
-         Filter: (id > 2500)
+   ->  Seq Scan on num_range_rel_3000
+(4 rows)
+
+EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE id >= 1000 AND id < 3000;
+              QUERY PLAN              
+--------------------------------------
+ Append
+   ->  Seq Scan on num_range_rel_1000
+   ->  Seq Scan on num_range_rel_2000
+(3 rows)
+
+EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE id >= 1500 AND id < 2500;
+              QUERY PLAN              
+--------------------------------------
+ Append
+   ->  Seq Scan on num_range_rel_1000
+         Filter: (id >= 1500)
+   ->  Seq Scan on num_range_rel_2000
+         Filter: (id < 2500)
 (5 rows)
+
+EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE (id >= 500 AND id < 1500) OR (id > 2500);
+              QUERY PLAN              
+--------------------------------------
+ Append
+   ->  Seq Scan on num_range_rel_0
+         Filter: (id >= 500)
+   ->  Seq Scan on num_range_rel_1000
+         Filter: (id < 1500)
+   ->  Seq Scan on num_range_rel_2000
+         Filter: (id > 2500)
+   ->  Seq Scan on num_range_rel_3000
+(8 rows)
 
 SELECT drop_range_partitions('num_range_rel');
  drop_range_partitions 
