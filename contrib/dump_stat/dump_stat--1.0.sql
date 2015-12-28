@@ -213,7 +213,8 @@ CREATE FUNCTION dump_statistic() RETURNS SETOF TEXT AS $$
 	BEGIN
 		for r in
 				select * from pg_catalog.pg_statistic 
-				where get_namespace(starelid) != to_namespace('pg_catalog') loop
+				where get_namespace(starelid) != to_namespace('pg_catalog') 
+						and get_namespace(starelid) != to_namespace('information_schema') loop
 			
 			relname := to_schema_qualified_relname(r.starelid);
 			attname := quote_literal(to_attname(relname, r.staattnum));
