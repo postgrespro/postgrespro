@@ -1,5 +1,6 @@
 #include "pathman.h"
 
+/* Check if two ranges are intersecting */
 bool
 irange_intersects(IndexRange a, IndexRange b)
 {
@@ -7,6 +8,7 @@ irange_intersects(IndexRange a, IndexRange b)
 		   (irange_lower(b) <= irange_upper(a));
 }
 
+/* Check if two ranges are conjuncted */
 bool
 irange_conjuncted(IndexRange a, IndexRange b)
 {
@@ -14,6 +16,7 @@ irange_conjuncted(IndexRange a, IndexRange b)
 		   (irange_lower(b) - 1 <= irange_upper(a));
 }
 
+/* Make union of two ranges. They should have the same lossiness. */
 IndexRange
 irange_union(IndexRange a, IndexRange b)
 {
@@ -23,6 +26,7 @@ irange_union(IndexRange a, IndexRange b)
 					   irange_is_lossy(a));
 }
 
+/* Get intersection of two ranges */
 IndexRange
 irange_intersect(IndexRange a, IndexRange b)
 {
@@ -31,6 +35,9 @@ irange_intersect(IndexRange a, IndexRange b)
 					   irange_is_lossy(a) || irange_is_lossy(b));
 }
 
+/*
+ * Make union of two index rage lists.
+ */
 List *
 irange_list_union(List *a, List *b)
 {
@@ -47,6 +54,7 @@ irange_list_union(List *a, List *b)
 	{
 		IndexRange	next;
 
+		/* Fetch next range with lesser lower bound */
 		if (ca && cb)
 		{
 			if (irange_lower(lfirst_irange(ca)) <= irange_lower(lfirst_irange(cb)))
@@ -73,6 +81,7 @@ irange_list_union(List *a, List *b)
 
 		if (!have_cur)
 		{
+			/* Put this range as current value if don't have it yet */
 			cur = next;
 			have_cur = true;
 		}
@@ -80,6 +89,9 @@ irange_list_union(List *a, List *b)
 		{
 			if (irange_conjuncted(next, cur))
 			{
+				/*
+				 * Ranges are conjuncted, try to unify them.
+				 */
 				if (irange_is_lossy(next) == irange_is_lossy(cur))
 				{
 					cur = irange_union(next, cur);
@@ -105,18 +117,26 @@ irange_list_union(List *a, List *b)
 			}
 			else
 			{
+				/*
+				 * Next range is not conjuncted with current. Put current to the
+				 * result list and put next as current.
+				 */
 				result = lappend_irange(result, cur);
 				cur = next;
 			}
 		}
 	}
 
+	/* Put current value into result list if any */
 	if (have_cur)
 		result = lappend_irange(result, cur);
 
 	return result;
 }
 
+/*
+ * Find intersection of two range lists.
+ */
 List *
 irange_list_intersect(List *a, List *b)
 {
@@ -132,10 +152,16 @@ irange_list_intersect(List *a, List *b)
 	{
 		ra = lfirst_irange(ca);
 		rb = lfirst_irange(cb);
+
+		/* Only care about intersecting ranges */
 		if (irange_intersects(ra, rb))
 		{
 			IndexRange	intersect, last;
 
+			/*
+			 * Get intersection and try to "glue" it to previous range,
+			 * put it separately otherwise.
+			 */
 			intersect = irange_intersect(ra, rb);
 			if (result != NIL)
 			{
@@ -156,6 +182,11 @@ irange_list_intersect(List *a, List *b)
 			}
 		}
 
+		/*
+		 * Fetch next ranges. We use upper bound of current range to determine
+		 * which lists to fetch, since lower bound of next range is greater (or
+		 * equal) to upper bound of current.
+		 */
 		if (irange_upper(ra) <= irange_upper(rb))
 			ca = lnext(ca);
 		if (irange_upper(ra) >= irange_upper(rb))
@@ -164,6 +195,7 @@ irange_list_intersect(List *a, List *b)
 	return result;
 }
 
+/* Get total number of elements in range list */
 int
 irange_list_length(List *rangeset)
 {
@@ -178,6 +210,7 @@ irange_list_length(List *rangeset)
 	return result;
 }
 
+/* Find particular index in range list */
 bool
 irange_list_find(List *rangeset, int index, bool *lossy)
 {
