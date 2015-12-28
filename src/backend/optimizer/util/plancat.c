@@ -164,7 +164,7 @@ get_relation_info(PlannerInfo *root, Oid relationObjectId, bool inhparent,
 			Relation	indexRelation;
 			Form_pg_index index;
 			IndexOptInfo *info;
-			int			ncolumns;
+			int			ncolumns, nkeycolumns;
 			int			i;
 
 			/*
@@ -207,6 +207,23 @@ get_relation_info(PlannerInfo *root, Oid relationObjectId, bool inhparent,
 				RelationGetForm(indexRelation)->reltablespace;
 			info->rel = rel;
 			info->ncolumns = ncolumns = index->indnatts;
+			info->nkeycolumns = nkeycolumns = index->indnkeyatts;
+
+			/* TODO
+			 * All these arrays below still have length = ncolumns.
+			 * Fix, when optional opclass functionality will be added.
+			 *
+			 * Generally, any column could be returned by IndexOnlyScan.
+			 * Even if it doesn't have opclass for that type of index.
+			 *
+			 * For example,
+			 * we have an index "create index on tbl(c1) including c2".
+			 * If there's no suitable oplass on c2
+			 * query "select c2 from tbl where c2 < 10" can't use index-only scan
+			 * and query "select c2 from tbl where c1 < 10" can.
+			 * But now it doesn't because of requirement that
+			 * each indexed column must have an opclass.
+			 */
 			info->indexkeys = (int *) palloc(sizeof(int) * ncolumns);
 			info->indexcollations = (Oid *) palloc(sizeof(Oid) * ncolumns);
 			info->opfamily = (Oid *) palloc(sizeof(Oid) * ncolumns);

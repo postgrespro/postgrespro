@@ -351,6 +351,12 @@ typedef struct ViewOptions
 #define RelationGetNumberOfAttributes(relation) ((relation)->rd_rel->relnatts)
 
 /*
+ * RelationGetNumberOfAttributes
+ *		Returns the number of attributes in a relation.
+ */
+#define IndexRelationGetNumberOfKeyAttributes(relation) ((relation)->rd_index->indnkeyatts)
+
+/*
  * RelationGetDescr
  *		Returns tuple descriptor for a relation.
  */
