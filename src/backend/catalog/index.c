@@ -211,7 +211,7 @@ index_check_primary_key(Relation heapRel,
 	 * null, otherwise attempt to ALTER TABLE .. SET NOT NULL
 	 */
 	cmds = NIL;
-	for (i = 0; i < indexInfo->ii_NumIndexAttrs; i++)
+	for (i = 0; i < indexInfo->ii_NumIndexKeyAttrs; i++)
 	{
 		AttrNumber	attnum = indexInfo->ii_KeyAttrNumbers[i];
 		HeapTuple	atttuple;
@@ -606,6 +606,7 @@ UpdateIndexRelation(Oid indexoid,
 	values[Anum_pg_index_indexrelid - 1] = ObjectIdGetDatum(indexoid);
 	values[Anum_pg_index_indrelid - 1] = ObjectIdGetDatum(heapoid);
 	values[Anum_pg_index_indnatts - 1] = Int16GetDatum(indexInfo->ii_NumIndexAttrs);
+	values[Anum_pg_index_indnkeyatts - 1] = Int16GetDatum(indexInfo->ii_NumIndexKeyAttrs);
 	values[Anum_pg_index_indisunique - 1] = BoolGetDatum(indexInfo->ii_Unique);
 	values[Anum_pg_index_indisprimary - 1] = BoolGetDatum(primary);
 	values[Anum_pg_index_indisexclusion - 1] = BoolGetDatum(isexclusion);
@@ -1069,6 +1070,8 @@ index_create(Relation heapRelation,
 	else
 		Assert(indexRelation->rd_indexcxt != NULL);
 
+	indexRelation->rd_index->indnkeyatts = indexInfo->ii_NumIndexKeyAttrs;
+
 	/*
 	 * If this is bootstrap (initdb) time, then we don't actually fill in the
 	 * index yet.  We'll be creating more indexes and classes later, so we
@@ -1189,7 +1192,7 @@ index_constraint_create(Relation heapRelation,
 								   true,
 								   RelationGetRelid(heapRelation),
 								   indexInfo->ii_KeyAttrNumbers,
-								   indexInfo->ii_NumIndexAttrs,
+								   indexInfo->ii_NumIndexKeyAttrs,
 								   InvalidOid,	/* no domain */
 								   indexRelationId,		/* index OID */
 								   InvalidOid,	/* no foreign key */
@@ -1637,6 +1640,10 @@ BuildIndexInfo(Relation index)
 		elog(ERROR, "invalid indnatts %d for index %u",
 			 numKeys, RelationGetRelid(index));
 	ii->ii_NumIndexAttrs = numKeys;
+	ii->ii_NumIndexKeyAttrs = indexStruct->indnkeyatts;
+	Assert(ii->ii_NumIndexKeyAttrs != 0);
+	Assert(ii->ii_NumIndexKeyAttrs <= ii->ii_NumIndexAttrs);
+
 	for (i = 0; i < numKeys; i++)
 		ii->ii_KeyAttrNumbers[i] = indexStruct->indkey.values[i];
 

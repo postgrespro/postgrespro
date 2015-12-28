@@ -137,7 +137,6 @@ CheckIndexCompatible(Oid oldId,
 	Relation	irel;
 	int			i;
 	Datum		d;
-
 	/* Caller should already have the relation locked in some way. */
 	relationId = IndexGetRelation(oldId, false);
 
@@ -208,7 +207,7 @@ CheckIndexCompatible(Oid oldId,
 	}
 
 	/* Any change in operator class or collation breaks compatibility. */
-	old_natts = indexForm->indnatts;
+	old_natts = indexForm->indnkeyatts;
 	Assert(old_natts == numberOfAttributes);
 
 	d = SysCacheGetAttr(INDEXRELID, tuple, Anum_pg_index_indcollation, &isnull);
@@ -320,7 +319,8 @@ DefineIndex(Oid relationId,
 	Datum		reloptions;
 	int16	   *coloptions;
 	IndexInfo  *indexInfo;
-	int			numberOfAttributes;
+	int			numberOfAttributes,
+				numberOfKeyAttributes;
 	TransactionId limitXmin;
 	VirtualTransactionId *old_snapshots;
 	ObjectAddress address;
@@ -331,10 +331,27 @@ DefineIndex(Oid relationId,
 	Snapshot	snapshot;
 	int			i;
 
+	if(list_intersection(stmt->indexParams, stmt->indexIncludingParams) != NIL)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
+				 errmsg("included columns must not intersect with key columns")));
+
 	/*
 	 * count attributes in index
 	 */
+	numberOfKeyAttributes = list_length(stmt->indexParams);
+	if (numberOfKeyAttributes <= 0)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
+				 errmsg("must specify at least one key column")));
+
+	/*
+	 * All information about key and included cols is in numberOfKeyAttributes number.
+	 * So we can concat all index params into one list.
+	 */
+	stmt->indexParams = list_concat(stmt->indexParams, stmt->indexIncludingParams);
 	numberOfAttributes = list_length(stmt->indexParams);
+
 	if (numberOfAttributes <= 0)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
@@ -466,6 +483,7 @@ DefineIndex(Oid relationId,
 	 * look up the access method, verify it can handle the requested features
 	 */
 	accessMethodName = stmt->accessMethod;
+
 	tuple = SearchSysCache1(AMNAME, PointerGetDatum(accessMethodName));
 	if (!HeapTupleIsValid(tuple))
 	{
@@ -511,6 +529,12 @@ DefineIndex(Oid relationId,
 		errmsg("access method \"%s\" does not support exclusion constraints",
 			   accessMethodName)));
 
+	if (list_length(stmt->indexIncludingParams) > 0 && !accessMethodForm->amcanincluding)
+		ereport(ERROR,
+		(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+		errmsg("access method \"%s\" does not support included columns",
+				accessMethodName)));
+
 	amcanorder = accessMethodForm->amcanorder;
 	amoptions = accessMethodForm->amoptions;
 
@@ -536,6 +560,7 @@ DefineIndex(Oid relationId,
 	 */
 	indexInfo = makeNode(IndexInfo);
 	indexInfo->ii_NumIndexAttrs = numberOfAttributes;
+	indexInfo->ii_NumIndexKeyAttrs = numberOfKeyAttributes;
 	indexInfo->ii_Expressions = NIL;	/* for now */
 	indexInfo->ii_ExpressionsState = NIL;
 	indexInfo->ii_Predicate = make_ands_implicit((Expr *) stmt->whereClause);

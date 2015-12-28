@@ -1134,9 +1134,22 @@ pg_get_indexdef_worker(Oid indexrelid, int colno,
 		Oid			keycoltype;
 		Oid			keycolcollation;
 
+		/* Report the INCLUDED attributes, if any. */
+		if(keyno == idxrec->indnkeyatts)
+		{
+			if(!attrsOnly)
+			{
+				appendStringInfoString(&buf, ") INCLUDING (");
+				sep = "";
+			}
+		}
+		else if (keyno > idxrec->indnkeyatts)
+			sep = ", ";
+
 		if (!colno)
 			appendStringInfoString(&buf, sep);
 		sep = ", ";
+
 
 		if (attnum != 0)
 		{
@@ -1145,8 +1158,12 @@ pg_get_indexdef_worker(Oid indexrelid, int colno,
 			int32		keycoltypmod;
 
 			attname = get_relid_attribute_name(indrelid, attnum);
-			if (!colno || colno == keyno + 1)
+
+			if (!colno || colno == keyno + 1) {
 				appendStringInfoString(&buf, quote_identifier(attname));
+				if ((attrsOnly)&&(keyno >= idxrec->indnkeyatts))
+					appendStringInfoString(&buf, " (included)");
+			}
 			get_atttypetypmodcoll(indrelid, attnum,
 								  &keycoltype, &keycoltypmod,
 								  &keycolcollation);
