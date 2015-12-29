@@ -8,6 +8,7 @@
 #include "optimizer/paths.h"
 #include "optimizer/pathnode.h"
 #include "optimizer/planner.h"
+#include "optimizer/restrictinfo.h"
 #include "utils/hsearch.h"
 #include "utils/tqual.h"
 #include "utils/rel.h"
@@ -337,22 +338,26 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti,
 		bool alwaysTrue;
 		WrapperNode *wrap = (WrapperNode *) lfirst(lc);
 		Node *new_clause = wrapper_make_expression(wrap, index, &alwaysTrue);
-		RestrictInfo *new_rinfo;
+		RestrictInfo *old_rinfo = (RestrictInfo *) lfirst(lc2),
+					 *new_rinfo;
 
 		if (alwaysTrue)
 			continue;
 		Assert(new_clause);
 
-		/* TODO: evade double copy of clause */
-
-		new_rinfo = copyObject((Node *) lfirst(lc2));
-		new_rinfo->clause = (Expr *)new_clause;
+		new_rinfo = make_restrictinfo((Expr *) new_clause,
+									  old_rinfo->is_pushed_down,
+									  old_rinfo->outerjoin_delayed,
+									  old_rinfo->pseudoconstant,
+									  old_rinfo->required_relids,
+									  old_rinfo->outer_relids,
+									  old_rinfo->nullable_relids);
 
 		/* replace old relids with new ones */
 		change_varnos((Node *)new_rinfo, rel->relid, childrel->relid);
 
 		childrel->baserestrictinfo = lappend(childrel->baserestrictinfo,
-											 new_rinfo);
+											 (void *) new_rinfo);
 	}
 
 	/* Build an AppendRelInfo for this parent and child */
