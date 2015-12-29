@@ -1,0 +1,142 @@
+<!-- doc/src/sgml/release-pro-9.5.sgml -->
+<!-- See header comment in release.sgml about typical markup -->
+
+ <sect1 id="release-pro-9-5">
+  <title>Postgres Pro 9.5</title>
+
+  <note>
+   <title>Release Date</title>
+   <simpara>2016-??-??</simpara>
+   <simpara>Current as of 2015-12-30</simpara>
+  </note>
+
+  <sect2>
+   <title>Overview</title>
+
+   <para>
+    Major enhancements in <productname>Postgres Pro</> 9.5 include:
+   </para>
+
+   <!-- This list duplicates items below, but without authors or details-->
+
+   <itemizedlist>
+
+    <listitem>
+     <para>
+     </para>
+    </listitem>
+
+
+   </itemizedlist>
+
+   <para>
+    The above items are explained in more detail in the sections below.
+   </para>
+
+  </sect2>
+
+  <sect2>
+
+  <title>Migration to Version 9.5</title>
+
+   <para>
+    A dump/restore using <xref linkend="app-pg-dumpall">, or use
+    of <xref linkend="pgupgrade">, is required for those wishing to migrate
+    data from any previous release.
+   </para>
+
+
+   <itemizedlist>
+    <listitem>
+    <para>
+    <!-- to be filled in -->
+    </para>
+    </listitem>
+   </itemizedlist>
+
+  </sect2>
+
+  <sect2>
+   <title>Changes</title>
+
+   <para>
+    Below you will find a detailed account of the changes between
+    <productname>PostgrePro</productname> 9.5 and the previous major
+    release.
+   </para>
+
+   <sect3>
+    <title>Server</title>
+
+    <sect4>
+     <title>Indexes</title>
+
+     <itemizedlist>
+
+      <listitem>
+       <para>
+       <!-- to be filled -->
+       </para>
+
+      </listitem>
+
+     </itemizedlist>
+
+    </sect4>
+
+    <sect4>
+     <title>General Performance</title>
+
+     <itemizedlist>
+    <listitem>
+<!-- Put commit message here -->      
+    <para>
+    
+       <!-- to be filled -->
+    </para>
+    </listitem>
+     </itemizedlist>
+
+    </sect4>
+
+
+   </sect3>
+
+   <sect3>
+    <title>Replication and Recovery</title>
+
+     <itemizedlist>
+
+      <listitem>
+
+<!-- Put commit message here -->      
+       <para>
+       <!-- to be filled -->
+       </para>
+
+      </listitem>
+     </itemizedlist>
+
+   </sect3>
+
+
+
+   <sect3>
+    <title>Additional Modules</title>
+
+    <itemizedlist>
+
+     <listitem>
+<!--
+Put commit ID and message here
+-->
+      <para>
+      <!-- To be filled in -->
+      </para>
+     </listitem>
+
+    </itemizedlist>
+   </sect3>
+  </sect2>
+
+ </sect1>
