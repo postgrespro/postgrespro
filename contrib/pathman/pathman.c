@@ -1,6 +1,7 @@
 #include "pathman.h"
 #include "postgres.h"
 #include "fmgr.h"
+#include "nodes/nodeFuncs.h"
 #include "nodes/pg_list.h"
 #include "nodes/relation.h"
 #include "nodes/primnodes.h"
@@ -28,6 +29,13 @@ typedef struct
 	Oid new_varno;
 } change_varno_context;
 
+typedef struct
+{
+	const Node	   *orig;
+	List		   *args;
+	List		   *rangeset;
+} WrapperNode;
+
 /* Original hooks */
 static set_rel_pathlist_hook_type set_rel_pathlist_hook_original = NULL;
 static shmem_startup_hook_type shmem_startup_hook_original = NULL;
@@ -38,17 +46,18 @@ static void my_shmem_startup(void);
 static void my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte);
 static PlannedStmt * my_planner_hook(Query *parse, int cursorOptions, ParamListInfo boundParams);
 
-static void append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte, int childOID);
+static void append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti,
+				RangeTblEntry *rte, int index, Oid childOID, List *wrappers);
+static Node *wrapper_make_expression(WrapperNode *wrap, int index, bool *alwaysTrue);
 static void set_pathkeys(PlannerInfo *root, RelOptInfo *childrel, Path *path);
 static void disable_inheritance(Query *parse);
 
-static List *walk_expr_tree(Expr *expr, const PartRelationInfo *prel, bool *all);
+static WrapperNode *walk_expr_tree(Expr *expr, const PartRelationInfo *prel);
 static int make_hash(const PartRelationInfo *prel, int value);
-static int range_binary_search(const RangeRelation *rangerel, FmgrInfo *cmp_func, Datum value, bool *fountPtr);
-static List *handle_binary_opexpr(const PartRelationInfo *partrel, const OpExpr *expr, const Var *v, const Const *c, bool *all);
-static List *handle_opexpr(const OpExpr *expr, const PartRelationInfo *prel, bool *all);
-static List *handle_boolexpr(const BoolExpr *expr, const PartRelationInfo *prel, bool *all);
-static List *handle_arrexpr(const ScalarArrayOpExpr *expr, const PartRelationInfo *prel, bool *all);
+static void handle_binary_opexpr(const PartRelationInfo *prel, WrapperNode *result, const Var *v, const Const *c);
+static WrapperNode *handle_opexpr(const OpExpr *expr, const PartRelationInfo *prel);
+static WrapperNode *handle_boolexpr(const BoolExpr *expr, const PartRelationInfo *prel);
+static WrapperNode *handle_arrexpr(const ScalarArrayOpExpr *expr, const PartRelationInfo *prel);
 
 static void set_plain_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte);
 static void set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte);
@@ -58,13 +67,10 @@ static void change_varnos_in_restrinct_info(RestrictInfo *rinfo, change_varno_co
 static void change_varnos(Node *node, Oid old_varno, Oid new_varno);
 static bool change_varno_walker(Node *node, change_varno_context *context);
 
-static bool reconstruct_restrictinfo(Node *node, PartRelationInfo *prel, Oid relid);
-
 /* callbacks */
 PG_FUNCTION_INFO_V1( on_partitions_created );
 PG_FUNCTION_INFO_V1( on_partitions_updated );
 PG_FUNCTION_INFO_V1( on_partitions_removed );
-PG_FUNCTION_INFO_V1( find_range_partition );
 
 
 /*
@@ -198,10 +204,9 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 
 	if (prel != NULL)
 	{
-		List *children = NIL;
-		List *ranges;
+		List		   *ranges,
+					   *wrappers;
 		ListCell	   *lc;
-		int	childOID = -1;
 		int	i;
 		Oid *dsm_arr;
 
@@ -212,37 +217,27 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 		// 	// children = lappend_int(children, prel->children[i]);
 		// 	children = lappend_int(children, dsm_arr[i]);
 
-		ranges = list_make1_int(make_range(0, prel->children_count-1));
+		ranges = list_make1_int(make_irange(0, prel->children_count - 1, false));
 
-		/* Run over restrictions and collect children partitions */
+		/* Make wrappers over restrictions and collect final rangeset */
+		wrappers = NIL;
 		foreach(lc, rel->baserestrictinfo)
 		{
-			bool all;
+			WrapperNode *wrap;
+
 			RestrictInfo *rinfo = (RestrictInfo*) lfirst(lc);
-			List *ret = walk_expr_tree(rinfo->clause, prel, &all);
-			ranges = intersect_ranges(ranges, ret);
 
-			// if (!all)
-			// {
-			// 	children = list_intersection_int(children, ret);
-			// 	list_free(ret);
-			// }
-		}
-
-		foreach(lc, ranges)
-		{
-			int i;
-			IndexRange range = (IndexRange) lfirst(lc);
-			for (i=range_min(range); i<=range_max(range); i++)
-				children = lappend_int(children, dsm_arr[i]);
+			wrap = walk_expr_tree(rinfo->clause, prel);
+			wrappers = lappend(wrappers, wrap);
+			ranges = irange_list_intersect(ranges, wrap->rangeset);
 		}
 
 		/* expand simple_rte_array and simple_rel_array */
-		if (list_length(children) > 0)
+		if (list_length(ranges) > 0)
 		{
 			RelOptInfo **new_rel_array;
 			RangeTblEntry **new_rte_array;
-			int len = list_length(children);
+			int len = irange_list_length(ranges);
 
 			/* Expand simple_rel_array and simple_rte_array */
 			ereport(LOG, (errmsg("Expanding simple_rel_array")));
@@ -255,7 +250,7 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 				palloc0((root->simple_rel_array_size + len) * sizeof(RangeTblEntry *));
 
 			/* TODO: use memcpy */
-			for (i=0; i<root->simple_rel_array_size; i++)
+			for (i = 0; i < root->simple_rel_array_size; i++)
 			{
 				new_rel_array[i] = root->simple_rel_array[i];
 				new_rte_array[i] = root->simple_rte_array[i];
@@ -267,10 +262,20 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 			/* TODO: free old arrays */
 		}
 
-		foreach(lc, children)
+		/*
+		 * Iterate all indexes in rangeset and append corresponding child
+		 * relations.
+		 */
+		foreach(lc, ranges)
 		{
-			childOID = (Oid) lfirst_int(lc);
-			append_child_relation(root, rel, rti, rte, childOID);
+			IndexRange	irange = lfirst_irange(lc);
+			Oid			childOid;
+
+			for (i = irange_lower(irange); i <= irange_upper(irange); i++)
+			{
+				childOid = dsm_arr[i];
+				append_child_relation(root, rel, rti, rte, i, childOid, wrappers);
+			}
 		}
 
 		/* TODO: clear old path list */
@@ -285,8 +290,9 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 	}
 }
 
-void
-append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte, int childOID)
+static void
+append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti,
+	RangeTblEntry *rte, int index, Oid childOid, List *wrappers)
 {
 	RangeTblEntry *childrte;
 	RelOptInfo    *childrel;
@@ -295,14 +301,14 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEnt
 	PartRelationInfo *prel;
 
 	Node *node;
-	ListCell *lc;
+	ListCell *lc, *lc2;
 
 	prel = (PartRelationInfo *)
 			hash_search(relations, (const void *) &rte->relid, HASH_FIND, 0);
 
 	/* Create RangeTblEntry for child relation */
 	childrte = copyObject(rte);
-	childrte->relid = childOID;
+	childrte->relid = childOid;
 	childrte->inh = false;
 	childrte->requiredPerms = 0;
 	root->parse->rtable = lappend(root->parse->rtable, childrte);
@@ -326,22 +332,27 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEnt
 
 	/* copy restrictions */
 	childrel->baserestrictinfo = NIL;
-	foreach(lc, rel->baserestrictinfo)
+	forboth(lc, wrappers, lc2, rel->baserestrictinfo)
 	{
+		bool alwaysTrue;
+		WrapperNode *wrap = (WrapperNode *) lfirst(lc);
+		Node *new_clause = wrapper_make_expression(wrap, index, &alwaysTrue);
 		RestrictInfo *new_rinfo;
 
-		node = (Node *) lfirst(lc);
-		new_rinfo = copyObject(node);
+		if (alwaysTrue)
+			continue;
+		Assert(new_clause);
+
+		/* TODO: evade double copy of clause */
+
+		new_rinfo = copyObject((Node *) lfirst(lc2));
+		new_rinfo->clause = (Expr *)new_clause;
 
 		/* replace old relids with new ones */
-		// change_varnos_in_restrinct_info(new_rinfo, rel->relid, childrel->relid);
-		change_varnos(new_rinfo, rel->relid, childrel->relid);
+		change_varnos((Node *)new_rinfo, rel->relid, childrel->relid);
 
 		childrel->baserestrictinfo = lappend(childrel->baserestrictinfo,
 											 new_rinfo);
-
-		/* TODO: temporarily commented out */
-		// reconstruct_restrictinfo((Node *) new_rinfo, prel, childOID);
 	}
 
 	/* Build an AppendRelInfo for this parent and child */
@@ -353,7 +364,82 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEnt
 	root->total_table_pages += (double) childrel->pages;
 
 	ereport(LOG,
-			(errmsg("Relation %u appended", childOID)));
+			(errmsg("Relation %u appended", childOid)));
+}
+
+/* Convert wrapper into expression for given index */
+static Node *
+wrapper_make_expression(WrapperNode *wrap, int index, bool *alwaysTrue)
+{
+	bool	lossy, found;
+
+	*alwaysTrue = false;
+	/*
+	 * TODO: use faster algorithm using knowledge than we enumerate indexes
+	 * sequntially.
+	 */
+	found = irange_list_find(wrap->rangeset, index, &lossy);
+	/* Return NULL for always true and always false. */
+	if (!found)
+		return NULL;
+	if (!lossy)
+	{
+		*alwaysTrue = true;
+		return NULL;
+	}
+
+	if (IsA(wrap->orig, BoolExpr))
+	{
+		const BoolExpr *expr = (const BoolExpr *) wrap->orig;
+		BoolExpr *result;
+
+		if (expr->boolop == OR_EXPR || expr->boolop == AND_EXPR)
+		{
+			ListCell *lc;
+			List *args = NIL;
+
+			foreach (lc, wrap->args)
+			{
+				Node   *arg;
+				bool	childAlwaysTrue;
+
+				arg = wrapper_make_expression((WrapperNode *)lfirst(lc), index, &childAlwaysTrue);
+#ifdef USE_ASSERT_CHECKING
+				/*
+				 * We shouldn't get there for always true clause under OR and
+				 * always false clause under AND.
+				 */
+				if (expr->boolop == OR_EXPR)
+					Assert(!childAlwaysTrue);
+				if (expr->boolop == AND_EXPR)
+					Assert(arg || childAlwaysTrue);
+#endif
+				if (arg)
+					args = lappend(args, arg);
+			}
+
+			Assert(list_length(args) >= 1);
+
+			/* Remove redundant OR/AND when child is single. */
+			if (list_length(args) == 1)
+				return (Node *) linitial(args);
+
+			result = makeNode(BoolExpr);
+			result->xpr.type = T_BoolExpr;
+			result->args = args;
+			result->boolop = expr->boolop;
+			result->location = expr->location;
+			return (Node *)result;
+		}
+		else
+		{
+			return copyObject(wrap->orig);
+		}
+	}
+	else
+	{
+		return copyObject(wrap->orig);
+	}
 }
 
 
@@ -442,128 +528,62 @@ change_varnos_in_restrinct_info(RestrictInfo *rinfo, change_varno_context *conte
 	}
 }
 
-
-/*
- * Recursive function that removes expressions that doesn't satisfy specified
- * relation. Function returns false if clause should be removed from expression
- * and true otherwise.
- *
- * node is instance of Expr or RestricInfo
- * relid is relation Oid
- */
-static bool
-reconstruct_restrictinfo(Node *node, PartRelationInfo *prel, Oid relid)
-{
-	ListCell *lc;
-	List *new_args = NIL;
-	BoolExpr *boolexpr;
-	bool ret;
-
-	if (!node)
-		return false;
-
-	if (IsA(node, RestrictInfo))
-	{
-		RestrictInfo *rinfo = (RestrictInfo *) node;
-		ret = reconstruct_restrictinfo((Node *) rinfo->clause, prel, relid);
-		reconstruct_restrictinfo((Node *) rinfo->orclause, prel, relid);
-		return ret;
-	}
-	if (IsA(node, BoolExpr))
-	{
-		boolexpr = (BoolExpr *) node;
-		switch (boolexpr->boolop)
-		{
-			case OR_EXPR:
-				ret = false;
-				foreach (lc, boolexpr->args)
-				{
-					/* if relation does satisfy this clause then append it */
-					if(reconstruct_restrictinfo((Node*)lfirst(lc), prel, relid))
-					{
-						new_args = lappend(new_args, lfirst(lc));
-						ret = true;
-					}
-				}
-				boolexpr->args = new_args;
-				/* TODO: destroy old args and list itself */
-				return ret;
-			case AND_EXPR:
-				ret = true;
-				foreach (lc, boolexpr->args)
-				{
-					if(!reconstruct_restrictinfo((Node*)lfirst(lc), prel, relid))
-						ret = false;
-				}
-				return ret;
-			default:
-				break;
-		}
-	}
-	if(IsA(node, OpExpr) || IsA(node, ScalarArrayOpExpr))
-	{
-		bool all;
-		List *relids = walk_expr_tree((Expr *) node, prel, &all);
-		if (all)
-			return true;
-		return list_member_int(relids, (int)relid);
-	}
-
-	return true;
-}
-
 /*
  * Recursive function to walk through conditions tree
  */
-static List *
-walk_expr_tree(Expr *expr, const PartRelationInfo *prel, bool *all)
+static WrapperNode *
+walk_expr_tree(Expr *expr, const PartRelationInfo *prel)
 {
 	BoolExpr		   *boolexpr;
 	OpExpr			   *opexpr;
 	ScalarArrayOpExpr  *arrexpr;
+	WrapperNode		   *result;
 
 	switch (expr->type)
 	{
 		/* AND, OR, NOT expressions */
 		case T_BoolExpr:
 			boolexpr = (BoolExpr *) expr;
-			return handle_boolexpr(boolexpr, prel, all);
+			return handle_boolexpr(boolexpr, prel);
 		/* =, !=, <, > etc. */
 		case T_OpExpr:
 			opexpr = (OpExpr *) expr;
-			return handle_opexpr(opexpr, prel, all);
+			return handle_opexpr(opexpr, prel);
 		/* IN expression */
 		case T_ScalarArrayOpExpr:
 			arrexpr = (ScalarArrayOpExpr *) expr;
-			*all = false;
-			return handle_arrexpr(arrexpr, prel, all);
+			return handle_arrexpr(arrexpr, prel);
 		default:
-			*all = true;
-			return NIL;
+			result = (WrapperNode *)palloc(sizeof(WrapperNode));
+			result->orig = (const Node *)expr;
+			result->args = NIL;
+			result->rangeset = list_make1_irange(make_irange(0, prel->children_count - 1, true));
+			return result;
 	}
 }
 
 /*
  *	This function determines which partitions should appear in query plan
  */
-static List *
-handle_binary_opexpr(const PartRelationInfo *prel, const OpExpr *expr,
-					 const Var *v, const Const *c, bool *all)
+static void
+handle_binary_opexpr(const PartRelationInfo *prel, WrapperNode *result,
+					 const Var *v, const Const *c)
 {
 	HashRelationKey		key;
 	RangeRelation	   *rangerel;
-	int					int_value;
 	Datum				value;
-	bool found;
-	int pos;
-	int startidx, endidx;
-	FmgrInfo *cmp_func;
-	*all = false;
+	int					i,
+						int_value,
+						strategy;
+	FmgrInfo		   *cmp_func;
+	const OpExpr	   *expr = (const OpExpr *)result->orig;
+	TypeCacheEntry	   *tce;
+
 
 	/* determine operator type */
-	TypeCacheEntry *tce = lookup_type_cache(v->vartype,
+	tce = lookup_type_cache(v->vartype,
 		TYPECACHE_EQ_OPR | TYPECACHE_LT_OPR | TYPECACHE_GT_OPR | TYPECACHE_CMP_PROC | TYPECACHE_CMP_PROC_FINFO);
-	int strategy = get_op_opfamily_strategy(expr->opno, tce->btree_opf);
+	strategy = get_op_opfamily_strategy(expr->opno, tce->btree_opf);
 	cmp_func = &tce->cmp_proc_finfo;
 
 	switch (prel->parttype)
@@ -574,7 +594,8 @@ handle_binary_opexpr(const PartRelationInfo *prel, const OpExpr *expr,
 				int_value = DatumGetInt32(c->constvalue);
 				key.hash = make_hash(prel, int_value);
 
-				return list_make1_int(make_range(key.hash, key.hash));
+				result->rangeset = list_make1_irange(make_irange(key.hash, key.hash, true));
+				return;
 			}
 		case PT_RANGE:
 			value = c->constvalue;
@@ -583,231 +604,237 @@ handle_binary_opexpr(const PartRelationInfo *prel, const OpExpr *expr,
 			if (rangerel != NULL)
 			{
 				RangeEntry *re;
-				// bool		found = false;
-				// startidx = 0;
-				// int counter = 0;
+				bool		found = false,
+							lossy = false;
+				int			counter = 0,
+							startidx = 0,
+							cmp_min,
+							cmp_max,
+							endidx = rangerel->nranges - 1;
 				RangeEntry *ranges = dsm_array_get_pointer(&rangerel->ranges);
-
-				// endidx = rangerel->nranges-1;
 
 				/* check boundaries */
 				if (rangerel->nranges == 0)
 				{
-					*all = true;
-					return list_make1_int(make_range(0, RANGE_INFINITY));
+					result->rangeset = NIL;
+					return;
 				}
-				else if ((check_gt(cmp_func, ranges[0].min, value) && (strategy == BTGreaterStrategyNumber || strategy == BTGreaterEqualStrategyNumber)) ||
-						 (check_lt(cmp_func, ranges[rangerel->nranges-1].max, value) && (strategy == BTLessStrategyNumber || strategy == BTLessEqualStrategyNumber)))
+				else
 				{
-					*all = true;
-					return list_make1_int(make_range(0, RANGE_INFINITY));
-				}
-				else if (check_gt(cmp_func, ranges[0].min, value) ||
-						 check_lt(cmp_func, ranges[rangerel->nranges-1].max, value))
-				{
-					*all = false;
-					return NIL;
+					/* Corner cases */
+					cmp_min = FunctionCall2(cmp_func, value, ranges[0].min),
+					cmp_max = FunctionCall2(cmp_func, value, ranges[rangerel->nranges - 1].max);
+
+					if ((cmp_min < 0 && strategy == BTLessEqualStrategyNumber) || 
+						(cmp_min <= 0 && strategy == BTLessStrategyNumber))
+					{
+						result->rangeset = NIL;
+						return;
+					}
+
+					if (cmp_max >= 0 && (strategy == BTGreaterEqualStrategyNumber || 
+						strategy == BTGreaterStrategyNumber))
+					{
+						result->rangeset = NIL;
+						return;
+					}
+
+					if ((cmp_min < 0 && strategy == BTGreaterStrategyNumber) || 
+						(cmp_min <= 0 && strategy == BTGreaterEqualStrategyNumber))
+					{
+						result->rangeset = list_make1_irange(make_irange(startidx, endidx, false));
+						return;
+					}
+
+					if (cmp_max >= 0 && (strategy == BTLessEqualStrategyNumber || 
+						strategy == BTLessStrategyNumber))
+					{
+						result->rangeset = list_make1_irange(make_irange(startidx, endidx, false));
+						return;
+					}
 				}
 
 				/* binary search */
-				// while (true)
-				// {
-				// 	i = startidx + (endidx - startidx) / 2;
-				// 	if (i >= 0 && i < rangerel->nranges)
-				// 	{
-				// 		re = &ranges[i];
-				// 		if (check_le(cmp_func, re->min, value) && check_le(cmp_func, value, re->max))
-				// 		{
-				// 			found = true;
-				// 			break;
-				// 		}
-				// 		else if (check_lt(cmp_func, value, re->min))
-				// 			endidx = i - 1;
-				// 		else if (check_gt(cmp_func, value, re->max))
-				// 			startidx = i + 1;
-				// 	}
-				// 	else
-				// 		break;
-				// 	/* for debug's sake */
-				// 	Assert(++counter < 100);
-				// }
-				pos = range_binary_search(rangerel, cmp_func, value, &found);
-				re = &ranges[pos];
+				while (true)
+				{
+					i = startidx + (endidx - startidx) / 2;
+					Assert(i >= 0 && i < rangerel->nranges);
+					re = &ranges[i];
+					cmp_min = FunctionCall2(cmp_func, value, re->min);
+					cmp_max = FunctionCall2(cmp_func, value, re->max);
+					if (cmp_min < 0 || (cmp_min == 0 && strategy == BTLessStrategyNumber))
+					{
+						endidx = i - 1;
+					}
+					else if (cmp_max > 0 || (cmp_max >= 0 && strategy != BTLessStrategyNumber))
+					{
+						startidx = i + 1;
+					}
+					else
+					{
+						if (strategy == BTGreaterEqualStrategyNumber && cmp_min == 0)
+							lossy = false;
+						else if (strategy == BTLessStrategyNumber && cmp_max == 0)
+							lossy = false;
+						else
+							lossy = true;
+						found = true;
+						break;
+					}
+					/* for debug's sake */
+					Assert(++counter < 100);
+				}
+
+				Assert(found);
 
 				/* filter partitions */
-				if (re != NULL)
+				switch(strategy)
 				{
-					switch(strategy)
-					{
-						case BTLessStrategyNumber:
-							startidx = 0;
-							endidx = check_eq(cmp_func, re->min, value) ? pos-1 : pos;
-							break;
-						case BTLessEqualStrategyNumber:
-							startidx = 0;
-							endidx = pos;
-							break;
-						case BTEqualStrategyNumber:
-							// return list_make1_int(re->child_oid);
-							// return list_make1_int(make_range(prel->oid, prel->oid));
-							if (found)
-								return list_make1_int(make_range(pos, pos));
-							else
-								return NIL;
-						case BTGreaterEqualStrategyNumber:
-							startidx = pos;
-							endidx = rangerel->nranges-1;
-							break;
-						case BTGreaterStrategyNumber:
-							startidx = check_eq(cmp_func, re->max, value) ? pos+1 : pos;
-							endidx = rangerel->nranges-1;
-					}
-					// for (j=startidx; j<=endidx; j++)
-					// 	children = lappend_int(children, ranges[j].child_oid);
-					*all = false;
-					return list_make1_int(make_range(startidx, endidx));
-
-					// return children;
+					case BTLessStrategyNumber:
+					case BTLessEqualStrategyNumber:
+						if (lossy)
+						{
+							result->rangeset = list_make1_irange(make_irange(i, i, true));
+							if (i > 0)
+								result->rangeset = lcons_irange(
+									make_irange(0, i - 1, false), result->rangeset);
+						}
+						else
+						{
+							result->rangeset = list_make1_irange(
+								make_irange(0, i, false));
+						}
+						return;
+					case BTEqualStrategyNumber:
+						result->rangeset = list_make1_irange(make_irange(i, i, true));
+						return;
+					case BTGreaterEqualStrategyNumber:
+					case BTGreaterStrategyNumber:
+						if (lossy)
+						{
+							result->rangeset = list_make1_irange(make_irange(i, i, true));
+							if (i < prel->children_count - 1)
+								result->rangeset = lappend_irange(result->rangeset,
+									make_irange(i + 1, prel->children_count - 1, false));
+						}
+						else
+						{
+							result->rangeset = list_make1_irange(
+								make_irange(i, prel->children_count - 1, false));
+						}
+						return;
 				}
+				result->rangeset = list_make1_irange(make_irange(startidx, endidx, true));
+				return;
 			}
 	}
 
-	*all = true;
-	return NIL;
+	result->rangeset = list_make1_irange(make_irange(0, prel->children_count - 1, true));
 }
 
 /*
  * Calculates hash value
  */
 static int
-make_hash(const PartRelationInfo *prel, int value) {
+make_hash(const PartRelationInfo *prel, int value)
+{
 	return value % prel->children_count;
 }
 
 /*
- * Search for range section. Returns position of the item in array.
- * If item wasn't found then function returns closest position and sets
- * foundPtr to false.
- */
-static int
-range_binary_search(const RangeRelation *rangerel, FmgrInfo *cmp_func, Datum value, bool *fountPtr)
-{
-	int		i;
-	int		startidx = 0;
-	int		endidx = rangerel->nranges-1;
-	int		counter = 0;
-	RangeEntry *ranges = dsm_array_get_pointer(&rangerel->ranges);
-	RangeEntry *re;
-
-	*fountPtr = false;
-	while (true)
-	{
-		i = startidx + (endidx - startidx) / 2;
-		if (i >= 0 && i < rangerel->nranges)
-		{
-			re = &ranges[i];
-			if (check_le(cmp_func, re->min, value) && check_lt(cmp_func, value, re->max))
-			{
-				*fountPtr = true;
-				break;
-			}
-			
-			/* if we still didn't find position then it is not in array */
-			if (startidx == endidx)
-				return i;
-
-			if (check_lt(cmp_func, value, re->min))
-				endidx = i - 1;
-			else if (check_ge(cmp_func, value, re->max))
-				startidx = i + 1;
-		}
-		else
-			break;
-		/* for debug's sake */
-		Assert(++counter < 100);
-	}
-
-	return i;
-}
-
-/*
  *
  */
-static List *
-handle_opexpr(const OpExpr *expr, const PartRelationInfo *prel, bool *all)
+static WrapperNode *
+handle_opexpr(const OpExpr *expr, const PartRelationInfo *prel)
 {
-	Node *firstarg = NULL;
-	Node *secondarg = NULL;
+	WrapperNode	*result = (WrapperNode *)palloc(sizeof(WrapperNode));
+	Node		*firstarg = NULL,
+				*secondarg = NULL;
+
+	result->orig = (const Node *)expr;
+	result->args = NIL;
 
 	if (list_length(expr->args) == 2)
 	{
-		firstarg = (Node*) linitial(expr->args);
-		secondarg = (Node*) lsecond(expr->args);
-		if (firstarg->type == T_Var && secondarg->type == T_Const &&
-			((Var*)firstarg)->varattno == prel->attnum)
+		firstarg = (Node *) linitial(expr->args);
+		secondarg = (Node *) lsecond(expr->args);
+
+		if (IsA(firstarg, Var) && IsA(secondarg, Const) &&
+			((Var *)firstarg)->varattno == prel->attnum)
 		{
-			return handle_binary_opexpr(prel, expr, (Var*)firstarg, (Const*)secondarg, all);
+			handle_binary_opexpr(prel, result, (Var *)firstarg, (Const *)secondarg);
+			return result;
 		}
-		else if (secondarg->type == T_Var && firstarg->type == T_Const &&
-			((Var*)secondarg)->varattno == prel->attnum)
+		else if (IsA(secondarg, Var) && IsA(firstarg, Const) &&
+				 ((Var *)secondarg)->varattno == prel->attnum)
 		{
-			return handle_binary_opexpr(prel, expr, (Var*)secondarg, (Const*)firstarg, all);
+			handle_binary_opexpr(prel, result, (Var *)secondarg, (Const *)firstarg);
+			return result;
 		}
 	}
 
-	*all = true;
-	return NIL;
+	result->rangeset = list_make1_irange(make_irange(0, prel->children_count - 1, true));
+	return result;
 }
 
 /*
  *
  */
-static List *
-handle_boolexpr(const BoolExpr *expr, const PartRelationInfo *prel, bool *all)
+static WrapperNode *
+handle_boolexpr(const BoolExpr *expr, const PartRelationInfo *prel)
 {
-	ListCell *lc;
-	List *ret = NIL;
-	List *b = NIL;
+	WrapperNode	*result = (WrapperNode *)palloc(sizeof(WrapperNode));
+	ListCell	*lc;
 
-	*all = (expr->boolop == AND_EXPR) ? true : false;
+	result->orig = (const Node *)expr;
+	result->args = NIL;
 
 	if (expr->boolop == AND_EXPR)
-		ret = list_make1_int(make_range(0, RANGE_INFINITY));
+		result->rangeset = list_make1_irange(make_irange(0, prel->children_count - 1, false));
+	else
+		result->rangeset = NIL;
 
 	foreach (lc, expr->args)
 	{
-		bool sub_all = false;
-		b = walk_expr_tree((Expr*)lfirst(lc), prel, &sub_all);
+		WrapperNode *arg;
+
+		arg = walk_expr_tree((Expr *)lfirst(lc), prel);
+		result->args = lappend(result->args, arg);
 		switch(expr->boolop)
 		{
 			case OR_EXPR:
-				ret = unite_ranges(ret, b);
+				result->rangeset = irange_list_union(result->rangeset, arg->rangeset);
 				break;
 			case AND_EXPR:
-				ret = intersect_ranges(ret, b);
+				result->rangeset = irange_list_intersect(result->rangeset, arg->rangeset);
 				break;
 			default:
+				result->rangeset = list_make1_irange(make_irange(0, prel->children_count - 1, false));
 				break;
 		}
 	}
 
-	return ret;
+	return result;
 }
 
 /*
  *
  */
-static List *
-handle_arrexpr(const ScalarArrayOpExpr *expr, const PartRelationInfo *prel, bool *all)
+static WrapperNode *
+handle_arrexpr(const ScalarArrayOpExpr *expr, const PartRelationInfo *prel)
 {
-	Node	   *varnode = (Node *) linitial(expr->args);
-	Node	   *arraynode = (Node *) lsecond(expr->args);
-	// HashRelationKey		key;
-	
+	WrapperNode *result = (WrapperNode *)palloc(sizeof(WrapperNode));
+	Node		*varnode = (Node *) linitial(expr->args);
+	Node		*arraynode = (Node *) lsecond(expr->args);
+	int			 hash;
+
+	result->orig = (const Node *)expr;
+	result->args = NIL;
+
 	if (varnode == NULL || !IsA(varnode, Var))
 	{
-		*all = true;
-		return NIL;
+		result->rangeset = list_make1_irange(make_irange(0, prel->children_count - 1, true));
+		return result;
 	}
 
 	if (arraynode && IsA(arraynode, Const) &&
@@ -820,8 +847,7 @@ handle_arrexpr(const ScalarArrayOpExpr *expr, const PartRelationInfo *prel, bool
 		int			num_elems;
 		Datum	   *elem_values;
 		bool	   *elem_nulls;
-		int i;
-		List *oids = NIL;
+		int			i;
 
 		/* extract values from array */
 		arrayval = DatumGetArrayTypeP(((Const *) arraynode)->constvalue);
@@ -832,23 +858,25 @@ handle_arrexpr(const ScalarArrayOpExpr *expr, const PartRelationInfo *prel, bool
 						  elmlen, elmbyval, elmalign,
 						  &elem_values, &elem_nulls, &num_elems);
 
+		result->rangeset = NIL;
+
 		/* construct OIDs list */
-		for (i=0; i<num_elems; i++)
+		for (i = 0; i < num_elems; i++)
 		{
-			int hash = make_hash(prel, elem_values[i]);
-			oids = list_append_unique_int(oids, make_range(hash, hash));
+			hash = make_hash(prel, elem_values[i]);
+			result->rangeset = irange_list_union(result->rangeset,
+						list_make1_irange(make_irange(hash, hash, true)));
 		}
 
 		/* free resources */
 		pfree(elem_values);
 		pfree(elem_nulls);
 
-		*all = false;
-		return oids;
+		return result;
 	}
 
-	*all = true;
-	return NIL;
+	result->rangeset = list_make1_irange(make_irange(0, prel->children_count - 1, true));
+	return result;
 }
 
 /* copy-past from allpaths.c with modifications */
@@ -982,8 +1010,7 @@ accumulate_append_subpath(List *subpaths, Path *path)
  * Callbacks
  */
 Datum
-on_partitions_created(PG_FUNCTION_ARGS)
-{
+on_partitions_created(PG_FUNCTION_ARGS) {
 	// Oid relid;
 
 	LWLockAcquire(load_config_lock, LW_EXCLUSIVE);
@@ -999,8 +1026,7 @@ on_partitions_created(PG_FUNCTION_ARGS)
 }
 
 Datum
-on_partitions_updated(PG_FUNCTION_ARGS)
-{
+on_partitions_updated(PG_FUNCTION_ARGS) {
 	Oid					relid;
 	PartRelationInfo   *prel;
 
@@ -1020,9 +1046,8 @@ on_partitions_updated(PG_FUNCTION_ARGS)
 }
 
 Datum
-on_partitions_removed(PG_FUNCTION_ARGS)
-{
-	Oid		relid;
+on_partitions_removed(PG_FUNCTION_ARGS) {
+	Oid					relid;
 
 	LWLockAcquire(load_config_lock, LW_EXCLUSIVE);
 
@@ -1031,42 +1056,6 @@ on_partitions_removed(PG_FUNCTION_ARGS)
 	remove_relation_info(relid);
 
 	LWLockRelease(load_config_lock);
-
-	PG_RETURN_NULL();
-}
-
-/*
- * Returns partition oid for specified parent relid and value
- */
-Datum
-find_range_partition(PG_FUNCTION_ARGS)
-{
-	int		relid = DatumGetInt32(PG_GETARG_DATUM(0));
-	Datum	value = PG_GETARG_DATUM(1);
-	Oid		value_type = get_fn_expr_argtype(fcinfo->flinfo, 1);
-	int		pos;
-	bool	found;
-	RangeRelation	*rangerel;
-	RangeEntry		*ranges;
-	TypeCacheEntry	*tce;
-	FmgrInfo		*cmp_func;
-
-	tce = lookup_type_cache(value_type,
-		TYPECACHE_EQ_OPR | TYPECACHE_LT_OPR | TYPECACHE_GT_OPR |
-		TYPECACHE_CMP_PROC | TYPECACHE_CMP_PROC_FINFO);
-	cmp_func = &tce->cmp_proc_finfo;
-
-	rangerel = (RangeRelation *)
-		hash_search(range_restrictions, (const void *) &relid, HASH_FIND, NULL);
-
-	if (!rangerel)
-		PG_RETURN_NULL();
-
-	ranges = dsm_array_get_pointer(&rangerel->ranges);
-	pos = range_binary_search(rangerel, cmp_func, value, &found);
-
-	if (found)
-		PG_RETURN_OID(ranges[pos].child_oid);
 
 	PG_RETURN_NULL();
 }
