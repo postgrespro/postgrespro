@@ -126,6 +126,7 @@
 <!ENTITY ltree           SYSTEM "ltree.sgml">
 <!ENTITY oid2name        SYSTEM "oid2name.sgml">
 <!ENTITY pageinspect     SYSTEM "pageinspect.sgml">
+<!ENTITY dump-stat       SYSTEM "dump_stat.sgml">
 <!ENTITY passwordcheck   SYSTEM "passwordcheck.sgml">
 <!ENTITY pgbuffercache   SYSTEM "pgbuffercache.sgml">
 <!ENTITY pgcrypto        SYSTEM "pgcrypto.sgml">
