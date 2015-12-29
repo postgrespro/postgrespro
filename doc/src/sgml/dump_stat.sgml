@@ -1,0 +1,40 @@
+<!-- doc/src/sgml/dump_stat.sgml -->
+
+<sect1 id="dump-stat" xreflabel="dump-stat">
+    <title>dump_stat</title>
+
+    <indexterm zone="dump-stat">
+        <primary>dump_stat</primary>
+    </indexterm>
+
+    <para>
+        The <filename>dump_stat</> module provides functions that allow you to
+        backup and recover the contents of the pg_statistic table.
+    </para>
+
+    <sect2>
+        <title>Functions</title>
+
+        <variablelist>
+            <varlistentry>
+                <term>
+                    <function>dump_statistic() returns setof text</function>
+                    <indexterm>
+                        <primary>dump_statistic</primary>
+                    </indexterm>
+                </term>
+
+                <listitem>
+                    <para>
+                        <function>dump_statistic</function> dumps the contents of the
+                        <link linkend="catalog-pg-statistic"><structname>pg_statistic</structname></link>
+                        system catalog. It produces an <literal>INSERT</> statement
+                        per each tuple of the <literal>pg_statistic</>, excluding
+                        the ones that contain statistical data for tables in
+                        <literal>information_schema</> and <literal>pg_catalog</>
+                        schemas.
+                    </para>
+                </listitem>
+            </varlistentry>
+        </variablelist>
+</sect1>
