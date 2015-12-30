@@ -23,10 +23,14 @@ CREATE OR REPLACE FUNCTION to_schema_qualified_operator(opid oid) RETURNS TEXT A
 		end if;
 	
 		select nspname, oprname, oprleft, oprright
-		from pg_operator inner join pg_namespace
+		from pg_catalog.pg_operator inner join pg_catalog.pg_namespace
 				on oprnamespace = pg_namespace.oid
 		where pg_operator.oid = opid
 		into r;
+		
+		if r is null then
+			raise exception 'operator % does not exist', opid;
+		end if;
 
 		if r.oprleft = 0 then
 			ltype := 'NONE';
@@ -53,7 +57,7 @@ CREATE OR REPLACE FUNCTION to_schema_qualified_type(typid oid) RETURNS TEXT AS $
 
 	BEGIN
 		select quote_ident(nspname) || '.' || quote_ident(typname)
-		from pg_type inner join pg_namespace
+		from pg_catalog.pg_type inner join pg_catalog.pg_namespace
 				on typnamespace = pg_namespace.oid
 		where pg_type.oid = typid
 		into result;
@@ -63,13 +67,13 @@ CREATE OR REPLACE FUNCTION to_schema_qualified_type(typid oid) RETURNS TEXT AS $
 $$ LANGUAGE plpgsql;
 
 
-CREATE FUNCTION to_schema_qualified_relname(reloid oid) RETURNS TEXT AS $$
+CREATE FUNCTION to_schema_qualified_relation(reloid oid) RETURNS TEXT AS $$
 	DECLARE
 		result text;
 		
 	BEGIN
 		select quote_ident(nspname) || '.' || quote_ident(relname)
-		from pg_class inner join pg_namespace
+		from pg_catalog.pg_class inner join pg_catalog.pg_namespace
 				on relnamespace = pg_namespace.oid
 		where pg_class.oid = reloid
 		into result;
@@ -84,12 +88,13 @@ CREATE FUNCTION to_attname(relation text, colnum int2) RETURNS TEXT AS $$
 		result text;
 		
     BEGIN
-		select attname from pg_attribute
+		select attname
+		from pg_catalog.pg_attribute
 		where attrelid = relation::regclass and attnum = colnum
 		into result;
 		
 		if result is null then
-			raise notice 'attribute #% of relation % not found',
+			raise exception 'attribute #% of relation % not found',
 							colnum, quote_literal(relation);
 		end if;
 
@@ -103,12 +108,13 @@ CREATE FUNCTION to_attnum(relation text, col text) RETURNS INT2 AS $$
 		result int2;
 		
     BEGIN
-		select attnum from pg_attribute
+		select attnum
+		from pg_catalog.pg_attribute
 		where attrelid = relation::regclass and attname = col
 		into result;
 		
 		if result is null then
-			raise notice 'attribute % of relation % not found',
+			raise exception 'attribute % of relation % not found',
 							quote_literal(col), quote_literal(relation);
 		end if;
 
@@ -122,12 +128,13 @@ CREATE FUNCTION to_atttype(relation text, col text) RETURNS TEXT AS $$
 		result text;
 		
     BEGIN
-		select to_schema_qualified_type(atttypid) from pg_attribute
+		select to_schema_qualified_type(atttypid)
+		from pg_catalog.pg_attribute
 		where attrelid = relation::regclass and attname = col
 		into result;
 		
 		if result is null then
-			raise notice 'attribute % of relation % not found',
+			raise exception 'attribute % of relation % not found',
 							quote_literal(col), quote_literal(relation);
 		end if;
 
@@ -141,12 +148,13 @@ CREATE FUNCTION to_atttype(relation text, colnum int2) RETURNS TEXT AS $$
 		result text;
 		
     BEGIN
-		select to_schema_qualified_type(atttypid) from pg_attribute
+		select to_schema_qualified_type(atttypid)
+		from pg_catalog.pg_attribute
 		where attrelid = relation::regclass and attnum = colnum
 		into result;
 		
 		if result is null then
-			raise notice 'attribute #% of relation % not found',
+			raise exception 'attribute #% of relation % not found',
 							colnum, quote_literal(relation);
 		end if;
 
@@ -160,7 +168,8 @@ CREATE FUNCTION to_namespace(nsp text) RETURNS OID AS $$
 		result oid;
 		
     BEGIN
-		select oid from pg_namespace
+		select oid
+		from pg_catalog.pg_namespace
 		where nspname = nsp
 		into result;
 
@@ -174,7 +183,8 @@ CREATE FUNCTION get_namespace(relation oid) RETURNS OID AS $$
 		result oid;
 		
     BEGIN
-		select relnamespace from pg_class
+		select relnamespace
+		from pg_catalog.pg_class
 		where oid = relation
 		into result;
 
@@ -183,7 +193,7 @@ CREATE FUNCTION get_namespace(relation oid) RETURNS OID AS $$
 $$ LANGUAGE plpgsql;
 
 
-CREATE FUNCTION dump_statistic() RETURNS SETOF TEXT AS $$
+CREATE FUNCTION dump_statistic(relid oid) RETURNS SETOF TEXT AS $$
 	DECLARE
 		result	text;
 		
@@ -212,11 +222,12 @@ CREATE FUNCTION dump_statistic() RETURNS SETOF TEXT AS $$
 		
 	BEGIN
 		for r in
-				select * from pg_catalog.pg_statistic 
-				where get_namespace(starelid) != to_namespace('pg_catalog') 
-						and get_namespace(starelid) != to_namespace('information_schema') loop
+				select * from pg_catalog.pg_statistic
+				where starelid = relid
+					and get_namespace(starelid) != to_namespace('information_schema')
+					and get_namespace(starelid) != to_namespace('pg_catalog') loop
 			
-			relname := to_schema_qualified_relname(r.starelid);
+			relname := to_schema_qualified_relation(r.starelid);
 			attname := quote_literal(to_attname(relname, r.staattnum));
 			atttype := quote_literal(to_atttype(relname, r.staattnum));
 			relname := quote_literal(relname); -- redefine relname
@@ -226,7 +237,7 @@ CREATE FUNCTION dump_statistic() RETURNS SETOF TEXT AS $$
 			
 			cmd := 'WITH upsert as ( ' ||
 						'UPDATE pg_catalog.pg_statistic SET %s ' ||
-						'WHERE to_schema_qualified_relname(starelid) = ' || relname || ' '
+						'WHERE to_schema_qualified_relation(starelid) = ' || relname || ' '
 							'AND to_attname(' || relname || ', staattnum) = ' || attname || ' '
 							'AND to_atttype(' || relname || ', staattnum) = ' || atttype || ' '
 							'AND stainherit = ' || r.stainherit || ' ' ||
@@ -361,5 +372,69 @@ CREATE FUNCTION dump_statistic() RETURNS SETOF TEXT AS $$
 		end loop;
 
 		return;
+	END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE FUNCTION dump_statistic(schema_name text, table_name text) RETURNS SETOF TEXT AS $$
+	DECLARE
+		qual_relname	text;
+		relid			oid;
+
+	BEGIN
+		qual_relname := quote_ident(schema_name) ||
+							'.' || quote_ident(table_name);
+	
+		return next dump_statistic(qual_relname::regclass);
+		return;
+		
+	EXCEPTION
+		when invalid_schema_name then
+			raise exception 'schema % does not exist',
+							quote_literal(schema_name);
+		when undefined_table then
+			raise exception 'relation % does not exist',
+							quote_literal(qual_relname);
+	END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE FUNCTION dump_statistic(schema_name text) RETURNS SETOF TEXT AS $$
+	DECLARE
+		relid	oid;
+		i		text;
+		
+	BEGIN
+		for relid in
+				select pg_class.oid
+				from pg_catalog.pg_namespace
+					inner join pg_catalog.pg_class
+					on relnamespace = pg_namespace.oid
+				where nspname = schema_name loop
+			
+			for i in select dump_statistic(relid) loop
+				return next i;
+			end loop;
+		end loop;
+	END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE FUNCTION dump_statistic() RETURNS SETOF TEXT AS $$
+	DECLARE
+		relid	oid;
+		i		text;
+		
+	BEGIN
+		for relid in
+				select pg_class.oid
+				from pg_catalog.pg_namespace
+					inner join pg_catalog.pg_class
+					on relnamespace = pg_namespace.oid loop
+			
+			for i in select dump_statistic(relid) loop
+				return next i;
+			end loop;
+		end loop;
 	END;
 $$ LANGUAGE plpgsql;
