@@ -151,10 +151,13 @@ free_dsm_array(DsmArray *arr)
 	/* set blocks free */
 	for(;; i++)
 	{
-		table->blocks[start + i].is_free = false;
+		table->blocks[start + i].is_free = true;
 		if (i * table->block_size >= arr->length)
 			break;
 	}
+
+	if (arr->offset < table->first_free)
+		table->first_free = arr->offset;
 
 	arr->offset = 0;
 	arr->length = 0;
