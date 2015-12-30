@@ -96,7 +96,14 @@
     </para>
     <itemizedlist>
     <listitem>
+<!-- commit [7aa9e9b2bfd0a94]  Wed Dec 30 13:29:17 2015 +0300
+    Integrated resource owner patch by Alexander Alexeev. This patch
+    makes performance of resource deletion linear of number of used
+    resources, which improves performance for heavily partitioned tables
+    and queries which use large number of resoures
+-->
     <para>Resource owner optimisation for complicated queries: now
+
     resource lists has constant access time, which improves performance
     for heavily partitioned tables and queries which use hundreds of
     tables.
