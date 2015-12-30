@@ -427,7 +427,7 @@ CREATE FUNCTION dump_statistic(schema_name text) RETURNS SETOF TEXT AS $$
 		
 	BEGIN
 		-- validate schema name
-		select to_namespace(schema_name);
+		perform to_namespace(schema_name);
 	
 		for relid in
 				select pg_class.oid
