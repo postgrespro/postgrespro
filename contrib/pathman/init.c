@@ -26,11 +26,13 @@ static int cmp_range_entries(const void *p1, const void *p2);
 void
 init(void)
 {
+	bool new_segment_created;
+
 	initialization_needed = false;
-	create_dsm_segment(32);
+	new_segment_created = init_dsm_segment(32);
 
 	LWLockAcquire(load_config_lock, LW_EXCLUSIVE);
-	load_part_relations_hashtable();
+	load_part_relations_hashtable(new_segment_created);
 	LWLockRelease(load_config_lock);
 }
 
@@ -42,9 +44,9 @@ check_extension()
 }
 
 void
-load_part_relations_hashtable()
+load_part_relations_hashtable(bool reinitialize)
 {
-	PartRelationInfo *prinfo;
+	PartRelationInfo *prel;
 	int ret;
 	int i;
 	int proc;
@@ -78,12 +80,12 @@ load_part_relations_hashtable()
 			HeapTuple tuple = tuptable->vals[i];
 			int oid = DatumGetObjectId(SPI_getbinval(tuple, tupdesc, 1, &isnull));
 
-			prinfo = (PartRelationInfo*)
+			prel = (PartRelationInfo*)
 				hash_search(relations, (const void *)&oid, HASH_ENTER, NULL);
-			prinfo->oid = oid;
-			prinfo->attnum = DatumGetInt32(SPI_getbinval(tuple, tupdesc, 2, &isnull));
-			prinfo->parttype = DatumGetInt32(SPI_getbinval(tuple, tupdesc, 3, &isnull));
-			prinfo->atttype = DatumGetObjectId(SPI_getbinval(tuple, tupdesc, 4, &isnull));
+			prel->oid = oid;
+			prel->attnum = DatumGetInt32(SPI_getbinval(tuple, tupdesc, 2, &isnull));
+			prel->parttype = DatumGetInt32(SPI_getbinval(tuple, tupdesc, 3, &isnull));
+			prel->atttype = DatumGetObjectId(SPI_getbinval(tuple, tupdesc, 4, &isnull));
 
 			part_oids = lappend_int(part_oids, oid);
 
@@ -97,18 +99,31 @@ load_part_relations_hashtable()
 	{
 		Oid oid = (int) lfirst_int(lc);
 
-		prinfo = (PartRelationInfo*)
+		prel = (PartRelationInfo*)
 			hash_search(relations, (const void *)&oid, HASH_FIND, NULL);	
 
 		// load_check_constraints(oid);
 
-		switch(prinfo->parttype)
+		switch(prel->parttype)
 		{
 			case PT_RANGE:
 				// load_range_restrictions(oid);
+				if (reinitialize && prel->children.length > 0)
+				{
+					RangeRelation *rangerel = (RangeRelation *)
+						hash_search(range_restrictions, (void *) &oid, HASH_FIND, NULL);
+					free_dsm_array(&prel->children);
+					free_dsm_array(&rangerel->ranges);
+					prel->children_count = 0;
+				}
 				load_check_constraints(oid);
 				break;
 			case PT_HASH:
+				if (reinitialize && prel->children.length > 0)
+				{
+					free_dsm_array(&prel->children);
+					prel->children_count = 0;
+				}
 				load_hash_restrictions(oid);
 				break;
 		}
@@ -242,6 +257,10 @@ load_check_constraints(Oid parent_oid)
 	prel = (PartRelationInfo*)
 		hash_search(relations, (const void *) &parent_oid, HASH_FIND, &found);
 
+	/* skip if already loaded */
+	if (prel->children.length > 0)
+		return;
+
 	// /* if already loaded then quit */
 	// if (prel->children_count > 0)
 	// 	return;
@@ -256,7 +275,7 @@ load_check_constraints(Oid parent_oid)
 
 	if (ret > 0 && SPI_tuptable != NULL)
     {
-    	TupleDesc tupdesc = SPI_tuptable->tupdesc;
+    	// TupleDesc tupdesc = SPI_tuptable->tupdesc;
         SPITupleTable *tuptable = SPI_tuptable;
         Oid *children;
         RangeEntry *ranges;
@@ -265,7 +284,7 @@ load_check_constraints(Oid parent_oid)
 
 		rangerel = (RangeRelation *)
 			hash_search(range_restrictions, (void *) &parent_oid, HASH_ENTER, &found);
-		rangerel->nranges = 0;
+		// rangerel->nranges = 0;
 
         alloc_dsm_array(&prel->children, sizeof(Oid), proc);
         children = (Oid *) dsm_array_get_pointer(&prel->children);
@@ -304,15 +323,15 @@ load_check_constraints(Oid parent_oid)
 			re.min = min;
 			re.max = max;
 
-			ranges[rangerel->nranges++] = re;
+			ranges[i] = re;
 			// children[prel->children_count++] = re.child_oid;
 		}
 
 		/* sort ascending */
-		qsort(ranges, rangerel->nranges, sizeof(RangeEntry), cmp_range_entries);
+		qsort(ranges, proc, sizeof(RangeEntry), cmp_range_entries);
 
 		/* copy oids to prel */
-		for(i=0; i < rangerel->nranges; i++, prel->children_count++)
+		for(i=0; i < proc; i++, prel->children_count++)
 			children[i] = ranges[i].child_oid;
 
 		/* TODO: check if some ranges overlap! */
@@ -324,8 +343,8 @@ load_check_constraints(Oid parent_oid)
 static int
 cmp_range_entries(const void *p1, const void *p2)
 {
-	RangeEntry		*v1 = (const RangeEntry *) p1;
-	RangeEntry		*v2 = (const RangeEntry *) p2;
+	const RangeEntry	*v1 = (const RangeEntry *) p1;
+	const RangeEntry	*v2 = (const RangeEntry *) p2;
 
 	if (v1->min < v2->min)
 		return -1;
@@ -382,8 +401,8 @@ validate_range_constraint(Expr *expr, PartRelationInfo *prel, Datum *min, Datum 
 			return false;
 		*max = ((Const*) right)->constvalue;
 	}
-	else
-		return false;
+
+	return false;
 }
 
 /*

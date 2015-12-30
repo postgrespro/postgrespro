@@ -11,32 +11,44 @@ static dsm_segment *segment = NULL;
 void
 alloc_dsm_table()
 {
-	bool foundPtr;
-	table = (Table *) ShmemInitStruct("dsm table", sizeof(Table), &foundPtr);
-	table->segment = 0;
+	bool found;
+	table = (Table *) ShmemInitStruct("dsm table", sizeof(Table), &found);
+	if (!found)
+		table->segment_handle = 0;
 }
 
 
-void create_dsm_segment(size_t block_size)
+/*
+ * Initialize dsm segment. Returns true if new segment was created and
+ * false if attached to existing segment
+ */
+bool
+init_dsm_segment(size_t block_size)
 {
-	// bool foundPtr;
+	bool ret;
 	dsm_handle handle;
 
 	/* lock here */
 	LWLockAcquire(dsm_init_lock, LW_EXCLUSIVE);
 
-	/* if segment hasn't been created yet then create it */
-	if (table->segment == 0)
+	/* if there is already an existing segment then attach to it */
+	if (table->segment_handle != 0)
+	{
+		ret = false;
+		segment = dsm_attach(table->segment_handle);
+	}
+	
+	/*
+	 * If segment hasn't been created yet or has already been destroyed
+	 * (it happens when last session detaches segment) then create new one
+	 */
+	if (table->segment_handle == 0 || segment == NULL)
 	{
 		/* create segment */
 		segment = dsm_create(block_size * BLOCKS_COUNT, 0);
 		handle = dsm_segment_handle(segment);
 		init_dsm_table(table, handle, block_size);
-	}
-	/* else attach to an existing segment */
-	else
-	{
-		segment = dsm_attach(table->segment);
+		ret = true;
 	}
 
 	/*
@@ -47,6 +59,8 @@ void create_dsm_segment(size_t block_size)
 
 	/* unlock here */
 	LWLockRelease(dsm_init_lock);
+
+	return ret;
 }
 
 void
@@ -54,10 +68,9 @@ init_dsm_table(Table *tbl, dsm_handle h, size_t block_size)
 {
 	int i;
 	Block *block;
-	// Segment *segment = dsm_attach(h);
 
-	// seg = dsm_create(block_size * BLOCKS_COUNT, DSM_CREATE_NULL_IF_MAXSEGMENTS);
-	table->segment = h;
+	memset(table, 0, sizeof(Table));
+	table->segment_handle = h;
 	table->block_size = block_size;
 	table->first_free = 0;
 
@@ -83,8 +96,8 @@ alloc_dsm_array(DsmArray *arr, size_t entry_size, size_t length)
 	Block   *block = NULL;
 	int		free_count = 0;
 	int		size_requested = entry_size * length;
-	int min_pos;
-	int max_pos;
+	int min_pos = 0;
+	int max_pos = 0;
 
 	for (i = table->first_free; i<BLOCKS_COUNT; i++)
 	{

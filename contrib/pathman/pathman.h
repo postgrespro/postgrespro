@@ -64,7 +64,7 @@ typedef struct Block
 
 typedef struct Table
 {
-	dsm_handle	segment;
+	dsm_handle	segment_handle;
 	Block	blocks[BLOCKS_COUNT];
 	size_t	block_size;
 	size_t	first_free;
@@ -129,7 +129,7 @@ typedef struct RangeEntry
 typedef struct RangeRelation
 {
 	Oid			parent_oid;
-	int			nranges;
+	// int			nranges;
 	// RangeEntry	ranges[64];
 	DsmArray    ranges;
 } RangeRelation;
@@ -195,7 +195,7 @@ void init(void);
 void create_part_relations_hashtable(void);
 void create_hash_restrictions_hashtable(void);
 void create_range_restrictions_hashtable(void);
-void load_part_relations_hashtable(void);
+void load_part_relations_hashtable(bool reinitialize);
 void load_hash_restrictions(Oid relid);
 // void load_range_restrictions(Oid relid);
 void load_check_constraints(Oid parent_oid);

@@ -55,6 +55,7 @@ static void disable_inheritance(Query *parse);
 
 static WrapperNode *walk_expr_tree(Expr *expr, const PartRelationInfo *prel);
 static int make_hash(const PartRelationInfo *prel, int value);
+static int range_binary_search(const RangeRelation *rangerel, FmgrInfo *cmp_func, Datum value, bool *fountPtr);
 static void handle_binary_opexpr(const PartRelationInfo *prel, WrapperNode *result, const Var *v, const Const *c);
 static WrapperNode *handle_opexpr(const OpExpr *expr, const PartRelationInfo *prel);
 static WrapperNode *handle_boolexpr(const BoolExpr *expr, const PartRelationInfo *prel);
@@ -72,6 +73,7 @@ static bool change_varno_walker(Node *node, change_varno_context *context);
 PG_FUNCTION_INFO_V1( on_partitions_created );
 PG_FUNCTION_INFO_V1( on_partitions_updated );
 PG_FUNCTION_INFO_V1( on_partitions_removed );
+PG_FUNCTION_INFO_V1( find_range_partition );
 
 
 /*
@@ -113,8 +115,8 @@ _PG_fini(void)
 {
 	set_rel_pathlist_hook = set_rel_pathlist_hook_original;
 	shmem_startup_hook = shmem_startup_hook_original;
-	hash_destroy(relations);
-	hash_destroy(hash_restrictions);
+	// hash_destroy(relations);
+	// hash_destroy(hash_restrictions);
 }
 
 PlannedStmt *
@@ -584,7 +586,6 @@ handle_binary_opexpr(const PartRelationInfo *prel, WrapperNode *result,
 	const OpExpr	   *expr = (const OpExpr *)result->orig;
 	TypeCacheEntry	   *tce;
 
-
 	/* determine operator type */
 	tce = lookup_type_cache(v->vartype,
 		TYPECACHE_EQ_OPR | TYPECACHE_LT_OPR | TYPECACHE_GT_OPR | TYPECACHE_CMP_PROC | TYPECACHE_CMP_PROC_FINFO);
@@ -598,7 +599,6 @@ handle_binary_opexpr(const PartRelationInfo *prel, WrapperNode *result,
 			{
 				int_value = DatumGetInt32(c->constvalue);
 				key.hash = make_hash(prel, int_value);
-
 				result->rangeset = list_make1_irange(make_irange(key.hash, key.hash, true));
 				return;
 			}
@@ -615,11 +615,11 @@ handle_binary_opexpr(const PartRelationInfo *prel, WrapperNode *result,
 							startidx = 0,
 							cmp_min,
 							cmp_max,
-							endidx = rangerel->nranges - 1;
+							endidx = rangerel->ranges.length - 1;
 				RangeEntry *ranges = dsm_array_get_pointer(&rangerel->ranges);
 
 				/* check boundaries */
-				if (rangerel->nranges == 0)
+				if (rangerel->ranges.length == 0)
 				{
 					result->rangeset = NIL;
 					return;
@@ -628,7 +628,7 @@ handle_binary_opexpr(const PartRelationInfo *prel, WrapperNode *result,
 				{
 					/* Corner cases */
 					cmp_min = FunctionCall2(cmp_func, value, ranges[0].min),
-					cmp_max = FunctionCall2(cmp_func, value, ranges[rangerel->nranges - 1].max);
+					cmp_max = FunctionCall2(cmp_func, value, ranges[rangerel->ranges.length - 1].max);
 
 					if ((cmp_min < 0 && strategy == BTLessEqualStrategyNumber) || 
 						(cmp_min <= 0 && strategy == BTLessStrategyNumber))
@@ -660,10 +660,12 @@ handle_binary_opexpr(const PartRelationInfo *prel, WrapperNode *result,
 				}
 
 				/* binary search */
+				// pos = range_binary_search(rangerel, cmp_func, value, &found);
+				// re = &ranges[pos];
 				while (true)
 				{
 					i = startidx + (endidx - startidx) / 2;
-					Assert(i >= 0 && i < rangerel->nranges);
+					Assert(i >= 0 && i < rangerel->ranges.length);
 					re = &ranges[i];
 					cmp_min = FunctionCall2(cmp_func, value, re->min);
 					cmp_max = FunctionCall2(cmp_func, value, re->max);
@@ -744,6 +746,52 @@ static int
 make_hash(const PartRelationInfo *prel, int value)
 {
 	return value % prel->children_count;
+}
+
+/*
+ * Search for range section. Returns position of the item in array.
+ * If item wasn't found then function returns closest position and sets
+ * foundPtr to false.
+ */
+static int
+range_binary_search(const RangeRelation *rangerel, FmgrInfo *cmp_func, Datum value, bool *fountPtr)
+{
+	int		i;
+	int		startidx = 0;
+	int		endidx = rangerel->ranges.length-1;
+	int		counter = 0;
+	RangeEntry *ranges = dsm_array_get_pointer(&rangerel->ranges);
+	RangeEntry *re;
+
+	*fountPtr = false;
+	while (true)
+	{
+		i = startidx + (endidx - startidx) / 2;
+		if (i >= 0 && i < rangerel->ranges.length)
+		{
+			re = &ranges[i];
+			if (check_le(cmp_func, re->min, value) && check_lt(cmp_func, value, re->max))
+			{
+				*fountPtr = true;
+				break;
+			}
+			
+			/* if we still didn't find position then it is not in array */
+			if (startidx == endidx)
+				return i;
+
+			if (check_lt(cmp_func, value, re->min))
+				endidx = i - 1;
+			else if (check_ge(cmp_func, value, re->max))
+				startidx = i + 1;
+		}
+		else
+			break;
+		/* for debug's sake */
+		Assert(++counter < 100);
+	}
+
+	return i;
 }
 
 /*
@@ -1015,7 +1063,8 @@ accumulate_append_subpath(List *subpaths, Path *path)
  * Callbacks
  */
 Datum
-on_partitions_created(PG_FUNCTION_ARGS) {
+on_partitions_created(PG_FUNCTION_ARGS)
+{
 	// Oid relid;
 
 	LWLockAcquire(load_config_lock, LW_EXCLUSIVE);
@@ -1023,7 +1072,7 @@ on_partitions_created(PG_FUNCTION_ARGS) {
 	/* Reload config */
 	/* TODO: reload just the specified relation */
 	// relid = DatumGetInt32(PG_GETARG_DATUM(0))
-	load_part_relations_hashtable();
+	load_part_relations_hashtable(false);
 
 	LWLockRelease(load_config_lock);
 
@@ -1031,7 +1080,8 @@ on_partitions_created(PG_FUNCTION_ARGS) {
 }
 
 Datum
-on_partitions_updated(PG_FUNCTION_ARGS) {
+on_partitions_updated(PG_FUNCTION_ARGS)
+{
 	Oid					relid;
 	PartRelationInfo   *prel;
 
@@ -1043,7 +1093,7 @@ on_partitions_updated(PG_FUNCTION_ARGS) {
 	{
 		LWLockAcquire(load_config_lock, LW_EXCLUSIVE);
 		remove_relation_info(relid);
-		load_part_relations_hashtable();
+		load_part_relations_hashtable(false);
 		LWLockRelease(load_config_lock);
 	}
 
@@ -1051,8 +1101,9 @@ on_partitions_updated(PG_FUNCTION_ARGS) {
 }
 
 Datum
-on_partitions_removed(PG_FUNCTION_ARGS) {
-	Oid					relid;
+on_partitions_removed(PG_FUNCTION_ARGS)
+{
+	Oid		relid;
 
 	LWLockAcquire(load_config_lock, LW_EXCLUSIVE);
 
@@ -1061,6 +1112,42 @@ on_partitions_removed(PG_FUNCTION_ARGS) {
 	remove_relation_info(relid);
 
 	LWLockRelease(load_config_lock);
+
+	PG_RETURN_NULL();
+}
+
+/*
+ * Returns partition oid for specified parent relid and value
+ */
+Datum
+find_range_partition(PG_FUNCTION_ARGS)
+{
+	int		relid = DatumGetInt32(PG_GETARG_DATUM(0));
+	Datum	value = PG_GETARG_DATUM(1);
+	Oid		value_type = get_fn_expr_argtype(fcinfo->flinfo, 1);
+	int		pos;
+	bool	found;
+	RangeRelation	*rangerel;
+	RangeEntry		*ranges;
+	TypeCacheEntry	*tce;
+	FmgrInfo		*cmp_func;
+
+	tce = lookup_type_cache(value_type,
+		TYPECACHE_EQ_OPR | TYPECACHE_LT_OPR | TYPECACHE_GT_OPR |
+		TYPECACHE_CMP_PROC | TYPECACHE_CMP_PROC_FINFO);
+	cmp_func = &tce->cmp_proc_finfo;
+
+	rangerel = (RangeRelation *)
+		hash_search(range_restrictions, (const void *) &relid, HASH_FIND, NULL);
+
+	if (!rangerel)
+		PG_RETURN_NULL();
+
+	ranges = dsm_array_get_pointer(&rangerel->ranges);
+	pos = range_binary_search(rangerel, cmp_func, value, &found);
+
+	if (found)
+		PG_RETURN_OID(ranges[pos].child_oid);
 
 	PG_RETURN_NULL();
 }
