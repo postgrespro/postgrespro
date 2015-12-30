@@ -29,6 +29,219 @@
 #include "utils/snapmgr.h"
 
 /*
+ * ResourceArray is a common structure for storing different types of resources.
+ *
+ * ResourceOwner can own `HeapTuple`s, `Relation`s, `Snapshot`s, etc. For
+ * each resource type there are procedures ResourceOwnerRemember* and
+ * ResourceOwnerForget*. There are also ResourceOwnerEnlarge* procedures
+ * which should be called before corresponding ResourceOwnerRemember* calls
+ * (see below). Internally each type of resource is stored in separate
+ * ResourceArray.
+ *
+ * There are two major reasons for using ResourceArray instead of, say,
+ * regular C arrays.
+ *
+ * Firstly we would like to prevent code duplication. For instance
+ * ResourceArray provides generic Remember/Forget/Enlarge procedures, so
+ * corresponding ResourceOwner* procedures are just a typesafe wrappers for
+ * these procedures.
+ *
+ * Secondly ResourceArray must be more efficient than regular C array.
+ * Current implementation in general could be considered a hash table. It has
+ * O(1) complexity of both Remember and Forget procedures.
+ */
+typedef struct ResourceArray
+{
+	Datum	   *itemsarr;		/* buffer for storing values */
+	Datum		invalidval;		/* value that is considered invalid */
+	uint32		capacity;		/* capacity of array */
+	uint32		nitems;			/* how many items is stored in items array */
+	uint32		maxitems;		/* precalculated RESARRAY_MAX_ITEMS(capacity) */
+	uint32		lastidx;		/* index of last item returned by GetAny */
+}	ResourceArray;
+
+/*
+ * This number is used as initial size of resource array. If given number of
+ * items is not enough, we double array size and reallocate memory.
+ *
+ * Should be power of two since we use (arrsize - 1) as mask for hash value.
+ *
+ */
+#define RESARRAY_INIT_SIZE 16
+
+/*
+ * How many items could be stored in a resource array of given capacity. If
+ * this number is reached we need to resize an array to prevent hash collisions.
+ *
+ * This computation actually costs only two additions and one binary shift.
+ */
+#define RESARRAY_MAX_ITEMS(capacity) ((capacity)*3/4)
+
+/*
+ * Initialize ResourceArray
+ */
+static void
+ResourceArrayInit(ResourceArray * resarr, Datum invalidval)
+{
+	Assert(resarr->itemsarr == NULL);
+	Assert(resarr->capacity == 0);
+	Assert(resarr->nitems == 0);
+	Assert(resarr->maxitems == 0);
+	Assert(resarr->invalidval == 0);
+	Assert(resarr->lastidx == 0);
+
+	resarr->invalidval = invalidval;
+}
+
+/*
+ * Add a resource to ResourceArray
+ *
+ * Caller must have previously done ResourceArrayEnlarge()
+ */
+static void
+ResourceArrayAdd(ResourceArray * resarr, Datum data)
+{
+	Datum		idx;
+	Datum		mask = resarr->capacity - 1;
+
+	Assert(resarr->maxitems > resarr->nitems);
+	Assert(resarr->capacity > 0);
+	Assert(resarr->itemsarr != NULL);
+	Assert(data != resarr->invalidval);
+
+	idx = hash_any((void *) &data, sizeof(data)) & mask;
+
+	while (true)
+	{
+		if (resarr->itemsarr[idx] == resarr->invalidval)
+			break;
+		idx = (idx + 1) & mask;
+	}
+
+	resarr->itemsarr[idx] = data;
+	resarr->nitems++;
+}
+
+/*
+ * Remove a resource from ResourceArray
+ *
+ * Returns true on success, false if resource was not found
+ */
+static bool
+ResourceArrayRemove(ResourceArray * resarr, Datum data)
+{
+	uint32		i;
+	Datum		idx;
+	Datum		mask = resarr->capacity - 1;
+
+	Assert(resarr->capacity > 0);
+	Assert(resarr->itemsarr != NULL);
+	Assert(data != resarr->invalidval);
+
+	idx = hash_any((void *) &data, sizeof(data)) & mask;
+	for (i = 0; i < resarr->capacity; i++)
+	{
+		if (resarr->itemsarr[idx] == data)
+		{
+			resarr->itemsarr[idx] = resarr->invalidval;
+			resarr->nitems--;
+			return true;
+		}
+		idx = (idx + 1) & mask;
+	}
+
+	return false;
+}
+
+/*
+ * Make sure there is a room for at least one more resource in an array.
+ *
+ * This is separate from actually inserting a resource because if we run out
+ * of memory, it's critical to do so *before* acquiring the resource.
+ */
+static void
+ResourceArrayEnlarge(ResourceArray * resarr)
+{
+	uint32		i,
+				oldcap;
+	Datum	   *olditemsarr;
+
+	if (resarr->nitems < resarr->maxitems)
+		return;					/* nothing to do */
+
+	olditemsarr = resarr->itemsarr;
+	oldcap = resarr->capacity;
+
+	resarr->capacity = oldcap > 0 ? oldcap * 2 : RESARRAY_INIT_SIZE;
+	resarr->itemsarr = (Datum *)
+		MemoryContextAlloc(TopMemoryContext,
+						   resarr->capacity * sizeof(Datum));
+	resarr->maxitems = RESARRAY_MAX_ITEMS(resarr->capacity);
+	resarr->nitems = 0;
+
+	for (i = 0; i < resarr->capacity; i++)
+		resarr->itemsarr[i] = resarr->invalidval;
+
+	if (olditemsarr != NULL)
+	{
+		while (oldcap > 0)
+		{
+			oldcap--;
+			if (olditemsarr[oldcap] != resarr->invalidval)
+				ResourceArrayAdd(resarr, olditemsarr[oldcap]);
+		}
+		pfree(olditemsarr);
+	}
+}
+
+/*
+ * Get any convenient element.
+ *
+ * Returns true on success, false on failure.
+ */
+static bool
+ResourceArrayGetAny(ResourceArray * resarr, Datum *out)
+{
+	uint32		mask;
+
+	if (resarr->nitems == 0)
+		return false;
+
+	Assert(resarr->capacity > 0);
+	mask = resarr->capacity - 1;
+
+	for (;;)
+	{
+		resarr->lastidx = resarr->lastidx & mask;
+		if (resarr->itemsarr[resarr->lastidx] != resarr->invalidval)
+			break;
+
+		resarr->lastidx++;
+	}
+
+	*out = resarr->itemsarr[resarr->lastidx];
+	return true;
+}
+
+/*
+ * Return ResourceArray to initial state
+ */
+static void
+ResourceArrayFree(ResourceArray * resarr)
+{
+	Assert(resarr->nitems == 0);
+
+	resarr->capacity = 0;
+	resarr->maxitems = 0;
+
+	if (!resarr->itemsarr)
+		return;
+
+	pfree(resarr->itemsarr);
+	resarr->itemsarr = NULL;
+}
+
+/*
  * To speed up bulk releasing or reassigning locks from a resource owner to
  * its parent, each resource owner has a small cache of locks it owns. The
  * lock manager has the same information in its local lock hash table, and
@@ -56,53 +269,22 @@ typedef struct ResourceOwnerData
 	ResourceOwner nextchild;	/* next child of same parent */
 	const char *name;			/* name (just for debugging) */
 
-	/* We have built-in support for remembering owned buffers */
-	int			nbuffers;		/* number of owned buffer pins */
-	Buffer	   *buffers;		/* dynamically allocated array */
-	int			maxbuffers;		/* currently allocated array size */
-
 	/* We can remember up to MAX_RESOWNER_LOCKS references to local locks. */
 	int			nlocks;			/* number of owned locks */
 	LOCALLOCK  *locks[MAX_RESOWNER_LOCKS];		/* list of owned locks */
 
-	/* We have built-in support for remembering catcache references */
-	int			ncatrefs;		/* number of owned catcache pins */
-	HeapTuple  *catrefs;		/* dynamically allocated array */
-	int			maxcatrefs;		/* currently allocated array size */
+	/* We have built-in support for remembering: */
 
-	int			ncatlistrefs;	/* number of owned catcache-list pins */
-	CatCList  **catlistrefs;	/* dynamically allocated array */
-	int			maxcatlistrefs; /* currently allocated array size */
+	ResourceArray catrefarr;	/* `HeapTuple`s */
+	ResourceArray catlistrefarr;	/* `ResourceOwner`s */
+	ResourceArray relrefarr;	/* `Relation`s */
+	ResourceArray planrefarr;	/* `CachedPlan*`s */
+	ResourceArray tupdescarr;	/* `TupleDesc`s */
+	ResourceArray snapshotarr;	/* `Snapshot`s */
+	ResourceArray dsmarr;		/* `dsm_segment*`s */
+	ResourceArray bufferarr;	/* `Buffer`s  */
+	ResourceArray filearr;		/* `File`s */
 
-	/* We have built-in support for remembering relcache references */
-	int			nrelrefs;		/* number of owned relcache pins */
-	Relation   *relrefs;		/* dynamically allocated array */
-	int			maxrelrefs;		/* currently allocated array size */
-
-	/* We have built-in support for remembering plancache references */
-	int			nplanrefs;		/* number of owned plancache pins */
-	CachedPlan **planrefs;		/* dynamically allocated array */
-	int			maxplanrefs;	/* currently allocated array size */
-
-	/* We have built-in support for remembering tupdesc references */
-	int			ntupdescs;		/* number of owned tupdesc references */
-	TupleDesc  *tupdescs;		/* dynamically allocated array */
-	int			maxtupdescs;	/* currently allocated array size */
-
-	/* We have built-in support for remembering snapshot references */
-	int			nsnapshots;		/* number of owned snapshot references */
-	Snapshot   *snapshots;		/* dynamically allocated array */
-	int			maxsnapshots;	/* currently allocated array size */
-
-	/* We have built-in support for remembering open temporary files */
-	int			nfiles;			/* number of owned temporary files */
-	File	   *files;			/* dynamically allocated array */
-	int			maxfiles;		/* currently allocated array size */
-
-	/* We have built-in support for remembering dynamic shmem segments */
-	int			ndsms;			/* number of owned shmem segments */
-	dsm_segment **dsms;			/* dynamically allocated array */
-	int			maxdsms;		/* currently allocated array size */
 }	ResourceOwnerData;
 
 
@@ -168,6 +350,16 @@ ResourceOwnerCreate(ResourceOwner parent, const char *name)
 		parent->firstchild = owner;
 	}
 
+	ResourceArrayInit(&(owner->catrefarr), (Datum) (NULL));
+	ResourceArrayInit(&(owner->catlistrefarr), (Datum) (NULL));
+	ResourceArrayInit(&(owner->relrefarr), (Datum) (NULL));
+	ResourceArrayInit(&(owner->planrefarr), (Datum) (NULL));
+	ResourceArrayInit(&(owner->tupdescarr), (Datum) (NULL));
+	ResourceArrayInit(&(owner->snapshotarr), (Datum) (NULL));
+	ResourceArrayInit(&(owner->dsmarr), (Datum) (NULL));
+	ResourceArrayInit(&(owner->bufferarr), (Datum) (InvalidBuffer));
+	ResourceArrayInit(&(owner->filearr), (Datum) (-1));
+
 	return owner;
 }
 
@@ -229,6 +421,7 @@ ResourceOwnerReleaseInternal(ResourceOwner owner,
 	ResourceOwner child;
 	ResourceOwner save;
 	ResourceReleaseCallbackItem *item;
+	Datum		foundres;
 
 	/* Recurse to handle descendants */
 	for (child = owner->firstchild; child != NULL; child = child->nextchild)
@@ -252,45 +445,34 @@ ResourceOwnerReleaseInternal(ResourceOwner owner,
 		 * During a commit, there shouldn't be any remaining pins --- that
 		 * would indicate failure to clean up the executor correctly --- so
 		 * issue warnings.  In the abort case, just clean up quietly.
-		 *
-		 * We are careful to do the releasing back-to-front, so as to avoid
-		 * O(N^2) behavior in ResourceOwnerForgetBuffer().
 		 */
-		while (owner->nbuffers > 0)
+		while (ResourceArrayGetAny(&(owner->bufferarr), &foundres))
 		{
+			Buffer		res = (Buffer) foundres;
+
 			if (isCommit)
-				PrintBufferLeakWarning(owner->buffers[owner->nbuffers - 1]);
-			ReleaseBuffer(owner->buffers[owner->nbuffers - 1]);
+				PrintBufferLeakWarning(res);
+			ReleaseBuffer(res);
 		}
 
-		/*
-		 * Release relcache references.  Note that RelationClose will remove
-		 * the relref entry from my list, so I just have to iterate till there
-		 * are none.
-		 *
-		 * As with buffer pins, warn if any are left at commit time, and
-		 * release back-to-front for speed.
-		 */
-		while (owner->nrelrefs > 0)
+		/* Ditto for relcache references. */
+		while (ResourceArrayGetAny(&(owner->relrefarr), &foundres))
 		{
+			Relation	res = (Relation) foundres;
+
 			if (isCommit)
-				PrintRelCacheLeakWarning(owner->relrefs[owner->nrelrefs - 1]);
-			RelationClose(owner->relrefs[owner->nrelrefs - 1]);
+				PrintRelCacheLeakWarning(res);
+			RelationClose(res);
 		}
 
-		/*
-		 * Release dynamic shared memory segments.  Note that dsm_detach()
-		 * will remove the segment from my list, so I just have to iterate
-		 * until there are none.
-		 *
-		 * As in the preceding cases, warn if there are leftover at commit
-		 * time.
-		 */
-		while (owner->ndsms > 0)
+		/* Ditto for dynamic shared memory segments */
+		while (ResourceArrayGetAny(&(owner->dsmarr), &foundres))
 		{
+			dsm_segment *res = (dsm_segment *) foundres;
+
 			if (isCommit)
-				PrintDSMLeakWarning(owner->dsms[owner->ndsms - 1]);
-			dsm_detach(owner->dsms[owner->ndsms - 1]);
+				PrintDSMLeakWarning(res);
+			dsm_detach(res);
 		}
 	}
 	else if (phase == RESOURCE_RELEASE_LOCKS)
@@ -351,47 +533,63 @@ ResourceOwnerReleaseInternal(ResourceOwner owner,
 		 * As with buffer pins, warn if any are left at commit time, and
 		 * release back-to-front for speed.
 		 */
-		while (owner->ncatrefs > 0)
+		while (ResourceArrayGetAny(&(owner->catrefarr), &foundres))
 		{
+			HeapTuple	res = (HeapTuple) foundres;
+
 			if (isCommit)
-				PrintCatCacheLeakWarning(owner->catrefs[owner->ncatrefs - 1]);
-			ReleaseCatCache(owner->catrefs[owner->ncatrefs - 1]);
+				PrintCatCacheLeakWarning(res);
+			ReleaseCatCache(res);
 		}
+
 		/* Ditto for catcache lists */
-		while (owner->ncatlistrefs > 0)
+		while (ResourceArrayGetAny(&(owner->catlistrefarr), &foundres))
 		{
+			CatCList   *res = (CatCList *) foundres;
+
 			if (isCommit)
-				PrintCatCacheListLeakWarning(owner->catlistrefs[owner->ncatlistrefs - 1]);
-			ReleaseCatCacheList(owner->catlistrefs[owner->ncatlistrefs - 1]);
+				PrintCatCacheListLeakWarning(res);
+			ReleaseCatCacheList(res);
 		}
+
 		/* Ditto for plancache references */
-		while (owner->nplanrefs > 0)
+		while (ResourceArrayGetAny(&(owner->planrefarr), &foundres))
 		{
+			CachedPlan *res = (CachedPlan *) foundres;
+
 			if (isCommit)
-				PrintPlanCacheLeakWarning(owner->planrefs[owner->nplanrefs - 1]);
-			ReleaseCachedPlan(owner->planrefs[owner->nplanrefs - 1], true);
+				PrintPlanCacheLeakWarning(res);
+			ReleaseCachedPlan(res, true);
 		}
+
 		/* Ditto for tupdesc references */
-		while (owner->ntupdescs > 0)
+		while (ResourceArrayGetAny(&(owner->tupdescarr), &foundres))
 		{
+			TupleDesc	res = (TupleDesc) foundres;
+
 			if (isCommit)
-				PrintTupleDescLeakWarning(owner->tupdescs[owner->ntupdescs - 1]);
-			DecrTupleDescRefCount(owner->tupdescs[owner->ntupdescs - 1]);
+				PrintTupleDescLeakWarning(res);
+			DecrTupleDescRefCount(res);
 		}
+
 		/* Ditto for snapshot references */
-		while (owner->nsnapshots > 0)
+		while (ResourceArrayGetAny(&(owner->snapshotarr), &foundres))
 		{
+			Snapshot	res = (Snapshot) foundres;
+
 			if (isCommit)
-				PrintSnapshotLeakWarning(owner->snapshots[owner->nsnapshots - 1]);
-			UnregisterSnapshot(owner->snapshots[owner->nsnapshots - 1]);
+				PrintSnapshotLeakWarning(res);
+			UnregisterSnapshot(res);
 		}
 
 		/* Ditto for temporary files */
-		while (owner->nfiles > 0)
+		while (ResourceArrayGetAny(&(owner->filearr), &foundres))
 		{
+			File		res = (File) foundres;
+
 			if (isCommit)
-				PrintFileLeakWarning(owner->files[owner->nfiles - 1]);
-			FileClose(owner->files[owner->nfiles - 1]);
+				PrintFileLeakWarning(res);
+			FileClose(res);
 		}
 
 		/* Clean up index scans too */
@@ -418,16 +616,7 @@ ResourceOwnerDelete(ResourceOwner owner)
 	Assert(owner != CurrentResourceOwner);
 
 	/* And it better not own any resources, either */
-	Assert(owner->nbuffers == 0);
 	Assert(owner->nlocks == 0 || owner->nlocks == MAX_RESOWNER_LOCKS + 1);
-	Assert(owner->ncatrefs == 0);
-	Assert(owner->ncatlistrefs == 0);
-	Assert(owner->nrelrefs == 0);
-	Assert(owner->ndsms == 0);
-	Assert(owner->nplanrefs == 0);
-	Assert(owner->ntupdescs == 0);
-	Assert(owner->nsnapshots == 0);
-	Assert(owner->nfiles == 0);
 
 	/*
 	 * Delete children.  The recursive call will delink the child from me, so
@@ -444,25 +633,15 @@ ResourceOwnerDelete(ResourceOwner owner)
 	ResourceOwnerNewParent(owner, NULL);
 
 	/* And free the object. */
-	if (owner->buffers)
-		pfree(owner->buffers);
-	if (owner->catrefs)
-		pfree(owner->catrefs);
-	if (owner->catlistrefs)
-		pfree(owner->catlistrefs);
-	if (owner->relrefs)
-		pfree(owner->relrefs);
-	if (owner->planrefs)
-		pfree(owner->planrefs);
-	if (owner->tupdescs)
-		pfree(owner->tupdescs);
-	if (owner->snapshots)
-		pfree(owner->snapshots);
-	if (owner->files)
-		pfree(owner->files);
-	if (owner->dsms)
-		pfree(owner->dsms);
-
+	ResourceArrayFree(&(owner->catrefarr));
+	ResourceArrayFree(&(owner->catlistrefarr));
+	ResourceArrayFree(&(owner->relrefarr));
+	ResourceArrayFree(&(owner->planrefarr));
+	ResourceArrayFree(&(owner->tupdescarr));
+	ResourceArrayFree(&(owner->snapshotarr));
+	ResourceArrayFree(&(owner->dsmarr));
+	ResourceArrayFree(&(owner->bufferarr));
+	ResourceArrayFree(&(owner->filearr));
 	pfree(owner);
 }
 
@@ -575,26 +754,9 @@ UnregisterResourceReleaseCallback(ResourceReleaseCallback callback, void *arg)
 void
 ResourceOwnerEnlargeBuffers(ResourceOwner owner)
 {
-	int			newmax;
-
-	if (owner == NULL ||
-		owner->nbuffers < owner->maxbuffers)
-		return;					/* nothing to do */
-
-	if (owner->buffers == NULL)
-	{
-		newmax = 16;
-		owner->buffers = (Buffer *)
-			MemoryContextAlloc(TopMemoryContext, newmax * sizeof(Buffer));
-		owner->maxbuffers = newmax;
-	}
-	else
-	{
-		newmax = owner->maxbuffers * 2;
-		owner->buffers = (Buffer *)
-			repalloc(owner->buffers, newmax * sizeof(Buffer));
-		owner->maxbuffers = newmax;
-	}
+	if (owner == NULL)
+		return;
+	ResourceArrayEnlarge(&(owner->bufferarr));
 }
 
 /*
@@ -608,12 +770,9 @@ ResourceOwnerEnlargeBuffers(ResourceOwner owner)
 void
 ResourceOwnerRememberBuffer(ResourceOwner owner, Buffer buffer)
 {
-	if (owner != NULL)
-	{
-		Assert(owner->nbuffers < owner->maxbuffers);
-		owner->buffers[owner->nbuffers] = buffer;
-		owner->nbuffers++;
-	}
+	if (owner == NULL)
+		return;
+	ResourceArrayAdd(&(owner->bufferarr), (Datum) buffer);
 }
 
 /*
@@ -625,33 +784,15 @@ ResourceOwnerRememberBuffer(ResourceOwner owner, Buffer buffer)
 void
 ResourceOwnerForgetBuffer(ResourceOwner owner, Buffer buffer)
 {
-	if (owner != NULL)
-	{
-		Buffer	   *buffers = owner->buffers;
-		int			nb1 = owner->nbuffers - 1;
-		int			i;
+	bool		res;
 
-		/*
-		 * Scan back-to-front because it's more likely we are releasing a
-		 * recently pinned buffer.  This isn't always the case of course, but
-		 * it's the way to bet.
-		 */
-		for (i = nb1; i >= 0; i--)
-		{
-			if (buffers[i] == buffer)
-			{
-				while (i < nb1)
-				{
-					buffers[i] = buffers[i + 1];
-					i++;
-				}
-				owner->nbuffers = nb1;
-				return;
-			}
-		}
+	if (owner == NULL)
+		return;
+
+	res = ResourceArrayRemove(&(owner->bufferarr), (Datum) buffer);
+	if (!res)
 		elog(ERROR, "buffer %d is not owned by resource owner %s",
 			 buffer, owner->name);
-	}
 }
 
 /*
@@ -667,6 +808,8 @@ ResourceOwnerForgetBuffer(ResourceOwner owner, Buffer buffer)
 void
 ResourceOwnerRememberLock(ResourceOwner owner, LOCALLOCK *locallock)
 {
+	Assert(locallock != NULL);
+
 	if (owner->nlocks > MAX_RESOWNER_LOCKS)
 		return;					/* we have already overflowed */
 
@@ -714,25 +857,7 @@ ResourceOwnerForgetLock(ResourceOwner owner, LOCALLOCK *locallock)
 void
 ResourceOwnerEnlargeCatCacheRefs(ResourceOwner owner)
 {
-	int			newmax;
-
-	if (owner->ncatrefs < owner->maxcatrefs)
-		return;					/* nothing to do */
-
-	if (owner->catrefs == NULL)
-	{
-		newmax = 16;
-		owner->catrefs = (HeapTuple *)
-			MemoryContextAlloc(TopMemoryContext, newmax * sizeof(HeapTuple));
-		owner->maxcatrefs = newmax;
-	}
-	else
-	{
-		newmax = owner->maxcatrefs * 2;
-		owner->catrefs = (HeapTuple *)
-			repalloc(owner->catrefs, newmax * sizeof(HeapTuple));
-		owner->maxcatrefs = newmax;
-	}
+	ResourceArrayEnlarge(&(owner->catrefarr));
 }
 
 /*
@@ -743,9 +868,7 @@ ResourceOwnerEnlargeCatCacheRefs(ResourceOwner owner)
 void
 ResourceOwnerRememberCatCacheRef(ResourceOwner owner, HeapTuple tuple)
 {
-	Assert(owner->ncatrefs < owner->maxcatrefs);
-	owner->catrefs[owner->ncatrefs] = tuple;
-	owner->ncatrefs++;
+	ResourceArrayAdd(&(owner->catrefarr), (Datum) tuple);
 }
 
 /*
@@ -754,25 +877,12 @@ ResourceOwnerRememberCatCacheRef(ResourceOwner owner, HeapTuple tuple)
 void
 ResourceOwnerForgetCatCacheRef(ResourceOwner owner, HeapTuple tuple)
 {
-	HeapTuple  *catrefs = owner->catrefs;
-	int			nc1 = owner->ncatrefs - 1;
-	int			i;
+	bool		res = ResourceArrayRemove(&(owner->catrefarr),
+										  (Datum) tuple);
 
-	for (i = nc1; i >= 0; i--)
-	{
-		if (catrefs[i] == tuple)
-		{
-			while (i < nc1)
-			{
-				catrefs[i] = catrefs[i + 1];
-				i++;
-			}
-			owner->ncatrefs = nc1;
-			return;
-		}
-	}
-	elog(ERROR, "catcache reference %p is not owned by resource owner %s",
-		 tuple, owner->name);
+	if (!res)
+		elog(ERROR, "catcache reference %p is not owned by resource owner %s",
+			 tuple, owner->name);
 }
 
 /*
@@ -785,25 +895,7 @@ ResourceOwnerForgetCatCacheRef(ResourceOwner owner, HeapTuple tuple)
 void
 ResourceOwnerEnlargeCatCacheListRefs(ResourceOwner owner)
 {
-	int			newmax;
-
-	if (owner->ncatlistrefs < owner->maxcatlistrefs)
-		return;					/* nothing to do */
-
-	if (owner->catlistrefs == NULL)
-	{
-		newmax = 16;
-		owner->catlistrefs = (CatCList **)
-			MemoryContextAlloc(TopMemoryContext, newmax * sizeof(CatCList *));
-		owner->maxcatlistrefs = newmax;
-	}
-	else
-	{
-		newmax = owner->maxcatlistrefs * 2;
-		owner->catlistrefs = (CatCList **)
-			repalloc(owner->catlistrefs, newmax * sizeof(CatCList *));
-		owner->maxcatlistrefs = newmax;
-	}
+	ResourceArrayEnlarge(&(owner->catlistrefarr));
 }
 
 /*
@@ -814,9 +906,7 @@ ResourceOwnerEnlargeCatCacheListRefs(ResourceOwner owner)
 void
 ResourceOwnerRememberCatCacheListRef(ResourceOwner owner, CatCList *list)
 {
-	Assert(owner->ncatlistrefs < owner->maxcatlistrefs);
-	owner->catlistrefs[owner->ncatlistrefs] = list;
-	owner->ncatlistrefs++;
+	ResourceArrayAdd(&(owner->catlistrefarr), (Datum) list);
 }
 
 /*
@@ -825,25 +915,12 @@ ResourceOwnerRememberCatCacheListRef(ResourceOwner owner, CatCList *list)
 void
 ResourceOwnerForgetCatCacheListRef(ResourceOwner owner, CatCList *list)
 {
-	CatCList  **catlistrefs = owner->catlistrefs;
-	int			nc1 = owner->ncatlistrefs - 1;
-	int			i;
+	bool		res = ResourceArrayRemove(&(owner->catlistrefarr),
+										  (Datum) list);
 
-	for (i = nc1; i >= 0; i--)
-	{
-		if (catlistrefs[i] == list)
-		{
-			while (i < nc1)
-			{
-				catlistrefs[i] = catlistrefs[i + 1];
-				i++;
-			}
-			owner->ncatlistrefs = nc1;
-			return;
-		}
-	}
-	elog(ERROR, "catcache list reference %p is not owned by resource owner %s",
-		 list, owner->name);
+	if (!res)
+		elog(ERROR, "catcache list reference %p is not owned by resource owner %s",
+			 list, owner->name);
 }
 
 /*
@@ -856,25 +933,7 @@ ResourceOwnerForgetCatCacheListRef(ResourceOwner owner, CatCList *list)
 void
 ResourceOwnerEnlargeRelationRefs(ResourceOwner owner)
 {
-	int			newmax;
-
-	if (owner->nrelrefs < owner->maxrelrefs)
-		return;					/* nothing to do */
-
-	if (owner->relrefs == NULL)
-	{
-		newmax = 16;
-		owner->relrefs = (Relation *)
-			MemoryContextAlloc(TopMemoryContext, newmax * sizeof(Relation));
-		owner->maxrelrefs = newmax;
-	}
-	else
-	{
-		newmax = owner->maxrelrefs * 2;
-		owner->relrefs = (Relation *)
-			repalloc(owner->relrefs, newmax * sizeof(Relation));
-		owner->maxrelrefs = newmax;
-	}
+	ResourceArrayEnlarge(&(owner->relrefarr));
 }
 
 /*
@@ -885,9 +944,7 @@ ResourceOwnerEnlargeRelationRefs(ResourceOwner owner)
 void
 ResourceOwnerRememberRelationRef(ResourceOwner owner, Relation rel)
 {
-	Assert(owner->nrelrefs < owner->maxrelrefs);
-	owner->relrefs[owner->nrelrefs] = rel;
-	owner->nrelrefs++;
+	ResourceArrayAdd(&(owner->relrefarr), (Datum) rel);
 }
 
 /*
@@ -896,25 +953,12 @@ ResourceOwnerRememberRelationRef(ResourceOwner owner, Relation rel)
 void
 ResourceOwnerForgetRelationRef(ResourceOwner owner, Relation rel)
 {
-	Relation   *relrefs = owner->relrefs;
-	int			nr1 = owner->nrelrefs - 1;
-	int			i;
+	bool		res = ResourceArrayRemove(&(owner->relrefarr),
+										  (Datum) rel);
 
-	for (i = nr1; i >= 0; i--)
-	{
-		if (relrefs[i] == rel)
-		{
-			while (i < nr1)
-			{
-				relrefs[i] = relrefs[i + 1];
-				i++;
-			}
-			owner->nrelrefs = nr1;
-			return;
-		}
-	}
-	elog(ERROR, "relcache reference %s is not owned by resource owner %s",
-		 RelationGetRelationName(rel), owner->name);
+	if (!res)
+		elog(ERROR, "relcache reference %s is not owned by resource owner %s",
+			 RelationGetRelationName(rel), owner->name);
 }
 
 /*
@@ -937,25 +981,7 @@ PrintRelCacheLeakWarning(Relation rel)
 void
 ResourceOwnerEnlargePlanCacheRefs(ResourceOwner owner)
 {
-	int			newmax;
-
-	if (owner->nplanrefs < owner->maxplanrefs)
-		return;					/* nothing to do */
-
-	if (owner->planrefs == NULL)
-	{
-		newmax = 16;
-		owner->planrefs = (CachedPlan **)
-			MemoryContextAlloc(TopMemoryContext, newmax * sizeof(CachedPlan *));
-		owner->maxplanrefs = newmax;
-	}
-	else
-	{
-		newmax = owner->maxplanrefs * 2;
-		owner->planrefs = (CachedPlan **)
-			repalloc(owner->planrefs, newmax * sizeof(CachedPlan *));
-		owner->maxplanrefs = newmax;
-	}
+	ResourceArrayEnlarge(&(owner->planrefarr));
 }
 
 /*
@@ -966,9 +992,7 @@ ResourceOwnerEnlargePlanCacheRefs(ResourceOwner owner)
 void
 ResourceOwnerRememberPlanCacheRef(ResourceOwner owner, CachedPlan *plan)
 {
-	Assert(owner->nplanrefs < owner->maxplanrefs);
-	owner->planrefs[owner->nplanrefs] = plan;
-	owner->nplanrefs++;
+	ResourceArrayAdd(&(owner->planrefarr), (Datum) plan);
 }
 
 /*
@@ -977,25 +1001,12 @@ ResourceOwnerRememberPlanCacheRef(ResourceOwner owner, CachedPlan *plan)
 void
 ResourceOwnerForgetPlanCacheRef(ResourceOwner owner, CachedPlan *plan)
 {
-	CachedPlan **planrefs = owner->planrefs;
-	int			np1 = owner->nplanrefs - 1;
-	int			i;
+	bool		res = ResourceArrayRemove(&(owner->planrefarr),
+										  (Datum) plan);
 
-	for (i = np1; i >= 0; i--)
-	{
-		if (planrefs[i] == plan)
-		{
-			while (i < np1)
-			{
-				planrefs[i] = planrefs[i + 1];
-				i++;
-			}
-			owner->nplanrefs = np1;
-			return;
-		}
-	}
-	elog(ERROR, "plancache reference %p is not owned by resource owner %s",
-		 plan, owner->name);
+	if (!res)
+		elog(ERROR, "plancache reference %p is not owned by resource owner %s",
+			 plan, owner->name);
 }
 
 /*
@@ -1017,25 +1028,7 @@ PrintPlanCacheLeakWarning(CachedPlan *plan)
 void
 ResourceOwnerEnlargeTupleDescs(ResourceOwner owner)
 {
-	int			newmax;
-
-	if (owner->ntupdescs < owner->maxtupdescs)
-		return;					/* nothing to do */
-
-	if (owner->tupdescs == NULL)
-	{
-		newmax = 16;
-		owner->tupdescs = (TupleDesc *)
-			MemoryContextAlloc(TopMemoryContext, newmax * sizeof(TupleDesc));
-		owner->maxtupdescs = newmax;
-	}
-	else
-	{
-		newmax = owner->maxtupdescs * 2;
-		owner->tupdescs = (TupleDesc *)
-			repalloc(owner->tupdescs, newmax * sizeof(TupleDesc));
-		owner->maxtupdescs = newmax;
-	}
+	ResourceArrayEnlarge(&(owner->tupdescarr));
 }
 
 /*
@@ -1046,9 +1039,7 @@ ResourceOwnerEnlargeTupleDescs(ResourceOwner owner)
 void
 ResourceOwnerRememberTupleDesc(ResourceOwner owner, TupleDesc tupdesc)
 {
-	Assert(owner->ntupdescs < owner->maxtupdescs);
-	owner->tupdescs[owner->ntupdescs] = tupdesc;
-	owner->ntupdescs++;
+	ResourceArrayAdd(&(owner->tupdescarr), (Datum) tupdesc);
 }
 
 /*
@@ -1057,25 +1048,12 @@ ResourceOwnerRememberTupleDesc(ResourceOwner owner, TupleDesc tupdesc)
 void
 ResourceOwnerForgetTupleDesc(ResourceOwner owner, TupleDesc tupdesc)
 {
-	TupleDesc  *tupdescs = owner->tupdescs;
-	int			nt1 = owner->ntupdescs - 1;
-	int			i;
+	bool		res = ResourceArrayRemove(&(owner->tupdescarr),
+										  (Datum) tupdesc);
 
-	for (i = nt1; i >= 0; i--)
-	{
-		if (tupdescs[i] == tupdesc)
-		{
-			while (i < nt1)
-			{
-				tupdescs[i] = tupdescs[i + 1];
-				i++;
-			}
-			owner->ntupdescs = nt1;
-			return;
-		}
-	}
-	elog(ERROR, "tupdesc reference %p is not owned by resource owner %s",
-		 tupdesc, owner->name);
+	if (!res)
+		elog(ERROR, "tupdesc reference %p is not owned by resource owner %s",
+			 tupdesc, owner->name);
 }
 
 /*
@@ -1099,25 +1077,7 @@ PrintTupleDescLeakWarning(TupleDesc tupdesc)
 void
 ResourceOwnerEnlargeSnapshots(ResourceOwner owner)
 {
-	int			newmax;
-
-	if (owner->nsnapshots < owner->maxsnapshots)
-		return;					/* nothing to do */
-
-	if (owner->snapshots == NULL)
-	{
-		newmax = 16;
-		owner->snapshots = (Snapshot *)
-			MemoryContextAlloc(TopMemoryContext, newmax * sizeof(Snapshot));
-		owner->maxsnapshots = newmax;
-	}
-	else
-	{
-		newmax = owner->maxsnapshots * 2;
-		owner->snapshots = (Snapshot *)
-			repalloc(owner->snapshots, newmax * sizeof(Snapshot));
-		owner->maxsnapshots = newmax;
-	}
+	ResourceArrayEnlarge(&(owner->snapshotarr));
 }
 
 /*
@@ -1128,9 +1088,7 @@ ResourceOwnerEnlargeSnapshots(ResourceOwner owner)
 void
 ResourceOwnerRememberSnapshot(ResourceOwner owner, Snapshot snapshot)
 {
-	Assert(owner->nsnapshots < owner->maxsnapshots);
-	owner->snapshots[owner->nsnapshots] = snapshot;
-	owner->nsnapshots++;
+	ResourceArrayAdd(&(owner->snapshotarr), (Datum) snapshot);
 }
 
 /*
@@ -1139,25 +1097,12 @@ ResourceOwnerRememberSnapshot(ResourceOwner owner, Snapshot snapshot)
 void
 ResourceOwnerForgetSnapshot(ResourceOwner owner, Snapshot snapshot)
 {
-	Snapshot   *snapshots = owner->snapshots;
-	int			ns1 = owner->nsnapshots - 1;
-	int			i;
+	bool		res = ResourceArrayRemove(&(owner->snapshotarr),
+										  (Datum) snapshot);
 
-	for (i = ns1; i >= 0; i--)
-	{
-		if (snapshots[i] == snapshot)
-		{
-			while (i < ns1)
-			{
-				snapshots[i] = snapshots[i + 1];
-				i++;
-			}
-			owner->nsnapshots = ns1;
-			return;
-		}
-	}
-	elog(ERROR, "snapshot reference %p is not owned by resource owner %s",
-		 snapshot, owner->name);
+	if (!res)
+		elog(ERROR, "snapshot reference %p is not owned by resource owner %s",
+			 snapshot, owner->name);
 }
 
 /*
@@ -1182,25 +1127,7 @@ PrintSnapshotLeakWarning(Snapshot snapshot)
 void
 ResourceOwnerEnlargeFiles(ResourceOwner owner)
 {
-	int			newmax;
-
-	if (owner->nfiles < owner->maxfiles)
-		return;					/* nothing to do */
-
-	if (owner->files == NULL)
-	{
-		newmax = 16;
-		owner->files = (File *)
-			MemoryContextAlloc(TopMemoryContext, newmax * sizeof(File));
-		owner->maxfiles = newmax;
-	}
-	else
-	{
-		newmax = owner->maxfiles * 2;
-		owner->files = (File *)
-			repalloc(owner->files, newmax * sizeof(File));
-		owner->maxfiles = newmax;
-	}
+	ResourceArrayEnlarge(&(owner->filearr));
 }
 
 /*
@@ -1211,9 +1138,7 @@ ResourceOwnerEnlargeFiles(ResourceOwner owner)
 void
 ResourceOwnerRememberFile(ResourceOwner owner, File file)
 {
-	Assert(owner->nfiles < owner->maxfiles);
-	owner->files[owner->nfiles] = file;
-	owner->nfiles++;
+	ResourceArrayAdd(&(owner->filearr), (Datum) file);
 }
 
 /*
@@ -1222,25 +1147,12 @@ ResourceOwnerRememberFile(ResourceOwner owner, File file)
 void
 ResourceOwnerForgetFile(ResourceOwner owner, File file)
 {
-	File	   *files = owner->files;
-	int			ns1 = owner->nfiles - 1;
-	int			i;
+	bool		res = ResourceArrayRemove(&(owner->filearr),
+										  (Datum) file);
 
-	for (i = ns1; i >= 0; i--)
-	{
-		if (files[i] == file)
-		{
-			while (i < ns1)
-			{
-				files[i] = files[i + 1];
-				i++;
-			}
-			owner->nfiles = ns1;
-			return;
-		}
-	}
-	elog(ERROR, "temporery file %d is not owned by resource owner %s",
-		 file, owner->name);
+	if (!res)
+		elog(ERROR, "temporary file %d is not owned by resource owner %s",
+			 file, owner->name);
 }
 
 
@@ -1265,26 +1177,7 @@ PrintFileLeakWarning(File file)
 void
 ResourceOwnerEnlargeDSMs(ResourceOwner owner)
 {
-	int			newmax;
-
-	if (owner->ndsms < owner->maxdsms)
-		return;					/* nothing to do */
-
-	if (owner->dsms == NULL)
-	{
-		newmax = 16;
-		owner->dsms = (dsm_segment **)
-			MemoryContextAlloc(TopMemoryContext,
-							   newmax * sizeof(dsm_segment *));
-		owner->maxdsms = newmax;
-	}
-	else
-	{
-		newmax = owner->maxdsms * 2;
-		owner->dsms = (dsm_segment **)
-			repalloc(owner->dsms, newmax * sizeof(dsm_segment *));
-		owner->maxdsms = newmax;
-	}
+	ResourceArrayEnlarge(&(owner->dsmarr));
 }
 
 /*
@@ -1295,9 +1188,7 @@ ResourceOwnerEnlargeDSMs(ResourceOwner owner)
 void
 ResourceOwnerRememberDSM(ResourceOwner owner, dsm_segment *seg)
 {
-	Assert(owner->ndsms < owner->maxdsms);
-	owner->dsms[owner->ndsms] = seg;
-	owner->ndsms++;
+	ResourceArrayAdd(&(owner->dsmarr), (Datum) seg);
 }
 
 /*
@@ -1306,26 +1197,12 @@ ResourceOwnerRememberDSM(ResourceOwner owner, dsm_segment *seg)
 void
 ResourceOwnerForgetDSM(ResourceOwner owner, dsm_segment *seg)
 {
-	dsm_segment **dsms = owner->dsms;
-	int			ns1 = owner->ndsms - 1;
-	int			i;
+	bool		res = ResourceArrayRemove(&(owner->dsmarr),
+										  (Datum) seg);
 
-	for (i = ns1; i >= 0; i--)
-	{
-		if (dsms[i] == seg)
-		{
-			while (i < ns1)
-			{
-				dsms[i] = dsms[i + 1];
-				i++;
-			}
-			owner->ndsms = ns1;
-			return;
-		}
-	}
-	elog(ERROR,
-		 "dynamic shared memory segment %u is not owned by resource owner %s",
-		 dsm_segment_handle(seg), owner->name);
+	if (!res)
+		elog(ERROR, "dynamic shared memory segment %u is not owned by resource"
+			 " owner %s", dsm_segment_handle(seg), owner->name);
 }
 
 

@@ -23,6 +23,7 @@
 
     <listitem>
      <para>
+       Scalability improvement for multicore/multeprocessor systems.
      </para>
     </listitem>
 
@@ -91,9 +92,17 @@
     <listitem>
 <!-- Put commit message here -->      
     <para>
-    
-       <!-- to be filled -->
+       Scalability improvements for multicore/multiprocessor systems:  
     </para>
+    <itemizedlist>
+    <listitem>
+    <para>Resource owner optimisation for complicated queries: now
+    resource lists has constant access time, which improves performance
+    for heavily partitioned tables and queries which use hundreds of
+    tables.
+    </para>
+    </listitem>
+     </itemizedlist>
     </listitem>
      </itemizedlist>
 
