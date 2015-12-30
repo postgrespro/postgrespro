@@ -29,7 +29,7 @@ CREATE OR REPLACE FUNCTION to_schema_qualified_operator(opid oid) RETURNS TEXT A
 		into r;
 		
 		if r is null then
-			raise exception 'operator % does not exist', opid;
+			raise exception '% is not a valid operator id', opid;
 		end if;
 
 		if r.oprleft = 0 then
@@ -61,6 +61,10 @@ CREATE OR REPLACE FUNCTION to_schema_qualified_type(typid oid) RETURNS TEXT AS $
 				on typnamespace = pg_namespace.oid
 		where pg_type.oid = typid
 		into result;
+		
+		if result is null then
+			raise exception '% is not a valid type id', typid;
+		end if;
 
 		return result;
 	END;
@@ -77,6 +81,10 @@ CREATE FUNCTION to_schema_qualified_relation(reloid oid) RETURNS TEXT AS $$
 				on relnamespace = pg_namespace.oid
 		where pg_class.oid = reloid
 		into result;
+		
+		if result is null then
+			raise exception '% is not a valid relation id', reloid;
+		end if;
 
 		return result;
 	END;
@@ -172,6 +180,11 @@ CREATE FUNCTION to_namespace(nsp text) RETURNS OID AS $$
 		from pg_catalog.pg_namespace
 		where nspname = nsp
 		into result;
+		
+		if result is null then
+			raise exception 'schema % does not exist',
+							quote_literal(nsp);
+		end if;
 
 		return result;
 	END;
@@ -187,6 +200,10 @@ CREATE FUNCTION get_namespace(relation oid) RETURNS OID AS $$
 		from pg_catalog.pg_class
 		where oid = relation
 		into result;
+		
+		if result is null then
+			raise exception 'relation % does not exist', relation;
+		end if;
 
 		return result;
 	END;
@@ -409,6 +426,9 @@ CREATE FUNCTION dump_statistic(schema_name text) RETURNS SETOF TEXT AS $$
 		i		text;
 		
 	BEGIN
+		-- validate schema name
+		select to_namespace(schema_name);
+	
 		for relid in
 				select pg_class.oid
 				from pg_catalog.pg_namespace
@@ -422,6 +442,11 @@ CREATE FUNCTION dump_statistic(schema_name text) RETURNS SETOF TEXT AS $$
 		end loop;
 		
 		return;
+		
+	EXCEPTION
+		when invalid_schema_name then
+			raise exception 'schema % does not exist',
+							quote_literal(schema_name);
 	END;
 $$ LANGUAGE plpgsql;
 
