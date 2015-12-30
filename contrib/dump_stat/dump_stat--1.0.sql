@@ -380,12 +380,16 @@ CREATE FUNCTION dump_statistic(schema_name text, table_name text) RETURNS SETOF 
 	DECLARE
 		qual_relname	text;
 		relid			oid;
+		i				text;
 
 	BEGIN
 		qual_relname := quote_ident(schema_name) ||
 							'.' || quote_ident(table_name);
 	
-		return next dump_statistic(qual_relname::regclass);
+		for i in select dump_statistic(qual_relname::regclass) loop
+			return next i;
+		end loop;
+		
 		return;
 		
 	EXCEPTION
@@ -416,6 +420,8 @@ CREATE FUNCTION dump_statistic(schema_name text) RETURNS SETOF TEXT AS $$
 				return next i;
 			end loop;
 		end loop;
+		
+		return;
 	END;
 $$ LANGUAGE plpgsql;
 
@@ -436,5 +442,7 @@ CREATE FUNCTION dump_statistic() RETURNS SETOF TEXT AS $$
 				return next i;
 			end loop;
 		end loop;
+		
+		return;
 	END;
 $$ LANGUAGE plpgsql;
