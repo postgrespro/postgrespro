@@ -146,8 +146,15 @@
 <!--
 Put commit ID and message here
 -->
+<!-- [d1c84bdc1a7d5f3fecd]
+Author: Nikolay Shaplov <n.shaplov@postgrespro.ru>
+Date:   Wed Dec 30 16:00:20 2015 +0300
+
+    Add patch that allows to view tuple raw data in pageinspect the way it was commited in master 9.6
+    in d6061f83a166b015657fda8623c704fcb86930e9 and 0271e27c1089f104236a7fe3b3fca52e5359ae56 -->
+
       <para>
-      <!-- To be filled in -->
+        pageinspect extension now can extract tuple data, not only metainformation.
       </para>
      </listitem>
 
