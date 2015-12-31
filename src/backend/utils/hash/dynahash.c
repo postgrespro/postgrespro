@@ -15,7 +15,7 @@
  * to hash_create.  This prevents any attempt to split buckets on-the-fly.
  * Therefore, each hash bucket chain operates independently, and no fields
  * of the hash header change after init except nentries and freeList.
- * A partitioned table uses a spinlock to guard changes of those two fields.
+ * A partitioned table uses spinlocks to guard changes of those fields.
  * This lets any subset of the hash buckets be treated as a separately
  * lockable partition.  We expect callers to use the low-order bits of a
  * lookup key's hash value as a partition number --- this will work because
@@ -87,6 +87,7 @@
 #include "access/xact.h"
 #include "storage/shmem.h"
 #include "storage/spin.h"
+#include "storage/lock.h"
 #include "utils/dynahash.h"
 #include "utils/memutils.h"
 
@@ -128,12 +129,21 @@ typedef HASHBUCKET *HASHSEGMENT;
  */
 struct HASHHDR
 {
-	/* In a partitioned table, take this lock to touch nentries or freeList */
-	slock_t		mutex;			/* unused if not partitioned table */
+	/*
+	 * In a partitioned table take these locks to touch nentries or freeList.
+	 * If hash table is not partitioned mutexes are not used.
+	 */
+	slock_t		mutex[NUM_LOCK_PARTITIONS];
 
-	/* These fields change during entry addition/deletion */
-	long		nentries;		/* number of entries in hash table */
-	HASHELEMENT *freeList;		/* linked list of free elements */
+	/*
+	 * These fields change during entry addition/deletion. If hash table is
+	 * not partitioned only nentries[0] and freeList[0] are used.
+	 */
+
+	/* number of entries in hash table */
+	long		nentries[NUM_LOCK_PARTITIONS];
+	/* linked list of free elements */
+	HASHELEMENT *freeList[NUM_LOCK_PARTITIONS];
 
 	/* These fields can change, but not in a partitioned table */
 	/* Also, dsize can't change in a shared table, even if unpartitioned */
@@ -165,6 +175,8 @@ struct HASHHDR
 };
 
 #define IS_PARTITIONED(hctl)  ((hctl)->num_partitions != 0)
+
+#define PARTITION_IDX(hctl, hashcode) (IS_PARTITIONED(hctl) ? LockHashPartition(hashcode) : 0)
 
 /*
  * Top control structure for a hashtable --- in a shared table, each backend
@@ -219,10 +231,10 @@ static long hash_accesses,
  */
 static void *DynaHashAlloc(Size size);
 static HASHSEGMENT seg_alloc(HTAB *hashp);
-static bool element_alloc(HTAB *hashp, int nelem);
+static bool element_alloc(HTAB *hashp, int nelem, int partition_idx);
 static bool dir_realloc(HTAB *hashp);
 static bool expand_table(HTAB *hashp);
-static HASHBUCKET get_hash_entry(HTAB *hashp);
+static HASHBUCKET get_hash_entry(HTAB *hashp, int partition_idx);
 static void hdefault(HTAB *hashp);
 static int	choose_nelem_alloc(Size entrysize);
 static bool init_htab(HTAB *hashp, long nelem);
@@ -282,6 +294,9 @@ hash_create(const char *tabname, long nelem, HASHCTL *info, int flags)
 {
 	HTAB	   *hashp;
 	HASHHDR    *hctl;
+	int			i,
+				partitions_number,
+				nelem_alloc;
 
 	/*
 	 * For shared hash tables, we have a local hash header (HTAB struct) that
@@ -482,10 +497,20 @@ hash_create(const char *tabname, long nelem, HASHCTL *info, int flags)
 	if ((flags & HASH_SHARED_MEM) ||
 		nelem < hctl->nelem_alloc)
 	{
-		if (!element_alloc(hashp, (int) nelem))
-			ereport(ERROR,
-					(errcode(ERRCODE_OUT_OF_MEMORY),
-					 errmsg("out of memory")));
+		if (IS_PARTITIONED(hashp->hctl))
+			partitions_number = NUM_LOCK_PARTITIONS;
+		else
+			partitions_number = 1;
+
+		nelem_alloc = ((int) nelem) / partitions_number;
+		if (nelem_alloc == 0)
+			nelem_alloc = 1;
+
+		for (i = 0; i < partitions_number; i++)
+			if (!element_alloc(hashp, nelem_alloc, i))
+				ereport(ERROR,
+						(errcode(ERRCODE_OUT_OF_MEMORY),
+						 errmsg("out of memory")));
 	}
 
 	if (flags & HASH_FIXED_SIZE)
@@ -502,9 +527,6 @@ hdefault(HTAB *hashp)
 	HASHHDR    *hctl = hashp->hctl;
 
 	MemSet(hctl, 0, sizeof(HASHHDR));
-
-	hctl->nentries = 0;
-	hctl->freeList = NULL;
 
 	hctl->dsize = DEF_DIRSIZE;
 	hctl->nsegs = 0;
@@ -572,12 +594,14 @@ init_htab(HTAB *hashp, long nelem)
 	HASHSEGMENT *segp;
 	int			nbuckets;
 	int			nsegs;
+	int			i;
 
 	/*
 	 * initialize mutex if it's a partitioned table
 	 */
 	if (IS_PARTITIONED(hctl))
-		SpinLockInit(&hctl->mutex);
+		for (i = 0; i < NUM_LOCK_PARTITIONS; i++)
+			SpinLockInit(&(hctl->mutex[i]));
 
 	/*
 	 * Divide number of elements by the fill factor to determine a desired
@@ -648,7 +672,7 @@ init_htab(HTAB *hashp, long nelem)
 			"HIGH MASK       ", hctl->high_mask,
 			"LOW  MASK       ", hctl->low_mask,
 			"NSEGS           ", hctl->nsegs,
-			"NENTRIES        ", hctl->nentries);
+			"NENTRIES        ", hash_get_num_entries(hctl));
 #endif
 	return true;
 }
@@ -769,7 +793,7 @@ hash_stats(const char *where, HTAB *hashp)
 			where, hashp->hctl->accesses, hashp->hctl->collisions);
 
 	fprintf(stderr, "hash_stats: entries %ld keysize %ld maxp %u segmentcount %ld\n",
-			hashp->hctl->nentries, (long) hashp->hctl->keysize,
+			hash_get_num_entries(hashp), (long) hashp->hctl->keysize,
 			hashp->hctl->max_bucket, hashp->hctl->nsegs);
 	fprintf(stderr, "%s: total accesses %ld total collisions %ld\n",
 			where, hash_accesses, hash_collisions);
@@ -863,6 +887,7 @@ hash_search_with_hash_value(HTAB *hashp,
 	HASHBUCKET	currBucket;
 	HASHBUCKET *prevBucketPtr;
 	HashCompareFunc match;
+	int			partition_idx = PARTITION_IDX(hctl, hashvalue);
 
 #if HASH_STATISTICS
 	hash_accesses++;
@@ -885,7 +910,7 @@ hash_search_with_hash_value(HTAB *hashp,
 		 * order of these tests is to try to check cheaper conditions first.
 		 */
 		if (!IS_PARTITIONED(hctl) && !hashp->frozen &&
-			hctl->nentries / (long) (hctl->max_bucket + 1) >= hctl->ffactor &&
+		hctl->nentries[0] / (long) (hctl->max_bucket + 1) >= hctl->ffactor &&
 			!has_seq_scans(hashp))
 			(void) expand_table(hashp);
 	}
@@ -941,25 +966,22 @@ hash_search_with_hash_value(HTAB *hashp,
 		case HASH_REMOVE:
 			if (currBucket != NULL)
 			{
-				/* use volatile pointer to prevent code rearrangement */
-				volatile HASHHDR *hctlv = hctl;
-
 				/* if partitioned, must lock to touch nentries and freeList */
-				if (IS_PARTITIONED(hctlv))
-					SpinLockAcquire(&hctlv->mutex);
+				if (IS_PARTITIONED(hctl))
+					SpinLockAcquire(&(hctl->mutex[partition_idx]));
 
-				Assert(hctlv->nentries > 0);
-				hctlv->nentries--;
+				Assert(hctl->nentries[partition_idx] > 0);
+				hctl->nentries[partition_idx]--;
 
 				/* remove record from hash bucket's chain. */
 				*prevBucketPtr = currBucket->link;
 
 				/* add the record to the freelist for this table.  */
-				currBucket->link = hctlv->freeList;
-				hctlv->freeList = currBucket;
+				currBucket->link = hctl->freeList[partition_idx];
+				hctl->freeList[partition_idx] = currBucket;
 
-				if (IS_PARTITIONED(hctlv))
-					SpinLockRelease(&hctlv->mutex);
+				if (IS_PARTITIONED(hctl))
+					SpinLockRelease(&hctl->mutex[partition_idx]);
 
 				/*
 				 * better hope the caller is synchronizing access to this
@@ -985,7 +1007,7 @@ hash_search_with_hash_value(HTAB *hashp,
 				elog(ERROR, "cannot insert into frozen hashtable \"%s\"",
 					 hashp->tabname);
 
-			currBucket = get_hash_entry(hashp);
+			currBucket = get_hash_entry(hashp, partition_idx);
 			if (currBucket == NULL)
 			{
 				/* out of memory */
@@ -1178,42 +1200,71 @@ hash_update_hash_key(HTAB *hashp,
  * create a new entry if possible
  */
 static HASHBUCKET
-get_hash_entry(HTAB *hashp)
+get_hash_entry(HTAB *hashp, int partition_idx)
 {
-	/* use volatile pointer to prevent code rearrangement */
-	volatile HASHHDR *hctlv = hashp->hctl;
+	HASHHDR    *hctl = hashp->hctl;
 	HASHBUCKET	newElement;
+	int			i,
+				borrow_from_idx;
 
 	for (;;)
 	{
 		/* if partitioned, must lock to touch nentries and freeList */
-		if (IS_PARTITIONED(hctlv))
-			SpinLockAcquire(&hctlv->mutex);
+		if (IS_PARTITIONED(hctl))
+			SpinLockAcquire(&hctl->mutex[partition_idx]);
 
 		/* try to get an entry from the freelist */
-		newElement = hctlv->freeList;
+		newElement = hctl->freeList[partition_idx];
+
 		if (newElement != NULL)
-			break;
+		{
+			/* remove entry from freelist, bump nentries */
+			hctl->freeList[partition_idx] = newElement->link;
+			hctl->nentries[partition_idx]++;
+			if (IS_PARTITIONED(hctl))
+				SpinLockRelease(&hctl->mutex[partition_idx]);
+
+			return newElement;
+		}
+
+		if (IS_PARTITIONED(hctl))
+			SpinLockRelease(&hctl->mutex[partition_idx]);
 
 		/* no free elements.  allocate another chunk of buckets */
-		if (IS_PARTITIONED(hctlv))
-			SpinLockRelease(&hctlv->mutex);
-
-		if (!element_alloc(hashp, hctlv->nelem_alloc))
+		if (!element_alloc(hashp, hctl->nelem_alloc, partition_idx))
 		{
-			/* out of memory */
-			return NULL;
+			if (!IS_PARTITIONED(hctl))
+				return NULL;	/* out of memory */
+
+			/* try to borrow element from another partition */
+			borrow_from_idx = partition_idx;
+			for (;;)
+			{
+				borrow_from_idx = (borrow_from_idx + 1) % NUM_LOCK_PARTITIONS;
+				if (borrow_from_idx == partition_idx)
+					break;
+
+				SpinLockAcquire(&(hctl->mutex[borrow_from_idx]));
+				newElement = hctl->freeList[borrow_from_idx];
+
+				if (newElement != NULL)
+				{
+					hctl->freeList[borrow_from_idx] = newElement->link;
+					SpinLockRelease(&(hctl->mutex[borrow_from_idx]));
+
+					SpinLockAcquire(&hctl->mutex[partition_idx]);
+					hctl->nentries[partition_idx]++;
+					SpinLockRelease(&hctl->mutex[partition_idx]);
+
+					break;
+				}
+
+				SpinLockRelease(&(hctl->mutex[borrow_from_idx]));
+			}
+
+			return newElement;
 		}
 	}
-
-	/* remove entry from freelist, bump nentries */
-	hctlv->freeList = newElement->link;
-	hctlv->nentries++;
-
-	if (IS_PARTITIONED(hctlv))
-		SpinLockRelease(&hctlv->mutex);
-
-	return newElement;
 }
 
 /*
@@ -1222,11 +1273,21 @@ get_hash_entry(HTAB *hashp)
 long
 hash_get_num_entries(HTAB *hashp)
 {
+	int			i;
+	long		sum = hashp->hctl->nentries[0];
+
 	/*
 	 * We currently don't bother with the mutex; it's only sensible to call
 	 * this function if you've got lock on all partitions of the table.
 	 */
-	return hashp->hctl->nentries;
+
+	if (!IS_PARTITIONED(hashp->hctl))
+		return sum;
+
+	for (i = 1; i < NUM_LOCK_PARTITIONS; i++)
+		sum += hashp->hctl->nentries[i];
+
+	return sum;
 }
 
 /*
@@ -1534,10 +1595,9 @@ seg_alloc(HTAB *hashp)
  * allocate some new elements and link them into the free list
  */
 static bool
-element_alloc(HTAB *hashp, int nelem)
+element_alloc(HTAB *hashp, int nelem, int partition_idx)
 {
-	/* use volatile pointer to prevent code rearrangement */
-	volatile HASHHDR *hctlv = hashp->hctl;
+	HASHHDR    *hctl = hashp->hctl;
 	Size		elementSize;
 	HASHELEMENT *firstElement;
 	HASHELEMENT *tmpElement;
@@ -1548,7 +1608,7 @@ element_alloc(HTAB *hashp, int nelem)
 		return false;
 
 	/* Each element has a HASHELEMENT header plus user data. */
-	elementSize = MAXALIGN(sizeof(HASHELEMENT)) + MAXALIGN(hctlv->entrysize);
+	elementSize = MAXALIGN(sizeof(HASHELEMENT)) + MAXALIGN(hctl->entrysize);
 
 	CurrentDynaHashCxt = hashp->hcxt;
 	firstElement = (HASHELEMENT *) hashp->alloc(nelem * elementSize);
@@ -1567,15 +1627,15 @@ element_alloc(HTAB *hashp, int nelem)
 	}
 
 	/* if partitioned, must lock to touch freeList */
-	if (IS_PARTITIONED(hctlv))
-		SpinLockAcquire(&hctlv->mutex);
+	if (IS_PARTITIONED(hctl))
+		SpinLockAcquire(&hctl->mutex[partition_idx]);
 
 	/* freelist could be nonempty if two backends did this concurrently */
-	firstElement->link = hctlv->freeList;
-	hctlv->freeList = prevElement;
+	firstElement->link = hctl->freeList[partition_idx];
+	hctl->freeList[partition_idx] = prevElement;
 
-	if (IS_PARTITIONED(hctlv))
-		SpinLockRelease(&hctlv->mutex);
+	if (IS_PARTITIONED(hctl))
+		SpinLockRelease(&hctl->mutex[partition_idx]);
 
 	return true;
 }
