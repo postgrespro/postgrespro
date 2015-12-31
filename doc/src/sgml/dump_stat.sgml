@@ -9,7 +9,11 @@
 
     <para>
         The <filename>dump_stat</> module provides functions that allow you to
-        backup and recover the contents of the pg_statistic table.
+        backup and recover the contents of the pg_statistic table. The
+        <function>dump_statistic</> function generates <literal>INSERT</> statements which
+        can later be applied to a compatible PostgreSQL server. The extension
+        should be installed on the recipient server in order to successfuly restore
+        statistical data since these statements rely on the provided functions.
     </para>
 
     <sect2>
@@ -33,6 +37,187 @@
                         the ones that contain statistical data for tables in
                         <literal>information_schema</> and <literal>pg_catalog</>
                         schemas.
+                    </para>
+                </listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <function>dump_statistic(schema_name text) returns setof text</function>
+                    <indexterm>
+                        <primary>dump_statistic</primary>
+                    </indexterm>
+                </term>
+
+                <listitem>
+                    <para>
+                        <function>dump_statistic</function> dumps the contents of the
+                        <link linkend="catalog-pg-statistic"><structname>pg_statistic</structname></link>
+                        system catalog. It produces an <literal>INSERT</> statement
+                        per each tuple of the <literal>pg_statistic</>, excluding
+                        the ones that contain statistical data for tables in
+                        <literal>information_schema</> and <literal>pg_catalog</>
+                        schemas.
+                    </para>
+                </listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <function>dump_statistic(schema_name text, table_name text) returns setof text</function>
+                    <indexterm>
+                        <primary>dump_statistic</primary>
+                    </indexterm>
+                </term>
+
+                <listitem>
+                    <para>
+                        <function>dump_statistic</function> dumps the contents of the
+                        <link linkend="catalog-pg-statistic"><structname>pg_statistic</structname></link>
+                        system catalog. It produces an <literal>INSERT</> statement
+                        per each tuple of the <literal>pg_statistic</>, excluding
+                        the ones that contain statistical data for tables in
+                        <literal>information_schema</> and <literal>pg_catalog</>
+                        schemas.
+                    </para>
+                </listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <function>to_schema_qualified_operator(opid oid) returns text</function>
+                    <indexterm>
+                        <primary>to_schema_qualified_operator</primary>
+                    </indexterm>
+                </term>
+
+                <listitem>
+                    <para>
+                        Fetches the schema-qualified operator name by operator id.
+                    </para>
+                </listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <function>to_schema_qualified_type(opid oid) returns text</function>
+                    <indexterm>
+                        <primary>to_schema_qualified_type</primary>
+                    </indexterm>
+                </term>
+
+                <listitem>
+                    <para>
+                        Fetches the schema-qualified type name by type id.
+                    </para>
+                </listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <function>to_schema_qualified_relation(opid oid) returns text</function>
+                    <indexterm>
+                        <primary>to_schema_qualified_relation</primary>
+                    </indexterm>
+                </term>
+
+                <listitem>
+                    <para>
+                        Fetches the schema-qualified relation name by relation id.
+                    </para>
+                </listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <function>anyarray_elemtype(arr anyarray) returns oid</function>
+                    <indexterm>
+                        <primary>anyarray_elemtype</primary>
+                    </indexterm>
+                </term>
+
+                <listitem>
+                    <para>
+                        Returns the element type of the given array as oid.
+                    </para>
+                </listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <function>to_attname(relation text, colnum int2) returns text</function>
+                    <indexterm>
+                        <primary>to_attname</primary>
+                    </indexterm>
+                </term>
+
+                <listitem>
+                    <para>
+                        Given a relation name and a column number, returns the column name as text.
+                    </para>
+                </listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <function>to_attnum(relation text, col text) returns int2</function>
+                    <indexterm>
+                        <primary>to_attnum</primary>
+                    </indexterm>
+                </term>
+
+                <listitem>
+                    <para>
+                        Given a relation name and a column name, returns the column number as int2.
+                    </para>
+                </listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <function>to_atttype(relation text, col text) returns text</function>
+                    <indexterm>
+                        <primary>to_atttype</primary>
+                    </indexterm>
+                </term>
+
+                <listitem>
+                    <para>
+                        Given a relation name and a column name, returns the column type as text.
+                    </para>
+                </listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <function>to_namespace(nsp text) returns oid</function>
+                    <indexterm>
+                        <primary>to_namespace</primary>
+                    </indexterm>
+                </term>
+
+                <listitem>
+                    <para>
+                        <function>to_namespace</function> duplicates the behavior of
+                        the cast to <literal>regnamespace</> type, which is not
+                        present in the 9.4 release (and prior releases). This
+                        function returns the oid of the given namespace.
+                    </para>
+                </listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <function>get_namespace(relation oid) returns oid</function>
+                    <indexterm>
+                        <primary>get_namespace</primary>
+                    </indexterm>
+                </term>
+
+                <listitem>
+                    <para>
+                        <function>get_namespace</function> returns the namespace
+                        of the given relation as oid.
                     </para>
                 </listitem>
             </varlistentry>
