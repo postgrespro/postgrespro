@@ -103,10 +103,16 @@
     and queries which use large number of resoures
 -->
     <para>Resource owner optimisation for complicated queries: now
-
     resource lists has constant access time, which improves performance
     for heavily partitioned tables and queries which use hundreds of
     tables.
+    </para>
+    </listitem>
+    <listitem>
+    <para>
+    Fix lock contention for HASHHDR.mutex. (Alexander Alexeev). This
+    prevents Postgres from waiting for lock up to several milliseconds
+    when modifying state, shared between processes.
     </para>
     </listitem>
      </itemizedlist>

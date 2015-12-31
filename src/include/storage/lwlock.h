@@ -144,12 +144,12 @@ extern PGDLLIMPORT LWLockPadded *MainLWLockArray;
  * having this file include lock.h or bufmgr.h would be backwards.
  */
 
-/* Number of partitions of the shared buffer mapping hashtable */
-#define NUM_BUFFER_PARTITIONS  128
-
 /* Number of partitions the shared lock tables are divided into */
-#define LOG2_NUM_LOCK_PARTITIONS  4
+#define LOG2_NUM_LOCK_PARTITIONS  7
 #define NUM_LOCK_PARTITIONS  (1 << LOG2_NUM_LOCK_PARTITIONS)
+
+/* Number of partitions of the shared buffer mapping hashtable */
+#define NUM_BUFFER_PARTITIONS NUM_LOCK_PARTITIONS
 
 /* Number of partitions the shared predicate lock tables are divided into */
 #define LOG2_NUM_PREDICATELOCK_PARTITIONS  4
