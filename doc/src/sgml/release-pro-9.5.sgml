@@ -109,6 +109,11 @@
     </para>
     </listitem>
     <listitem>
+<!--
+commit [90e649a7afac8c76]   Thu Dec 31 09:52:30 2015 +0300
+    Integrate dynahash patch by Alexander Alexeev. This fix lock
+    contension for shared memory
+-->
     <para>
     Fix lock contention for HASHHDR.mutex. (Alexander Alexeev). This
     prevents Postgres from waiting for lock up to several milliseconds
