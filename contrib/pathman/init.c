@@ -4,6 +4,7 @@
 
 #include "catalog/pg_class.h"
 #include "catalog/pg_constraint.h"
+#include "catalog/pg_operator.h"
 #include "utils/syscache.h"
 #include "access/htup_details.h"
 #include "utils/builtins.h"
@@ -17,6 +18,7 @@ bool	initialization_needed = true;
 
 
 static bool validate_range_constraint(Expr *, PartRelationInfo *, Datum *, Datum *);
+static bool validate_hash_constraint(Expr *expr, PartRelationInfo *prel, int *hash);
 static int cmp_range_entries(const void *p1, const void *p2);
 
 
@@ -124,7 +126,8 @@ load_part_relations_hashtable(bool reinitialize)
 					free_dsm_array(&prel->children);
 					prel->children_count = 0;
 				}
-				load_hash_restrictions(oid);
+				load_check_constraints(oid);
+				// load_hash_restrictions(oid);
 				break;
 		}
 	}
@@ -281,16 +284,20 @@ load_check_constraints(Oid parent_oid)
         RangeEntry *ranges;
         Datum min;
         Datum max;
-
-		rangerel = (RangeRelation *)
-			hash_search(range_restrictions, (void *) &parent_oid, HASH_ENTER, &found);
-		// rangerel->nranges = 0;
+		int hash;
+		HashRelation *hashrel;
 
         alloc_dsm_array(&prel->children, sizeof(Oid), proc);
         children = (Oid *) dsm_array_get_pointer(&prel->children);
 
-        alloc_dsm_array(&rangerel->ranges, sizeof(RangeEntry), proc);
-        ranges = (RangeEntry *) dsm_array_get_pointer(&rangerel->ranges);
+        if (prel->parttype == PT_RANGE)
+        {
+			rangerel = (RangeRelation *)
+				hash_search(range_restrictions, (void *) &parent_oid, HASH_ENTER, &found);
+
+	        alloc_dsm_array(&rangerel->ranges, sizeof(RangeEntry), proc);
+	        ranges = (RangeEntry *) dsm_array_get_pointer(&rangerel->ranges);
+	    }
 
         for (i=0; i<proc; i++)
         {
@@ -315,24 +322,42 @@ load_check_constraints(Oid parent_oid)
 			conbin = TextDatumGetCString(val);
 			expr = (Expr *) stringToNode(conbin);
 			
-			if (prel->parttype == PT_RANGE)
-				validate_range_constraint(expr, prel, &min, &max);
+			switch(prel->parttype)
+			{
+				case PT_RANGE:
+					if (!validate_range_constraint(expr, prel, &min, &max))
+						/* TODO: elog() */
+						continue;
 
-			// re.child_oid = DatumGetObjectId(SPI_getbinval(tuple, tupdesc, 2, &arg1_isnull));
-			re.child_oid = con->conrelid;
-			re.min = min;
-			re.max = max;
+					re.child_oid = con->conrelid;
+					re.min = min;
+					re.max = max;
 
-			ranges[i] = re;
-			// children[prel->children_count++] = re.child_oid;
+					ranges[i] = re;
+					break;
+			
+				case PT_HASH:
+					if (!validate_hash_constraint(expr, prel, &hash))
+						/* TODO: elog() */
+						continue;
+
+					hashrel = (HashRelation *)
+						hash_search(hash_restrictions, (void *) &hash, HASH_ENTER, &found);
+					hashrel->child_oid = con->conrelid;
+					children[hash] = con->conrelid;
+			}
 		}
+		prel->children_count = proc;
 
-		/* sort ascending */
-		qsort(ranges, proc, sizeof(RangeEntry), cmp_range_entries);
+		if (prel->parttype == PT_RANGE)
+		{
+			/* sort ascending */
+			qsort(ranges, proc, sizeof(RangeEntry), cmp_range_entries);
 
-		/* copy oids to prel */
-		for(i=0; i < proc; i++, prel->children_count++)
-			children[i] = ranges[i].child_oid;
+			/* copy oids to prel */
+			for(i=0; i < proc; i++)
+				children[i] = ranges[i].child_oid;
+		}
 
 		/* TODO: check if some ranges overlap! */
     }
@@ -400,6 +425,55 @@ validate_range_constraint(Expr *expr, PartRelationInfo *prel, Datum *min, Datum 
 		if ( ((Var*) left)->varattno != prel->attnum )
 			return false;
 		*max = ((Const*) right)->constvalue;
+	}
+
+	return true;
+}
+
+/*
+ * Validate hash constraint. It should look like "Var % Const = Const"
+ */
+static bool
+validate_hash_constraint(Expr *expr, PartRelationInfo *prel, int *hash)
+{
+	OpExpr *eqexpr;
+	OpExpr *modexpr;
+
+	if (!IsA(expr, OpExpr))
+		return false;
+	eqexpr = (OpExpr *) expr;
+
+	/* is this an equality operator? */
+	if (eqexpr->opno != Int4EqualOperator)
+		return false;
+
+	if (!IsA(linitial(eqexpr->args), OpExpr))
+		return false;
+
+	/* is this a modulus operator? */
+	modexpr = (OpExpr *) linitial(eqexpr->args);
+	if (modexpr->opno != 530)
+		return false;
+
+	if (list_length(modexpr->args) == 2)
+	{
+		Node *left = linitial(modexpr->args);
+		Node *right = lsecond(modexpr->args);
+		Const *mod_result;
+
+		if ( !IsA(left, Var) || !IsA(right, Const) )
+			return false;
+		if ( ((Var*) left)->varattno != prel->attnum )
+			return false;
+		if (DatumGetInt32(((Const*) right)->constvalue) != prel->children.length)
+			return false;
+
+		if ( !IsA(lsecond(eqexpr->args), Const) )
+			return false;
+
+		mod_result = lsecond(eqexpr->args);
+		*hash = DatumGetInt32(mod_result->constvalue);
+		return true;
 	}
 
 	return false;

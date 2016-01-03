@@ -32,6 +32,13 @@ BEGIN
                         , relation
                         , partnum);
 
+        EXECUTE format('ALTER TABLE %s_%s ADD CHECK (%s %% %s = %s)'
+                       , relation
+                       , partnum
+                       , attribute
+                       , partitions_count
+                       , partnum);
+
         -- EXECUTE format('CREATE TABLE %s_%s () INHERITS (%1$s)', relation, partnum);
         -- child_oid := relfilenode FROM pg_class WHERE relname = format('%s_%s', relation, partnum);
         INSERT INTO pg_pathman_hash_rels (parent, hash, child)
