@@ -26,6 +26,11 @@
        Scalability improvement for multicore/multeprocessor systems.
      </para>
     </listitem>
+    <listitem>
+     <para>
+       Contrib module pg_trgm supports substring searches (Arthur Zakirov).
+     </para>
+    </listitem>
 
 
    </itemizedlist>
@@ -168,7 +173,13 @@ Date:   Wed Dec 30 16:00:20 2015 +0300
         pageinspect extension now can extract tuple data, not only metainformation.
       </para>
      </listitem>
-
+     <listitem>
+     <para>
+        <!-- [04f01383f104] Arthur Zakirov Add substring_simularity functin -->
+        pg_trgm contrib module, which allows to do fuzzy string
+        comparations, now supports substring searches.
+     </para>
+     </listitem>
     </itemizedlist>
    </sect3>
   </sect2>
