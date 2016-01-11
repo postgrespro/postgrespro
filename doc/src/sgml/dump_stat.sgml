@@ -51,25 +51,30 @@
                         The <literal>INSERT</> statement takes form of
 <screen>
 WITH upsert as (
-  UPDATE pg_catalog.pg_statistic SET %s
-  WHERE to_schema_qualified_relation(starelid) = relname
-    AND to_attname(relname, staattnum) = attname
-    AND to_atttype(relname, staattnum) = atttype
-    AND stainherit = r.stainherit
+  UPDATE pg_catalog.pg_statistic SET <replaceable class="PARAMETER">column_name</> = <replaceable class="PARAMETER">expression</> [, ...]
+  WHERE to_schema_qualified_relation(starelid) = <replaceable class="PARAMETER">t_relname</>
+    AND to_attname(<replaceable class="PARAMETER">t_relname</>, staattnum) = <replaceable class="PARAMETER">t_attname</>
+    AND to_atttype(<replaceable class="PARAMETER">t_relname</>, staattnum) = <replaceable class="PARAMETER">t_atttype</>
+    AND stainherit = <replaceable class="PARAMETER">t_stainherit</>
   RETURNING *)
 ins as (
-  SELECT %s
+  SELECT <replaceable class="PARAMETER">expression</> [, ...]
   WHERE NOT EXISTS (SELECT * FROM upsert)
-    AND to_attnum(relname, attname) IS NOT NULL
-    AND to_atttype(relname, attname) = atttype)
+    AND to_attnum(<replaceable class="PARAMETER">t_relname</>, <replaceable class="PARAMETER">t_attname</>) IS NOT NULL
+    AND to_atttype(<replaceable class="PARAMETER">t_relname</>, <replaceable class="PARAMETER">t_attname</>) = <replaceable class="PARAMETER">t_atttype</>)
 INSERT INTO pg_catalog.pg_statistic SELECT * FROM ins;
+
+where <replaceable class="PARAMETER">expression</> can be one of:
+
+array_in(<replaceable class="PARAMETER">array_text</>, <replaceable class="PARAMETER">type_name</>::regtype::oid, -1)
+<replaceable class="PARAMETER">value</>::<replaceable class="PARAMETER">type_name</>
 </screen>
                     </para>
                     
                     <para>
                         Produced statements could be saved to a file, e.g.
 <screen>
-\COPY (select dump_statistic()) TO 'dump_stat.sql'
+test=# \COPY (select dump_statistic()) TO 'dump_stat.sql'
 </screen>
                     </para>
                 </listitem>
