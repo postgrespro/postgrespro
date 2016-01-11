@@ -9,11 +9,19 @@
 
     <para>
         The <filename>dump_stat</> module provides functions that allow you to
-        backup and recover the contents of the pg_statistic table. The
-        <function>dump_statistic</> function generates <literal>INSERT</> statements which
-        can later be applied to a compatible PostgreSQL server. The extension
+        backup and recover the contents of the
+        <link linkend="catalog-pg-statistic"><structname>pg_statistic</structname></link>
+        table. The <function>dump_statistic</> function generates <literal>INSERT</>
+        statements which can later be applied to a compatible database. The extension
         should be installed on the recipient server in order to successfuly restore
-        statistical data since these statements rely on the provided functions.
+        statistical data since these statements heavily rely on the provided functions.
+    </para>
+    
+    <para>
+        Note that the definition of the
+        <link linkend="catalog-pg-statistic"><structname>pg_statistic</structname></link>
+        table might change occasionally, which means that generated dump might be incompatible
+        with future releases of PostgreSQL.
     </para>
 
     <sect2>
@@ -33,10 +41,29 @@
                         <function>dump_statistic</function> dumps the contents of the
                         <link linkend="catalog-pg-statistic"><structname>pg_statistic</structname></link>
                         system catalog. It produces an <literal>INSERT</> statement
-                        per each tuple of the <literal>pg_statistic</>, excluding
-                        the ones that contain statistical data for tables in
-                        <literal>information_schema</> and <literal>pg_catalog</>
-                        schemas.
+                        per each tuple of the
+                        <link linkend="catalog-pg-statistic"><structname>pg_statistic</structname></link>,
+                        excluding the ones that contain statistical data for tables in the
+                        <literal>information_schema</> and <literal>pg_catalog</> schemas.
+                    </para>
+                    
+                    <para>
+                        The <literal>INSERT</> statement takes form of
+<screen>
+WITH upsert as (
+  UPDATE pg_catalog.pg_statistic SET %s
+  WHERE to_schema_qualified_relation(starelid) = relname
+    AND to_attname(relname, staattnum) = attname
+    AND to_atttype(relname, staattnum) = atttype
+    AND stainherit = r.stainherit
+  RETURNING *)
+ins as (
+  SELECT %s
+  WHERE NOT EXISTS (SELECT * FROM upsert)
+    AND to_attnum(relname, attname) IS NOT NULL
+    AND to_atttype(relname, attname) = atttype)
+INSERT INTO pg_catalog.pg_statistic SELECT * FROM ins;
+</screen>
                     </para>
                 </listitem>
             </varlistentry>
@@ -54,10 +81,10 @@
                         <function>dump_statistic</function> dumps the contents of the
                         <link linkend="catalog-pg-statistic"><structname>pg_statistic</structname></link>
                         system catalog. It produces an <literal>INSERT</> statement
-                        per each tuple of the <literal>pg_statistic</>, excluding
-                        the ones that contain statistical data for tables in
-                        <literal>information_schema</> and <literal>pg_catalog</>
-                        schemas.
+                        per each tuple of the
+                        <link linkend="catalog-pg-statistic"><structname>pg_statistic</structname></link>,
+                        excluding the ones that do not relate to the tables in
+                        <literal>schema_name</> schema.
                     </para>
                 </listitem>
             </varlistentry>
@@ -75,10 +102,10 @@
                         <function>dump_statistic</function> dumps the contents of the
                         <link linkend="catalog-pg-statistic"><structname>pg_statistic</structname></link>
                         system catalog. It produces an <literal>INSERT</> statement
-                        per each tuple of the <literal>pg_statistic</>, excluding
-                        the ones that contain statistical data for tables in
-                        <literal>information_schema</> and <literal>pg_catalog</>
-                        schemas.
+                        per each tuple of the
+                        <link linkend="catalog-pg-statistic"><structname>pg_statistic</structname></link>,
+                        excluding the ones that do not relate to the specified
+                        <literal>"schema_name.table_name"</> table.
                     </para>
                 </listitem>
             </varlistentry>
@@ -138,7 +165,7 @@
 
                 <listitem>
                     <para>
-                        Returns the element type of the given array as oid.
+                        Returns the element type of the given array as <literal>oid</>.
                     </para>
                 </listitem>
             </varlistentry>
@@ -153,7 +180,8 @@
 
                 <listitem>
                     <para>
-                        Given a relation name and a column number, returns the column name as text.
+                        Given a relation name and a column number, returns the column name
+                        as <literal>text</>.
                     </para>
                 </listitem>
             </varlistentry>
@@ -168,7 +196,8 @@
 
                 <listitem>
                     <para>
-                        Given a relation name and a column name, returns the column number as int2.
+                        Given a relation name and a column name, returns the column number
+                        as <literal>int2</>.
                     </para>
                 </listitem>
             </varlistentry>
@@ -183,7 +212,8 @@
 
                 <listitem>
                     <para>
-                        Given a relation name and a column name, returns the column type as text.
+                        Given a relation name and a column name, returns the column type
+                        as <literal>text</>.
                     </para>
                 </listitem>
             </varlistentry>
@@ -201,7 +231,7 @@
                         <function>to_namespace</function> duplicates the behavior of
                         the cast to <literal>regnamespace</> type, which is not
                         present in the 9.4 release (and prior releases). This
-                        function returns the oid of the given namespace.
+                        function returns the <literal>oid</> of the given schema.
                     </para>
                 </listitem>
             </varlistentry>
@@ -216,8 +246,8 @@
 
                 <listitem>
                     <para>
-                        <function>get_namespace</function> returns the namespace
-                        of the given relation as oid.
+                        <function>get_namespace</function> returns the schema
+                        of the given relation as <literal>oid</>.
                     </para>
                 </listitem>
             </varlistentry>
