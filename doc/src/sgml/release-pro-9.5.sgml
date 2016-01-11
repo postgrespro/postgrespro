@@ -1,0 +1,187 @@
+<!-- doc/src/sgml/release-pro-9.5.sgml -->
+<!-- See header comment in release.sgml about typical markup -->
+
+ <sect1 id="release-pro-9-5">
+  <title>Postgres Pro 9.5</title>
+
+  <note>
+   <title>Release Date</title>
+   <simpara>2016-??-??</simpara>
+   <simpara>Current as of 2015-12-30</simpara>
+  </note>
+
+  <sect2>
+   <title>Overview</title>
+
+   <para>
+    Major enhancements in <productname>Postgres Pro</> 9.5 include:
+   </para>
+
+   <!-- This list duplicates items below, but without authors or details-->
+
+   <itemizedlist>
+
+    <listitem>
+     <para>
+       Scalability improvement for multicore/multeprocessor systems.
+     </para>
+    </listitem>
+    <listitem>
+     <para>
+       Contrib module pg_trgm supports substring searches (Arthur Zakirov).
+     </para>
+    </listitem>
+
+
+   </itemizedlist>
+
+   <para>
+    The above items are explained in more detail in the sections below.
+   </para>
+
+  </sect2>
+
+  <sect2>
+
+  <title>Migration to Version 9.5</title>
+
+   <para>
+    A dump/restore using <xref linkend="app-pg-dumpall">, or use
+    of <xref linkend="pgupgrade">, is required for those wishing to migrate
+    data from any previous release.
+   </para>
+
+
+   <itemizedlist>
+    <listitem>
+    <para>
+    <!-- to be filled in -->
+    </para>
+    </listitem>
+   </itemizedlist>
+
+  </sect2>
+
+  <sect2>
+   <title>Changes</title>
+
+   <para>
+    Below you will find a detailed account of the changes between
+    <productname>PostgrePro</productname> 9.5 and the previous major
+    release.
+   </para>
+
+   <sect3>
+    <title>Server</title>
+
+    <sect4>
+     <title>Indexes</title>
+
+     <itemizedlist>
+
+      <listitem>
+       <para>
+       <!-- to be filled -->
+       </para>
+
+      </listitem>
+
+     </itemizedlist>
+
+    </sect4>
+
+    <sect4>
+     <title>General Performance</title>
+
+     <itemizedlist>
+    <listitem>
+<!-- Put commit message here -->      
+    <para>
+       Scalability improvements for multicore/multiprocessor systems:  
+    </para>
+    <itemizedlist>
+    <listitem>
+<!-- commit [7aa9e9b2bfd0a94]  Wed Dec 30 13:29:17 2015 +0300
+    Integrated resource owner patch by Alexander Alexeev. This patch
+    makes performance of resource deletion linear of number of used
+    resources, which improves performance for heavily partitioned tables
+    and queries which use large number of resoures
+-->
+    <para>Resource owner optimisation for complicated queries: now
+    resource lists has constant access time, which improves performance
+    for heavily partitioned tables and queries which use hundreds of
+    tables.
+    </para>
+    </listitem>
+    <listitem>
+<!--
+commit [90e649a7afac8c76]   Thu Dec 31 09:52:30 2015 +0300
+    Integrate dynahash patch by Alexander Alexeev. This fix lock
+    contension for shared memory
+-->
+    <para>
+    Fix lock contention for HASHHDR.mutex. (Alexander Alexeev). This
+    prevents Postgres from waiting for lock up to several milliseconds
+    when modifying state, shared between processes.
+    </para>
+    </listitem>
+     </itemizedlist>
+    </listitem>
+     </itemizedlist>
+
+    </sect4>
+
+
+   </sect3>
+
+   <sect3>
+    <title>Replication and Recovery</title>
+
+     <itemizedlist>
+
+      <listitem>
+
+<!-- Put commit message here -->      
+       <para>
+       <!-- to be filled -->
+       </para>
+
+      </listitem>
+     </itemizedlist>
+
+   </sect3>
+
+
+
+   <sect3>
+    <title>Additional Modules</title>
+
+    <itemizedlist>
+
+     <listitem>
+<!--
+Put commit ID and message here
+-->
+<!-- [d1c84bdc1a7d5f3fecd]
+Author: Nikolay Shaplov <n.shaplov@postgrespro.ru>
+Date:   Wed Dec 30 16:00:20 2015 +0300
+
+    Add patch that allows to view tuple raw data in pageinspect the way it was commited in master 9.6
+    in d6061f83a166b015657fda8623c704fcb86930e9 and 0271e27c1089f104236a7fe3b3fca52e5359ae56 -->
+
+      <para>
+        pageinspect extension now can extract tuple data, not only metainformation.
+      </para>
+     </listitem>
+     <listitem>
+     <para>
+        <!-- [04f01383f104] Arthur Zakirov Add substring_simularity functin -->
+        pg_trgm contrib module, which allows to do fuzzy string
+        comparations, now supports substring searches.
+     </para>
+     </listitem>
+    </itemizedlist>
+   </sect3>
+  </sect2>
+
+ </sect1>

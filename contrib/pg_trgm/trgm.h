@@ -26,12 +26,13 @@
 #define DIVUNION
 
 /* operator strategy numbers */
-#define SimilarityStrategyNumber	1
-#define DistanceStrategyNumber		2
-#define LikeStrategyNumber			3
-#define ILikeStrategyNumber			4
-#define RegExpStrategyNumber		5
-#define RegExpICaseStrategyNumber	6
+#define SimilarityStrategyNumber			1
+#define DistanceStrategyNumber				2
+#define LikeStrategyNumber					3
+#define ILikeStrategyNumber					4
+#define RegExpStrategyNumber				5
+#define RegExpICaseStrategyNumber			6
+#define SubstringSimilarityStrategyNumber	7
 
 
 typedef char trgm[3];
@@ -103,15 +104,22 @@ typedef char *BITVECP;
 #define GETARR(x)		( (trgm*)( (char*)x+TRGMHDRSIZE ) )
 #define ARRNELEM(x) ( ( VARSIZE(x) - TRGMHDRSIZE )/sizeof(trgm) )
 
+#ifdef DIVUNION
+#define CALCSML(count, len1, len2) ((float4) (count)) / ((float4) ((len1) + (len2) - (count)))
+#else
+#define CALCSML(count, len1, len2) ((float4) (count)) / ((float4) (((len1) > (len2)) ? (len1) : (len2)))
+#endif
+
 typedef struct TrgmPackedGraph TrgmPackedGraph;
 
 extern float4 trgm_limit;
+extern float4 trgm_substring_limit;
 
 extern uint32 trgm2int(trgm *ptr);
 extern void compact_trigram(trgm *tptr, char *str, int bytelen);
 extern TRGM *generate_trgm(char *str, int slen);
 extern TRGM *generate_wildcard_trgm(const char *str, int slen);
-extern float4 cnt_sml(TRGM *trg1, TRGM *trg2);
+extern float4 cnt_sml(TRGM *trg1, TRGM *trg2, bool inexact);
 extern bool trgm_contained_by(TRGM *trg1, TRGM *trg2);
 extern bool *trgm_presence_map(TRGM *query, TRGM *key);
 extern TRGM *createTrgmNFA(text *text_re, Oid collation,

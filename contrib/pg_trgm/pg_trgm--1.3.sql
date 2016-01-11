@@ -1,4 +1,4 @@
-/* contrib/pg_trgm/pg_trgm--1.1.sql */
+/* contrib/pg_trgm/pg_trgm--1.3.sql */
 
 -- complain if script is sourced in psql, rather than via CREATE EXTENSION
 \echo Use "CREATE EXTENSION pg_trgm" to load this file. \quit
@@ -33,6 +33,49 @@ CREATE OPERATOR % (
         RIGHTARG = text,
         PROCEDURE = similarity_op,
         COMMUTATOR = '%',
+        RESTRICT = contsel,
+        JOIN = contjoinsel
+);
+
+CREATE FUNCTION set_substring_limit(float4)
+RETURNS float4
+AS 'MODULE_PATHNAME'
+LANGUAGE C STRICT VOLATILE;
+
+CREATE FUNCTION show_substring_limit()
+RETURNS float4
+AS 'MODULE_PATHNAME'
+LANGUAGE C STRICT STABLE;
+
+CREATE FUNCTION substring_similarity(text,text)
+RETURNS float4
+AS 'MODULE_PATHNAME'
+LANGUAGE C STRICT IMMUTABLE;
+
+CREATE FUNCTION substring_similarity_op(text,text)
+RETURNS bool
+AS 'MODULE_PATHNAME'
+LANGUAGE C STRICT STABLE;  -- stable because depends on trgm_substring_limit
+
+CREATE FUNCTION substring_similarity_commutator_op(text,text)
+RETURNS bool
+AS 'MODULE_PATHNAME'
+LANGUAGE C STRICT STABLE;  -- stable because depends on trgm_substring_limit
+
+CREATE OPERATOR <% (
+        LEFTARG = text,
+        RIGHTARG = text,
+        PROCEDURE = substring_similarity_op,
+        COMMUTATOR = '%>',
+        RESTRICT = contsel,
+        JOIN = contjoinsel
+);
+
+CREATE OPERATOR %> (
+        LEFTARG = text,
+        RIGHTARG = text,
+        PROCEDURE = substring_similarity_commutator_op,
+        COMMUTATOR = '<%',
         RESTRICT = contsel,
         JOIN = contjoinsel
 );
@@ -138,6 +181,11 @@ ALTER OPERATOR FAMILY gist_trgm_ops USING gist ADD
         OPERATOR        5       pg_catalog.~ (text, text),
         OPERATOR        6       pg_catalog.~* (text, text);
 
+-- Add operators that are new in 9.6 (pg_trgm 1.3).
+
+ALTER OPERATOR FAMILY gist_trgm_ops USING gist ADD
+        OPERATOR        7       %> (text, text);
+
 -- support functions for gin
 CREATE FUNCTION gin_extract_value_trgm(text, internal)
 RETURNS internal
@@ -176,3 +224,18 @@ ALTER OPERATOR FAMILY gin_trgm_ops USING gin ADD
 ALTER OPERATOR FAMILY gin_trgm_ops USING gin ADD
         OPERATOR        5       pg_catalog.~ (text, text),
         OPERATOR        6       pg_catalog.~* (text, text);
+
+-- Add functions that are new in 9.6 (pg_trgm 1.2).
+
+CREATE FUNCTION gin_trgm_triconsistent(internal, int2, text, int4, internal, internal, internal)
+RETURNS "char"
+AS 'MODULE_PATHNAME'
+LANGUAGE C IMMUTABLE STRICT;
+
+ALTER OPERATOR FAMILY gin_trgm_ops USING gin ADD
+        FUNCTION        6      (text,text) gin_trgm_triconsistent (internal, int2, text, int4, internal, internal, internal);
+
+-- Add operators that are new in 9.6 (pg_trgm 1.3).
+
+ALTER OPERATOR FAMILY gin_trgm_ops USING gin ADD
+        OPERATOR        7       %> (text, text);
