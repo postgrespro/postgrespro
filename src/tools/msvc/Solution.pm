@@ -128,10 +128,10 @@ sub GenerateFiles
 	  || confess("Could not open configure.in for reading\n");
 	while (<C>)
 	{
-		if (/^AC_INIT\(\[PostgreSQL\], \[([^\]]+)\]/)
+		if (/^AC_INIT\(\[PostgresPro\], \[([^\]]+)\]/)
 		{
 			$self->{strver} = $1;
-			if ($self->{strver} !~ /^(\d+)\.(\d+)(?:\.(\d+))?/)
+			if ($self->{strver} !~ /^(\d+)\.(\d+)(?:\.(\d+))*/)
 			{
 				confess "Bad format of version: $self->{strver}\n";
 			}
