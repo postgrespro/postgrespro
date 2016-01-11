@@ -121,14 +121,14 @@ INSERT INTO pg_catalog.pg_statistic SELECT * FROM ins;
 
                 <listitem>
                     <para>
-                        Fetches the schema-qualified operator name by operator id.
+                        Fetches the schema-qualified operator name by operator id <literal>opid</>.
                     </para>
                 </listitem>
             </varlistentry>
 
             <varlistentry>
                 <term>
-                    <function>to_schema_qualified_type(opid oid) returns text</function>
+                    <function>to_schema_qualified_type(typid oid) returns text</function>
                     <indexterm>
                         <primary>to_schema_qualified_type</primary>
                     </indexterm>
@@ -136,14 +136,14 @@ INSERT INTO pg_catalog.pg_statistic SELECT * FROM ins;
 
                 <listitem>
                     <para>
-                        Fetches the schema-qualified type name by type id.
+                        Fetches the schema-qualified type name by type id <literal>typid</>.
                     </para>
                 </listitem>
             </varlistentry>
 
             <varlistentry>
                 <term>
-                    <function>to_schema_qualified_relation(opid oid) returns text</function>
+                    <function>to_schema_qualified_relation(relid oid) returns text</function>
                     <indexterm>
                         <primary>to_schema_qualified_relation</primary>
                     </indexterm>
@@ -151,7 +151,7 @@ INSERT INTO pg_catalog.pg_statistic SELECT * FROM ins;
 
                 <listitem>
                     <para>
-                        Fetches the schema-qualified relation name by relation id.
+                        Fetches the schema-qualified relation name by relation id <literal>relid</>.
                     </para>
                 </listitem>
             </varlistentry>
@@ -181,8 +181,8 @@ INSERT INTO pg_catalog.pg_statistic SELECT * FROM ins;
 
                 <listitem>
                     <para>
-                        Given a relation name and a column number, returns the column name
-                        as <literal>text</>.
+                        Given a relation name <literal>relation</> and a column number
+                        <literal>colnum</>, returns the column name as <literal>text</>.
                     </para>
                 </listitem>
             </varlistentry>
@@ -197,8 +197,8 @@ INSERT INTO pg_catalog.pg_statistic SELECT * FROM ins;
 
                 <listitem>
                     <para>
-                        Given a relation name and a column name, returns the column number
-                        as <literal>int2</>.
+                        Given a relation name <literal>relation</> and a column name
+                        <literal>col</>, returns the column number as <literal>int2</>.
                     </para>
                 </listitem>
             </varlistentry>
@@ -213,8 +213,8 @@ INSERT INTO pg_catalog.pg_statistic SELECT * FROM ins;
 
                 <listitem>
                     <para>
-                        Given a relation name and a column name, returns the column type
-                        as <literal>text</>.
+                        Given a relation name <literal>relation</> and a column name
+                        <literal>col</>, returns the column type as <literal>text</>.
                     </para>
                 </listitem>
             </varlistentry>
@@ -230,9 +230,10 @@ INSERT INTO pg_catalog.pg_statistic SELECT * FROM ins;
                 <listitem>
                     <para>
                         <function>to_namespace</function> duplicates the behavior of
-                        the cast to <literal>regnamespace</> type, which is not
-                        present in the 9.4 release (and prior releases). This
-                        function returns the <literal>oid</> of the given schema.
+                        the cast to the
+                        <link linkend="datatype-oid"><structname>regnamespace</structname></link>
+                        type, which is not present in the 9.4 release (and prior releases).
+                        This function returns the <literal>oid</> of the given schema.
                     </para>
                 </listitem>
             </varlistentry>
