@@ -92,7 +92,7 @@ test=# \COPY (select dump_statistic()) TO 'dump_stat.sql'
                         system catalog. It produces an <literal>INSERT</> statement
                         per each tuple of the
                         <link linkend="catalog-pg-statistic"><structname>pg_statistic</structname></link>,
-                        excluding the ones that do not relate to the tables in
+                        excluding the ones that do not relate to the tables in the
                         <literal>schema_name</> schema.
                     </para>
                 </listitem>
@@ -141,8 +141,15 @@ test=# \COPY (select dump_statistic()) TO 'dump_stat.sql'
 
                 <listitem>
                     <para>
-                        Fetches the schema-qualified type name by type id <literal>typid</>.
+                        Fetches the schema-qualified type name by type id <literal>typid</>. For example:
                     </para>
+<screen>
+test=# SELECT to_schema_qualified_operator('+(int,int)'::regoperator);
+          to_schema_qualified_operator          
+------------------------------------------------
+ pg_catalog.+(pg_catalog.int4, pg_catalog.int4)
+(1 row)
+</screen>
                 </listitem>
             </varlistentry>
 
@@ -171,8 +178,16 @@ test=# \COPY (select dump_statistic()) TO 'dump_stat.sql'
 
                 <listitem>
                     <para>
-                        Returns the element type of the given array as <literal>oid</>.
+                        Returns the element type of the given array as <literal>oid</>. For example:
                     </para>
+<screen>
+test=# SELECT anyarray_elemtype(array_in('{1,2,3}', 'int'::regtype, -1));
+ anyarray_elemtype 
+-------------------
+                23
+(1 row)
+</screen>
+                    
                 </listitem>
             </varlistentry>
 
@@ -219,7 +234,7 @@ test=# \COPY (select dump_statistic()) TO 'dump_stat.sql'
                 <listitem>
                     <para>
                         Given a relation name <literal>relation</> and a column name
-                        <literal>col</>, returns the column type as <literal>text</>.
+                        <literal>col</>, returns the schema-qualified column type as <literal>text</>.
                     </para>
                 </listitem>
             </varlistentry>
