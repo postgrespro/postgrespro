@@ -65,6 +65,13 @@ ins as (
 INSERT INTO pg_catalog.pg_statistic SELECT * FROM ins;
 </screen>
                     </para>
+                    
+                    <para>
+                        Produced statements could be saved to a file, e.g.
+<screen>
+\COPY (select dump_statistic()) TO 'dump_stat.sql'
+</screen>
+                    </para>
                 </listitem>
             </varlistentry>
 
