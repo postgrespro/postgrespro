@@ -107,17 +107,17 @@ bool
 _bt_doinsert(Relation rel, IndexTuple itup,
 			 IndexUniqueCheck checkUnique, Relation heapRel)
 {
-	bool		is_unique = false;
-	int			nkeyatts = rel->rd_rel->relnatts;
+	bool		is_unique;
+	int			nkeyatts;
 	ScanKey		itup_scankey;
 	BTStack		stack;
 	Buffer		buf;
 	OffsetNumber offset;
 
-	Assert (rel->rd_index != NULL);
 	Assert(rel->rd_index->indnatts != 0);
 	Assert(rel->rd_index->indnkeyatts != 0);
 	nkeyatts = IndexRelationGetNumberOfKeyAttributes(rel);
+	is_unique = false;
 
 	/* we need an insertion scan key to do our search, so build one */
 	itup_scankey = _bt_mkscankey(rel, itup);
@@ -248,17 +248,15 @@ _bt_check_unique(Relation rel, IndexTuple itup, Relation heapRel,
 {
 	TupleDesc	itupdesc = RelationGetDescr(rel);
 	int			nkeyatts = rel->rd_index->indnkeyatts;
-
-	Assert (rel->rd_index != NULL);
-	Assert(rel->rd_index->indnatts != 0);
-	Assert(rel->rd_index->indnkeyatts != 0);
-
 	SnapshotData SnapshotDirty;
 	OffsetNumber maxoff;
 	Page		page;
 	BTPageOpaque opaque;
 	Buffer		nbuf = InvalidBuffer;
 	bool		found = false;
+
+	Assert(rel->rd_index->indnatts != 0);
+	Assert(rel->rd_index->indnkeyatts != 0);
 
 	/* Assume unique until we find a duplicate */
 	*is_unique = true;
@@ -756,9 +754,12 @@ _bt_insertonpg(Relation rel,
 			 BufferGetBlockNumber(buf));
 
 	/* Truncate nonkey attributes when inserting on nonleaf pages. */
-	if (rel->rd_index->indnatts != rel->rd_index->indnkeyatts)
-		if (!P_ISLEAF(lpageop))
-			itup = index_reform_tuple(rel, itup, rel->rd_index->indnatts, rel->rd_index->indnkeyatts);
+	if (rel->rd_index->indnatts != rel->rd_index->indnkeyatts
+		&& !P_ISLEAF(lpageop))
+	{
+			itup = index_reform_tuple(rel, itup,
+				rel->rd_index->indnatts, rel->rd_index->indnkeyatts);
+	}
 
 	itemsz = IndexTupleDSize(*itup);
 	itemsz = MAXALIGN(itemsz);	/* be safe, PageAddItem will do this but we

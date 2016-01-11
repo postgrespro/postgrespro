@@ -594,13 +594,16 @@ _bt_buildadd(BTWriteState *wstate, BTPageState *state, IndexTuple itup)
 	}
 
 	/* Truncate nonkey attributes when inserting on nonleaf pages */
-	if (wstate->index->rd_index->indnatts != wstate->index->rd_index->indnkeyatts)
+	if (wstate->index->rd_index->indnatts
+		!= wstate->index->rd_index->indnkeyatts)
 	{
 		BTPageOpaque pageop = (BTPageOpaque) PageGetSpecialPointer(npage);
 
 		if (!P_ISLEAF(pageop))
 		{
-			itup = index_reform_tuple(wstate->index, itup, wstate->index->rd_index->indnatts, wstate->index->rd_index->indnkeyatts);
+			itup = index_reform_tuple(wstate->index,
+					itup, wstate->index->rd_index->indnatts,
+					wstate->index->rd_index->indnkeyatts);
 			itupsz = IndexTupleDSize(*itup);
 			itupsz = MAXALIGN(itupsz);
 		}

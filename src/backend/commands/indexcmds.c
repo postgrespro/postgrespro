@@ -137,6 +137,7 @@ CheckIndexCompatible(Oid oldId,
 	Relation	irel;
 	int			i;
 	Datum		d;
+
 	/* Caller should already have the relation locked in some way. */
 	relationId = IndexGetRelation(oldId, false);
 
@@ -346,8 +347,12 @@ DefineIndex(Oid relationId,
 				 errmsg("must specify at least one key column")));
 
 	/*
-	 * All information about key and included cols is in numberOfKeyAttributes number.
-	 * So we can concat all index params into one list.
+	 * We append any INCLUDING columns onto the indexParams list so that
+	 * we have one list with all columns. Later we can determine which of these
+	 * are key columns, and which are just part of the INCLUDING list by check the list
+	 * position. A list item in a position less than ii_NumIndexKeyAttrs is part of
+	 * the indexed columns, and anything equal to and over is part of the
+	 * INCLUDING columns.
 	 */
 	stmt->indexParams = list_concat(stmt->indexParams, stmt->indexIncludingParams);
 	numberOfAttributes = list_length(stmt->indexParams);
