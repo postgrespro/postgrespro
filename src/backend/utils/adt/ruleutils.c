@@ -1159,9 +1159,10 @@ pg_get_indexdef_worker(Oid indexrelid, int colno,
 
 			attname = get_relid_attribute_name(indrelid, attnum);
 
-			if (!colno || colno == keyno + 1) {
+			if (!colno || colno == keyno + 1)
+			{
 				appendStringInfoString(&buf, quote_identifier(attname));
-				if ((attrsOnly)&&(keyno >= idxrec->indnkeyatts))
+				if (attrsOnly && keyno >= idxrec->indnkeyatts)
 					appendStringInfoString(&buf, " (included)");
 			}
 			get_atttypetypmodcoll(indrelid, attnum,

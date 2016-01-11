@@ -346,15 +346,16 @@ typedef struct ViewOptions
 
 /*
  * RelationGetNumberOfAttributes
- *		Returns the number of attributes in a relation.
+ *		Returns the total number of attributes in a relation.
  */
 #define RelationGetNumberOfAttributes(relation) ((relation)->rd_rel->relnatts)
 
 /*
- * RelationGetNumberOfAttributes
- *		Returns the number of attributes in a relation.
+ * IndexRelationGetNumberOfKeyAttributes
+ *		Returns the number of key attributes in a relation.
  */
-#define IndexRelationGetNumberOfKeyAttributes(relation) ((relation)->rd_index->indnkeyatts)
+#define IndexRelationGetNumberOfKeyAttributes(relation) \
+		((relation)->rd_index->indnkeyatts)
 
 /*
  * RelationGetDescr

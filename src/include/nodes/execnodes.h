@@ -58,8 +58,8 @@
 typedef struct IndexInfo
 {
 	NodeTag		type;
-	int			ii_NumIndexAttrs;
-	int			ii_NumIndexKeyAttrs;
+	int			ii_NumIndexAttrs; /* total number of columns in index */
+	int			ii_NumIndexKeyAttrs; /* number of key columns in index */
 	AttrNumber	ii_KeyAttrNumbers[INDEX_MAX_KEYS];
 	List	   *ii_Expressions; /* list of Expr */
 	List	   *ii_ExpressionsState;	/* list of ExprState */

@@ -143,17 +143,23 @@ CREATE [ UNIQUE ] INDEX [ CONCURRENTLY ] [ [ IF NOT EXISTS ] <replaceable class=
       <term><literal>INCLUDING</literal></term>
       <listitem>
        <para>
-        This clause specifies additional columns to be appended to the set of index columns.
-        Included columns don't support any constraints <literal>(UNIQUE, PRMARY KEY, EXCLUSION CONSTRAINT)</>.
-        These columns can improve the performance of some queries  through using advantages of index-only scan
-        (Or so called <firstterm>covering</firstterm> indexes. Covering index is the index that
-        covers all columns required in the query and prevents a table access).
-        Besides that, included attributes are not stored in index inner pages.
-        It allows to decrease index size and furthermore it provides a way to extend included
-        columns to store atttributes without suitable opclass (not implemented yet).
-        This clause could be applied to both unique and nonunique indexes.
-        It's possible to have non-unique covering index, which behaves as a regular
-        multi-column index with a bit smaller index-size.
+        An optional <literal>INCLUDING</> clause allows a list of columns to be
+        specified which will be included in the index, in the non-key portion of
+        the index. Columns which are part of this clause cannot also exist in the
+        key columns portion of the index, and vice versa. The
+        <literal>INCLUDING</> columns exist solely to allow more queries to benefit
+        from <firstterm>index-only scans</> by including certain columns in the
+        index, the value of which would otherwise have to be obtained by reading
+        the table's heap. Having these columns in the <literal>INCLUDING</> clause
+        in some cases allows <productname>PostgreSQL</> to skip the heap read
+        completely. This also allows <literal>UNIQUE</> indexes to be defined on
+        one set of columns, which can include another set of column in the
+        <literal>INCLUDING</> clause, on which the uniqueness is not enforced upon.
+        It's the same with other constraints (PRIMARY KEY and EXCLUDE). This can
+        also can be used for non-unique indexes as any columns which are not required
+        for the searching or ordering of records can defined in the
+        <literal>INCLUDING</> clause, which can slightly reduce the size of the index,
+        due to storing included attributes only in leaf index pages.
         Currently, only the B-tree access method supports this feature.
        </para>
       </listitem>
@@ -617,7 +623,7 @@ Indexes:
   <title>Examples</title>
 
   <para>
-   To create an unique B-tree index on the column <literal>title</literal> in
+   To create a unique B-tree index on the column <literal>title</literal> in
    the table <literal>films</literal>:
 <programlisting>
 CREATE UNIQUE INDEX title_idx ON films (title);
@@ -625,7 +631,7 @@ CREATE UNIQUE INDEX title_idx ON films (title);
   </para>
 
   <para>
-   To create an unique B-tree index on the column <literal>title</literal>
+   To create a unique B-tree index on the column <literal>title</literal>
    and included columns <literal>director</literal> and <literal>rating</literal>
    in the table <literal>films</literal>:
 <programlisting>

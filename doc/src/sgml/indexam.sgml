@@ -768,7 +768,6 @@ amrestrpos (IndexScanDesc scan);
    multiple entries with identical keys. An access method that supports this
    feature sets <structname>pg_am</>.<structfield>amcanunique</> true.
    Columns included with clause INCLUDING  aren't used to enforce uniqueness.
-   An access method that supports this feature sets <structname>pg_am</>.<structfield>amcanincluding</> true.
    (At present, only b-tree supports them.)
   </para>
 

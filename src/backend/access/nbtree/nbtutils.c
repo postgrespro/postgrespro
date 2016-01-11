@@ -63,12 +63,11 @@ _bt_mkscankey(Relation rel, IndexTuple itup)
 {
 	ScanKey		skey;
 	TupleDesc	itupdesc;
-	int			nkeyatts = rel->rd_rel->relnatts;
+	int			nkeyatts;
 	int16	   *indoption = rel->rd_indoption;
 	int			i;
 	itupdesc = RelationGetDescr(rel);
 
-	Assert(rel->rd_index != NULL);
 	Assert(rel->rd_index->indnkeyatts != 0);
 	Assert(rel->rd_index->indnkeyatts <= rel->rd_index->indnatts);
 
