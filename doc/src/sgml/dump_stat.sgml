@@ -71,9 +71,6 @@ INSERT INTO pg_catalog.pg_statistic SELECT * FROM ins;
             <varlistentry>
                 <term>
                     <function>dump_statistic(schema_name text) returns setof text</function>
-                    <indexterm>
-                        <primary>dump_statistic</primary>
-                    </indexterm>
                 </term>
 
                 <listitem>
@@ -92,9 +89,6 @@ INSERT INTO pg_catalog.pg_statistic SELECT * FROM ins;
             <varlistentry>
                 <term>
                     <function>dump_statistic(schema_name text, table_name text) returns setof text</function>
-                    <indexterm>
-                        <primary>dump_statistic</primary>
-                    </indexterm>
                 </term>
 
                 <listitem>
