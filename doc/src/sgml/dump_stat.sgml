@@ -186,8 +186,7 @@ test=# SELECT anyarray_elemtype(array_in('{1,2,3}', 'int'::regtype, -1));
 -------------------
                 23
 (1 row)
-</screen>
-                    
+</screen>                  
                 </listitem>
             </varlistentry>
 
@@ -235,6 +234,19 @@ test=# SELECT anyarray_elemtype(array_in('{1,2,3}', 'int'::regtype, -1));
                     <para>
                         Given a relation name <literal>relation</> and a column name
                         <literal>col</>, returns the schema-qualified column type as <literal>text</>.
+                    </para>
+                </listitem>
+            </varlistentry>
+            
+            <varlistentry>
+                <term>
+                    <function>to_atttype(relation text, colnum int2) returns text</function>
+                </term>
+
+                <listitem>
+                    <para>
+                        Given a relation name <literal>relation</> and a column number
+                        <literal>colnum</>, returns the schema-qualified column type as <literal>text</>.
                     </para>
                 </listitem>
             </varlistentry>
