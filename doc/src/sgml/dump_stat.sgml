@@ -126,8 +126,15 @@ test=# \COPY (select dump_statistic()) TO 'dump_stat.sql'
 
                 <listitem>
                     <para>
-                        Fetches the schema-qualified operator name by operator id <literal>opid</>.
+                        Fetches the schema-qualified operator name by operator id <literal>opid</>. For example:
                     </para>
+<screen>
+test=# SELECT to_schema_qualified_operator('+(int,int)'::regoperator);
+          to_schema_qualified_operator          
+------------------------------------------------
+ pg_catalog.+(pg_catalog.int4, pg_catalog.int4)
+(1 row)
+</screen>
                 </listitem>
             </varlistentry>
 
@@ -141,15 +148,8 @@ test=# \COPY (select dump_statistic()) TO 'dump_stat.sql'
 
                 <listitem>
                     <para>
-                        Fetches the schema-qualified type name by type id <literal>typid</>. For example:
+                        Fetches the schema-qualified type name by type id <literal>typid</>.
                     </para>
-<screen>
-test=# SELECT to_schema_qualified_operator('+(int,int)'::regoperator);
-          to_schema_qualified_operator          
-------------------------------------------------
- pg_catalog.+(pg_catalog.int4, pg_catalog.int4)
-(1 row)
-</screen>
                 </listitem>
             </varlistentry>
 
