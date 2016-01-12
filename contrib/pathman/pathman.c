@@ -52,6 +52,7 @@ static void append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti,
 static Node *wrapper_make_expression(WrapperNode *wrap, int index, bool *alwaysTrue);
 static void set_pathkeys(PlannerInfo *root, RelOptInfo *childrel, Path *path);
 static void disable_inheritance(Query *parse);
+bool inheritance_disabled;
 
 static WrapperNode *walk_expr_tree(Expr *expr, const PartRelationInfo *prel);
 static int make_hash(const PartRelationInfo *prel, int value);
@@ -127,6 +128,7 @@ my_planner_hook(Query *parse, int cursorOptions, ParamListInfo boundParams)
 	if (initialization_needed)
 		init();
 
+	inheritance_disabled = false;
 	disable_inheritance(parse);
 	result = standard_planner(parse, cursorOptions, boundParams);
 	return result;
@@ -157,7 +159,16 @@ disable_inheritance(Query *parse)
 					prel = (PartRelationInfo *)
 						hash_search(relations, (const void *) &rte->relid, HASH_FIND, 0);
 					if (prel != NULL)
+					{
 						rte->inh = false;
+						/*
+						 * Sometimes user uses the ONLY statement and in this case
+						 * rte->inh is also false. We should differ the case
+						 * when user uses ONLY statement from case when we
+						 * make rte->inh false intentionally.
+						 */
+						inheritance_disabled = true;
+					}
 				}
 				break;
 			case RTE_SUBQUERY:
@@ -198,7 +209,7 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 	PartRelationInfo *prel = NULL;
 
 	/* This works on for SELECT queries */
-	if (root->parse->commandType != CMD_SELECT)
+	if (root->parse->commandType != CMD_SELECT || !inheritance_disabled)
 		return;
 
 	/* Lookup partitioning information for parent relation */

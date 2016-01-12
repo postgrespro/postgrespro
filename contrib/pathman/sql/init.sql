@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS @extschema@.pg_pathman_rels (
     id         SERIAL PRIMARY KEY,
     relname    VARCHAR(127),
     attname    VARCHAR(127),
-    atttype    INTEGER,
+    -- atttype    INTEGER,
     parttype   INTEGER
 );
 
@@ -168,6 +168,34 @@ RETURNS VOID AS 'pathman', 'on_partitions_removed' LANGUAGE C STRICT;
 
 CREATE OR REPLACE FUNCTION find_range_partition(relid OID, value ANYELEMENT)
 RETURNS OID AS 'pathman', 'find_range_partition' LANGUAGE C STRICT;
+
+CREATE OR REPLACE FUNCTION partition_data(p_parent text)
+RETURNS bigint AS
+$$
+DECLARE
+    rec RECORD;
+BEGIN
+    FOR rec IN  (SELECT child.relname, pg_constraint.consrc
+                   FROM pg_pathman_rels
+                   JOIN pg_class AS parent ON parent.relname = pg_pathman_rels.relname
+                   JOIN pg_inherits ON inhparent = parent.relfilenode
+                   JOIN pg_constraint ON conrelid = inhrelid AND contype='c'
+                   JOIN pg_class AS child ON child.relfilenode = inhrelid
+                   WHERE pg_pathman_rels.relname = p_parent)
+    LOOP
+        RAISE NOTICE 'child %, condition %', rec.relname, rec.consrc;
+
+        EXECUTE format('WITH part_data AS (
+                            DELETE FROM ONLY %s WHERE %s RETURNING *)
+                        INSERT INTO %s SELECT * FROM part_data'
+                        , p_parent
+                        , rec.consrc
+                        , rec.relname);
+    END LOOP;
+    RETURN 0;
+END
+$$ LANGUAGE plpgsql;
+
 
 -- CREATE OR REPLACE FUNCTION sample_rel_trigger_func()
 -- RETURNS TRIGGER AS $$
