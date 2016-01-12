@@ -91,9 +91,8 @@ test=# \COPY (select dump_statistic()) TO 'dump_stat.sql'
                         <link linkend="catalog-pg-statistic"><structname>pg_statistic</structname></link>
                         system catalog. It produces an <literal>INSERT</> statement
                         per each tuple of the
-                        <link linkend="catalog-pg-statistic"><structname>pg_statistic</structname></link>,
-                        excluding the ones that do not relate to the tables in the
-                        <literal>schema_name</> schema.
+                        <link linkend="catalog-pg-statistic"><structname>pg_statistic</structname></link>
+                        that relates to some table in the <literal>schema_name</> schema.
                     </para>
                 </listitem>
             </varlistentry>
@@ -109,9 +108,25 @@ test=# \COPY (select dump_statistic()) TO 'dump_stat.sql'
                         <link linkend="catalog-pg-statistic"><structname>pg_statistic</structname></link>
                         system catalog. It produces an <literal>INSERT</> statement
                         per each tuple of the
-                        <link linkend="catalog-pg-statistic"><structname>pg_statistic</structname></link>,
-                        excluding the ones that do not relate to the specified
-                        <literal>"schema_name.table_name"</> table.
+                        <link linkend="catalog-pg-statistic"><structname>pg_statistic</structname></link>
+                        that relates to the specified <literal>schema_name.table_name</> table.
+                    </para>
+                </listitem>
+            </varlistentry>
+            
+            <varlistentry>
+                <term>
+                    <function>dump_statistic(relid oid) returns setof text</function>
+                </term>
+
+                <listitem>
+                    <para>
+                        <function>dump_statistic</function> dumps the contents of the
+                        <link linkend="catalog-pg-statistic"><structname>pg_statistic</structname></link>
+                        system catalog. It produces an <literal>INSERT</> statement
+                        per each tuple of the
+                        <link linkend="catalog-pg-statistic"><structname>pg_statistic</structname></link>
+                        that contains statistical data for the relation referenced by <literal>relid</>.
                     </para>
                 </listitem>
             </varlistentry>
