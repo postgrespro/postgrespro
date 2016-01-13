@@ -250,28 +250,29 @@ $$
 DECLARE
     v_parent_relid OID;
     v_child_relid OID := p_partition::regclass::oid;
-    v_atttype INT;
     v_attname TEXT;
-    -- v_range ANYARRAY;
-    -- v_min ANYELEMENT;
-    -- v_max ANYELEMENT;
     v_cond TEXT;
     v_new_partition TEXT;
+    v_part_type INTEGER;
 BEGIN
     v_parent_relid := inhparent
                       FROM pg_inherits
                       WHERE inhrelid = v_child_relid;
 
-    SELECT attname INTO v_attname
+    SELECT attname, parttype INTO v_attname, v_part_type
     FROM pg_pathman_rels
     WHERE relname = v_parent_relid::regclass::text;
+
+    /* Check if this is RANGE partition */
+    IF v_part_type != 2 THEN
+        RAISE EXCEPTION 'Specified partition isn''t RANGE partition';
+    END IF;
 
     /* Get partition values range */
     p_range := get_partition_range(v_parent_relid, v_child_relid);
     IF p_range IS NULL THEN
         RAISE EXCEPTION 'Could not find specified partition';
     END IF;
-    RAISE NOTICE 'range: % - %', p_range[1], p_range[2];
 
     /* Check if value fit into the range */
     IF p_range[1] > p_value OR p_range[2] <= p_value
@@ -312,6 +313,123 @@ BEGIN
 END
 $$
 LANGUAGE plpgsql;
+
+
+/*
+ * Merge RANGE partitions
+ * 
+ * Note: we had to have at least one argument of type 
+ */
+    -- , OUT p_range1 ANYARRAY
+CREATE OR REPLACE FUNCTION merge_range_partitions(
+    p_partition1 TEXT
+    , p_partition2 TEXT)
+RETURNS VOID AS
+$$
+DECLARE
+    v_parent_relid1 OID;
+    v_parent_relid2 OID;
+    v_part1_relid OID := p_partition1::regclass::oid;
+    v_part2_relid OID := p_partition2::regclass::oid;
+    v_attname TEXT;
+    v_part_type INTEGER;
+    v_atttype TEXT;
+BEGIN
+    IF v_part1_relid = v_part2_relid THEN
+        RAISE EXCEPTION 'Cannot merge partition with itself';
+    END IF;
+
+    v_parent_relid1 := inhparent FROM pg_inherits WHERE inhrelid = v_part1_relid;
+    v_parent_relid2 := inhparent FROM pg_inherits WHERE inhrelid = v_part2_relid;
+
+    IF v_parent_relid1 != v_parent_relid2 THEN
+        RAISE EXCEPTION 'Cannot merge partitions having different parents';
+    END IF;
+
+    SELECT attname, parttype INTO v_attname, v_part_type
+    FROM pg_pathman_rels
+    WHERE relname = v_parent_relid1::regclass::text;
+
+    /* Check if this is RANGE partition */
+    IF v_part_type != 2 THEN
+        RAISE EXCEPTION 'Specified partitions aren''t RANGE partitions';
+    END IF;
+
+    SELECT typname INTO v_atttype
+    FROM pg_type
+    JOIN pg_attribute on atttypid = "oid"
+    WHERE attrelid = 'num_range_rel'::regclass::oid and attname = lower(v_attname);
+
+    EXECUTE format('SELECT merge_range_partitions_internal($1, $2 , $3, NULL::%s)', v_atttype)
+    USING v_parent_relid1, v_part1_relid , v_part2_relid;
+END
+$$
+LANGUAGE plpgsql;
+
+
+/*
+ * Merge two partitions. All data will be copied to the first one. Second
+ * partition will be destroyed.
+ *
+ * Notes: dummy field is used to pass the element type to the function
+ * (it is neccessary because of pseudo-types used in function)
+ */
+CREATE OR REPLACE FUNCTION merge_range_partitions_internal(
+    p_parent_relid OID
+    , p_part1_relid OID
+    , p_part2_relid OID
+    , dummy ANYELEMENT
+    , OUT p_range ANYARRAY)
+RETURNS ANYARRAY AS
+$$
+DECLARE
+    v_attname TEXT;
+    v_cond TEXT;
+BEGIN
+    SELECT attname INTO v_attname FROM pg_pathman_rels
+    WHERE relname = p_parent_relid::regclass::text;
+
+    /*
+     * Get ranges
+     * first and second elements of array are MIN and MAX of partition1
+     * third and forth elements are MIN and MAX of partition2
+     */
+    p_range := get_partition_range(p_parent_relid, p_part1_relid) ||
+               get_partition_range(p_parent_relid, p_part2_relid);
+    RAISE NOTICE 'type: %', pg_typeof(p_range[1]);
+    RAISE NOTICE 'min %, max %', pg_typeof(least(p_range[1], p_range[3])),
+        pg_typeof(greatest(p_range[2], p_range[4]));
+
+    /* Check if ranges are adjacent */
+    IF p_range[1] != p_range[4] AND p_range[2] != p_range[3] THEN
+        RAISE EXCEPTION 'Merge failed. Partitions must be adjacent';
+    END IF;
+
+    /* Extend first partition */
+    v_cond := get_range_condition(v_attname
+                                  , least(p_range[1], p_range[3])
+                                  , greatest(p_range[2], p_range[4]) - least(p_range[1], p_range[3]));
+    RAISE NOTICE 'cond: %', v_cond;
+
+    /* Alter first table */
+    EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %s_%s_check'
+                   , p_part1_relid::regclass::text
+                   , p_part1_relid::regclass::text
+                   , v_attname);
+    EXECUTE format('ALTER TABLE %s ADD CHECK (%s)'
+                   , p_part1_relid::regclass::text
+                   , v_cond);
+
+    /* Copy data from second partition to the first one */
+    EXECUTE format('WITH part_data AS (DELETE FROM %s RETURNING *)
+                    INSERT INTO %s SELECT * FROM part_data'
+                   , p_part2_relid::regclass::text
+                   , p_part1_relid::regclass::text);
+
+    /* Remove second partition */
+    EXECUTE format('DROP TABLE %s', p_part2_relid::regclass::text);
+END
+$$ LANGUAGE plpgsql;
 
 
 /*

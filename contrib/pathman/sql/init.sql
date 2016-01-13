@@ -5,19 +5,18 @@ CREATE TABLE IF NOT EXISTS @extschema@.pg_pathman_rels (
     id         SERIAL PRIMARY KEY,
     relname    VARCHAR(127),
     attname    VARCHAR(127),
-    -- atttype    INTEGER,
     parttype   INTEGER
 );
 
 /*
  * Relations using hash strategy
  */
-CREATE TABLE IF NOT EXISTS @extschema@.pg_pathman_hash_rels (
-    id         SERIAL PRIMARY KEY,
-    parent     VARCHAR(127),
-    hash       INTEGER,
-    child      VARCHAR(127)
-);
+-- CREATE TABLE IF NOT EXISTS @extschema@.pg_pathman_hash_rels (
+--     id         SERIAL PRIMARY KEY,
+--     parent     VARCHAR(127),
+--     hash       INTEGER,
+--     child      VARCHAR(127)
+-- );
 
 /*
  * Relations using range strategy
@@ -203,6 +202,21 @@ BEGIN
                         , rec.relname);
     END LOOP;
     RETURN 0;
+END
+$$ LANGUAGE plpgsql;
+
+
+/*
+ * Disable pathman partitioning for specified relation
+ */
+CREATE OR REPLACE FUNCTION disable_partitioning(IN relation TEXT)
+RETURNS VOID AS
+$$
+BEGIN
+    DELETE FROM pg_pathman_rels WHERE relname = relation;
+
+    /* Notify backend about changes */
+    PERFORM pg_pathman_on_remove_partitions(relation::regclass::oid);
 END
 $$ LANGUAGE plpgsql;
 
