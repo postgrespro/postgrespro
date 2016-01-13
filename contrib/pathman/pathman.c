@@ -75,6 +75,7 @@ PG_FUNCTION_INFO_V1( on_partitions_created );
 PG_FUNCTION_INFO_V1( on_partitions_updated );
 PG_FUNCTION_INFO_V1( on_partitions_removed );
 PG_FUNCTION_INFO_V1( find_range_partition );
+PG_FUNCTION_INFO_V1( get_partition_range );
 
 
 /*
@@ -1159,6 +1160,57 @@ find_range_partition(PG_FUNCTION_ARGS)
 
 	if (found)
 		PG_RETURN_OID(ranges[pos].child_oid);
+
+	PG_RETURN_NULL();
+}
+
+/*
+ * Returns range (min, max) as output parameters
+ *
+ * first argument is parent relid
+ * second is partition relid
+ * third and forth are MIN and MAX output parameters
+ */
+Datum
+get_partition_range(PG_FUNCTION_ARGS)
+{
+	int		parent_oid = DatumGetInt32(PG_GETARG_DATUM(0));
+	int		child_oid = DatumGetInt32(PG_GETARG_DATUM(1));
+	int nelems = 2;
+	Datum *elems = palloc(nelems * sizeof(Datum));
+	Oid elemtype = INT4OID;
+	PartRelationInfo   *prel;
+	RangeRelation	   *rangerel;
+	RangeEntry		   *ranges;
+	bool	found;
+	int 	i;
+
+	prel = (PartRelationInfo *)
+		hash_search(relations, (const void *) &parent_oid, HASH_FIND, 0);
+	
+	rangerel = (RangeRelation *)
+		hash_search(range_restrictions, (const void *) &parent_oid, HASH_FIND, NULL);
+
+	if (!prel || !rangerel)
+		PG_RETURN_NULL();
+
+	ranges = dsm_array_get_pointer(&rangerel->ranges);
+	for(i=0; i<rangerel->ranges.length; i++)
+		if (ranges[i].child_oid == child_oid)
+		{
+			found = true;
+			break;
+		}
+
+	if (found)
+	{
+		elems[0] = ranges[i].min;
+		elems[1] = ranges[i].max;
+
+		ArrayType *arr =
+			construct_array(elems, nelems, prel->atttype, sizeof(Oid), true, 'i');
+		PG_RETURN_ARRAYTYPE_P(arr);
+	}
 
 	PG_RETURN_NULL();
 }

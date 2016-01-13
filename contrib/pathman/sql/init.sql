@@ -169,6 +169,17 @@ RETURNS VOID AS 'pathman', 'on_partitions_removed' LANGUAGE C STRICT;
 CREATE OR REPLACE FUNCTION find_range_partition(relid OID, value ANYELEMENT)
 RETURNS OID AS 'pathman', 'find_range_partition' LANGUAGE C STRICT;
 
+/*
+ * Returns min and max values for specified RANGE partition.
+ */
+CREATE OR REPLACE FUNCTION get_partition_range(
+    parent_relid ANYELEMENT,
+    partition_relid ANYELEMENT)
+RETURNS ANYARRAY AS 'pathman', 'get_partition_range' LANGUAGE C STRICT;
+
+/*
+ * Copy rows to partitions
+ */
 CREATE OR REPLACE FUNCTION partition_data(p_parent text)
 RETURNS bigint AS
 $$
@@ -176,15 +187,14 @@ DECLARE
     rec RECORD;
 BEGIN
     FOR rec IN  (SELECT child.relname, pg_constraint.consrc
-                   FROM pg_pathman_rels
-                   JOIN pg_class AS parent ON parent.relname = pg_pathman_rels.relname
-                   JOIN pg_inherits ON inhparent = parent.relfilenode
-                   JOIN pg_constraint ON conrelid = inhrelid AND contype='c'
-                   JOIN pg_class AS child ON child.relfilenode = inhrelid
-                   WHERE pg_pathman_rels.relname = p_parent)
+                 FROM pg_pathman_rels
+                 JOIN pg_class AS parent ON parent.relname = pg_pathman_rels.relname
+                 JOIN pg_inherits ON inhparent = parent.relfilenode
+                 JOIN pg_constraint ON conrelid = inhrelid AND contype='c'
+                 JOIN pg_class AS child ON child.relfilenode = inhrelid
+                 WHERE pg_pathman_rels.relname = p_parent)
     LOOP
-        RAISE NOTICE 'child %, condition %', rec.relname, rec.consrc;
-
+        RAISE NOTICE 'Copying data to % (condition: %)', rec.relname, rec.consrc;
         EXECUTE format('WITH part_data AS (
                             DELETE FROM ONLY %s WHERE %s RETURNING *)
                         INSERT INTO %s SELECT * FROM part_data'
