@@ -8,7 +8,7 @@ SELECT create_hash_partitions('hash_rel', 'value', 3);
 CREATE TABLE num_range_rel (
     id SERIAL PRIMARY KEY,
     txt TEXT);
-SELECT create_range_partitions('num_range_rel', 'id', 'num', 0, 1000, 3);
+SELECT create_range_partitions('num_range_rel', 'id', 0, 1000, 3);
 
 INSERT INTO hash_rel VALUES (1, 1);
 INSERT INTO hash_rel VALUES (2, 2);
@@ -44,6 +44,21 @@ EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE id >= 1000 AND id < 3000;
 EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE id >= 1500 AND id < 2500;
 EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE (id >= 500 AND id < 1500) OR (id > 2500);
 
+/*
+ * Test split and merge
+ */
+
+/* Split first partition in half */
+SELECT split_range_partition('num_range_rel_1', 500);
+EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE id BETWEEN 100 AND 700;
+
+/* Merge two partitions into one */
+SELECT merge_range_partitions('num_range_rel_1', 'num_range_rel_' || currval('num_range_rel_seq'));
+EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE id BETWEEN 100 AND 700;
+
+/*
+ * Clean up
+ */
 SELECT drop_hash_partitions('hash_rel');
 DROP TABLE hash_rel CASCADE;
 

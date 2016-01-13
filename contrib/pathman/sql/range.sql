@@ -299,6 +299,7 @@ BEGIN
                 , v_new_partition);
 
     /* Alter original partition */
+    RAISE NOTICE 'Altering original partition...';
     v_cond := get_range_condition(v_attname, p_range[1], p_value - p_range[1]);
     EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %s_%s_check'
                    , p_partition
@@ -310,6 +311,8 @@ BEGIN
 
     /* Tell backend to reload configuration */
     PERFORM pg_pathman_on_update_partitions(v_parent_relid::INTEGER);
+
+    RAISE NOTICE 'Done!';
 END
 $$
 LANGUAGE plpgsql;
@@ -362,6 +365,11 @@ BEGIN
 
     EXECUTE format('SELECT merge_range_partitions_internal($1, $2 , $3, NULL::%s)', v_atttype)
     USING v_parent_relid1, v_part1_relid , v_part2_relid;
+
+    /* Tell backend to reload configuration */
+    PERFORM pg_pathman_on_update_partitions(v_parent_relid1::INTEGER);
+
+    RAISE NOTICE 'Done!';
 END
 $$
 LANGUAGE plpgsql;
@@ -396,9 +404,6 @@ BEGIN
      */
     p_range := get_partition_range(p_parent_relid, p_part1_relid) ||
                get_partition_range(p_parent_relid, p_part2_relid);
-    RAISE NOTICE 'type: %', pg_typeof(p_range[1]);
-    RAISE NOTICE 'min %, max %', pg_typeof(least(p_range[1], p_range[3])),
-        pg_typeof(greatest(p_range[2], p_range[4]));
 
     /* Check if ranges are adjacent */
     IF p_range[1] != p_range[4] AND p_range[2] != p_range[3] THEN
@@ -409,9 +414,9 @@ BEGIN
     v_cond := get_range_condition(v_attname
                                   , least(p_range[1], p_range[3])
                                   , greatest(p_range[2], p_range[4]) - least(p_range[1], p_range[3]));
-    RAISE NOTICE 'cond: %', v_cond;
 
-    /* Alter first table */
+    /* Alter first partition */
+    RAISE NOTICE 'Altering first partition...';
     EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %s_%s_check'
                    , p_part1_relid::regclass::text
                    , p_part1_relid::regclass::text
@@ -421,12 +426,14 @@ BEGIN
                    , v_cond);
 
     /* Copy data from second partition to the first one */
+    RAISE NOTICE 'Copying data...';
     EXECUTE format('WITH part_data AS (DELETE FROM %s RETURNING *)
                     INSERT INTO %s SELECT * FROM part_data'
                    , p_part2_relid::regclass::text
                    , p_part1_relid::regclass::text);
 
     /* Remove second partition */
+    RAISE NOTICE 'Dropping second partition...';
     EXECUTE format('DROP TABLE %s', p_part2_relid::regclass::text);
 END
 $$ LANGUAGE plpgsql;

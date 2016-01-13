@@ -41,11 +41,11 @@ BEGIN
 
         -- EXECUTE format('CREATE TABLE %s_%s () INHERITS (%1$s)', relation, partnum);
         -- child_oid := relfilenode FROM pg_class WHERE relname = format('%s_%s', relation, partnum);
-        INSERT INTO pg_pathman_hash_rels (parent, hash, child)
-        VALUES (relation, partnum, format('%s_%s', relation, partnum));
+        -- INSERT INTO pg_pathman_hash_rels (parent, hash, child)
+        -- VALUES (relation, partnum, format('%s_%s', relation, partnum));
     END LOOP;
-    INSERT INTO pg_pathman_rels (relname, attname, atttype, parttype)
-    VALUES (relation, attribute, 1, 1);
+    INSERT INTO pg_pathman_rels (relname, attname, parttype)
+    VALUES (relation, attribute, 1);
 
     /* Create triggers */
     PERFORM create_hash_insert_trigger(relation, attribute, partitions_count);
@@ -124,24 +124,11 @@ DECLARE
 BEGIN
     /* Drop trigger first */
     PERFORM drop_hash_triggers(relation);
-
-    relid := relfilenode FROM pg_class WHERE relname = relation;
-    partitions_count := COUNT(*) FROM pg_pathman_hash_rels WHERE parent = relation;
-
     DELETE FROM pg_pathman_rels WHERE relname = relation;
-    DELETE FROM pg_pathman_hash_rels WHERE parent = relation;
-
-    IF partitions_count > 0 THEN
-        RETURN;
-    END IF;
-
-    FOR partnum IN 0..partitions_count-1
-    LOOP
-        EXECUTE format(q, relation, partnum);
-    END LOOP;
+    -- EXECUTE format('DROP TABLE %s CASCADE', relation);
 
     /* Notify backend about changes */
-    PERFORM pg_pathman_on_remove_partitions(relid);
+    PERFORM pg_pathman_on_remove_partitions(relation::regclass::integer);
 END
 $$ LANGUAGE plpgsql;
 
