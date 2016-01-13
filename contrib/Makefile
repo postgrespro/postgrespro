@@ -40,6 +40,7 @@ SUBDIRS = \
 		postgres_fdw	\
 		seg		\
 		spi		\
+		sr_plan \
 		tablefunc	\
 		tcn		\
 		test_decoding	\
