@@ -9,7 +9,7 @@
 
  <para>
   This module implements the <type>hstore</> data type for storing sets of
-  key/value pairs within a single <productname>PostgreSQL</> value.
+  key/value pairs within a single <productname>&productname;</> value.
   This can be useful in various scenarios, such as rows with many attributes
   that are rarely examined, or semi-structured data.  Keys and values are
   simply text strings.
@@ -209,7 +209,7 @@ key =&gt; NULL
 
   <note>
   <para>
-   Prior to PostgreSQL 8.2, the containment operators <literal>@&gt;</>
+   Prior to &productname; 8.2, the containment operators <literal>@&gt;</>
    and <literal>&lt;@</> were called <literal>@</> and <literal>~</>,
    respectively. These names are still available, but are deprecated and will
    eventually be removed. Notice that the old names are reversed from the
@@ -568,7 +568,7 @@ SELECT key, count(*) FROM
   <title>Compatibility</title>
 
   <para>
-   As of PostgreSQL 9.0, <type>hstore</> uses a different internal
+   As of &productname; 9.0, <type>hstore</> uses a different internal
    representation than previous versions. This presents no obstacle for
    dump/restore upgrades since the text representation (used in the dump) is
    unchanged.

@@ -1,6 +1,6 @@
 <!--
 doc/src/sgml/ref/vacuum.sgml
-PostgreSQL documentation
+&productname; documentation
 -->
 
 <refentry id="SQL-VACUUM">
@@ -32,7 +32,7 @@ VACUUM [ FULL ] [ FREEZE ] [ VERBOSE ] ANALYZE [ <replaceable class="PARAMETER">
 
   <para>
    <command>VACUUM</command> reclaims storage occupied by dead tuples.
-   In normal <productname>PostgreSQL</productname> operation, tuples that
+   In normal <productname>&productname;</productname> operation, tuples that
    are deleted or obsoleted by an update are not physically removed from
    their table; they remain present until a <command>VACUUM</command> is
    done.  Therefore it's necessary to do <command>VACUUM</command>
@@ -71,7 +71,7 @@ VACUUM [ FULL ] [ FREEZE ] [ VERBOSE ] ANALYZE [ <replaceable class="PARAMETER">
    written in any order.  Without parentheses, options must be specified
    in exactly the order shown above.
    The parenthesized syntax was added in
-   <productname>PostgreSQL</productname> 9.0;  the unparenthesized
+   <productname>&productname;</productname> 9.0;  the unparenthesized
    syntax is deprecated.
   </para>
  </refsect1>
@@ -193,7 +193,7 @@ VACUUM [ FULL ] [ FREEZE ] [ VERBOSE ] ANALYZE [ <replaceable class="PARAMETER">
     ANALYZE</command> command for the affected table. This will update the
     system catalogs with
     the results of all recent changes, and allow the
-    <productname>PostgreSQL</productname> query planner to make better
+    <productname>&productname;</productname> query planner to make better
     choices in planning queries.
    </para>
 
@@ -214,7 +214,7 @@ VACUUM [ FULL ] [ FREEZE ] [ VERBOSE ] ANALYZE [ <replaceable class="PARAMETER">
    </para>
 
    <para>
-    <productname>PostgreSQL</productname> includes an <quote>autovacuum</>
+    <productname>&productname;</productname> includes an <quote>autovacuum</>
     facility which can automate routine vacuum maintenance.  For more
     information about automatic and manual vacuuming, see
     <xref linkend="routine-vacuuming">.

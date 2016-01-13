@@ -11,7 +11,7 @@
   The <application>tsearch2</> module provides backwards-compatible
   text search functionality for applications that used
   <application>tsearch2</> before text searching was integrated
-  into core <productname>PostgreSQL</productname> in release 8.3.
+  into core <productname>&productname;</productname> in release 8.3.
  </para>
 
  <sect2>
@@ -99,7 +99,7 @@
      The replacement <literal>tsearch2</literal> module offers a little
      bit of support for this by making it possible to load an old set
      of <application>tsearch2</> configuration tables into
-     <productname>PostgreSQL</productname> 8.3.  (Without the module,
+     <productname>&productname;</productname> 8.3.  (Without the module,
      it is not possible to load the configuration data because values in the
      <type>regprocedure</> columns cannot be resolved to functions.)
      While those configuration tables won't actually <emphasis>do</>
