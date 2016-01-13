@@ -9,7 +9,7 @@
  </indexterm>
 
  <para>
-  <productname>PostgreSQL</productname> uses a message-based protocol
+  <productname>&productname;</productname> uses a message-based protocol
   for communication between frontends and backends (clients and servers).
   The protocol is supported over <acronym>TCP/IP</acronym> and also over
   Unix-domain sockets.  Port number 5432 has been registered with IANA as
@@ -19,9 +19,9 @@
 
  <para>
   This document describes version 3.0 of the protocol, implemented in
-  <productname>PostgreSQL</productname> 7.4 and later.  For descriptions
+  <productname>&productname;</productname> 7.4 and later.  For descriptions
   of the earlier protocol versions, see previous releases of the
-  <productname>PostgreSQL</productname> documentation.  A single server
+  <productname>&productname;</productname> documentation.  A single server
   can support multiple protocol versions.  The initial
   startup-request message tells the server which protocol version the
   client is attempting to use, and then the server follows that protocol
@@ -164,7 +164,7 @@
 
    <para>
     Data of a particular data type might be transmitted in any of several
-    different <firstterm>formats</>.  As of <productname>PostgreSQL</> 7.4
+    different <firstterm>formats</>.  As of <productname>&productname;</> 7.4
     the only supported formats are <quote>text</> and <quote>binary</>,
     but the protocol makes provision for future extensions.  The desired
     format for any value is specified by a <firstterm>format code</>.
@@ -1245,12 +1245,12 @@
    <title><acronym>SSL</acronym> Session Encryption</title>
 
    <para>
-    If <productname>PostgreSQL</> was built with
+    If <productname>&productname;</> was built with
     <acronym>SSL</acronym> support, frontend/backend communications
     can be encrypted using <acronym>SSL</acronym>.  This provides
     communication security in environments where attackers might be
     able to capture the session traffic. For more information on
-    encrypting <productname>PostgreSQL</productname> sessions with
+    encrypting <productname>&productname;</productname> sessions with
     <acronym>SSL</acronym>, see <xref linkend="ssl-tcp">.
    </para>
 
@@ -1276,7 +1276,7 @@
     The frontend should also be prepared to handle an ErrorMessage
     response to SSLRequest from the server.  This would only occur if
     the server predates the addition of <acronym>SSL</acronym> support
-    to <productname>PostgreSQL</>.  (Such servers are now very ancient,
+    to <productname>&productname;</>.  (Such servers are now very ancient,
     and likely do not exist in the wild anymore.)
     In this case the connection must
     be closed, but the frontend might choose to open a fresh connection
@@ -2043,7 +2043,7 @@ The commands accepted in walsender mode are:
      <para>
       The tar archive for the data directory and each tablespace will contain
       all files in the directories, regardless of whether they are
-      <productname>PostgreSQL</> files or other files added to the same
+      <productname>&productname;</> files or other files added to the same
       directory. The only excluded files are:
       <itemizedlist spacing="compact" mark="bullet">
        <listitem>
@@ -2058,7 +2058,7 @@ The commands accepted in walsender mode are:
        </listitem>
        <listitem>
         <para>
-         various temporary files created during the operation of the PostgreSQL server
+         various temporary files created during the operation of the &productname; server
         </para>
        </listitem>
        <listitem>
@@ -3054,7 +3054,7 @@ CommandComplete (B)
         <literal>COPY <replaceable>rows</replaceable></literal> where
         <replaceable>rows</replaceable> is the number of rows copied.
         (Note: the row count appears only in
-        <productname>PostgreSQL</productname> 8.2 and later.)
+        <productname>&productname;</productname> 8.2 and later.)
        </para>
 
 </listitem>

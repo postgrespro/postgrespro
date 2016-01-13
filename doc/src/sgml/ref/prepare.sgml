@@ -1,6 +1,6 @@
 <!--
 doc/src/sgml/ref/prepare.sgml
-PostgreSQL documentation
+&productname; documentation
 -->
 
 <refentry id="SQL-PREPARE">
@@ -138,7 +138,7 @@ PREPARE <replaceable class="PARAMETER">name</replaceable> [ ( <replaceable class
   </para>
 
   <para>
-   To examine the query plan <productname>PostgreSQL</productname> is using
+   To examine the query plan <productname>&productname;</productname> is using
    for a prepared statement, use <xref linkend="sql-explain">.
    If a generic plan is in use, it will contain parameter symbols
    <literal>$<replaceable>n</></literal>, while a custom plan will have the
@@ -147,21 +147,21 @@ PREPARE <replaceable class="PARAMETER">name</replaceable> [ ( <replaceable class
 
   <para>
    For more information on query planning and the statistics collected
-   by <productname>PostgreSQL</productname> for that purpose, see
+   by <productname>&productname;</productname> for that purpose, see
    the <xref linkend="sql-analyze">
    documentation.
   </para>
 
   <para>
    Although the main point of a prepared statement is to avoid repeated parse
-   analysis and planning of the statement, <productname>PostgreSQL</> will
+   analysis and planning of the statement, <productname>&productname;</> will
    force re-analysis and re-planning of the statement before using it
    whenever database objects used in the statement have undergone
    definitional (DDL) changes since the previous use of the prepared
    statement.  Also, if the value of <xref linkend="guc-search-path"> changes
    from one use to the next, the statement will be re-parsed using the new
    <varname>search_path</>.  (This latter behavior is new as of
-   <productname>PostgreSQL</productname> 9.3.)  These rules make use of a
+   <productname>&productname;</productname> 9.3.)  These rules make use of a
    prepared statement semantically almost equivalent to re-submitting the
    same query text over and over, but with a performance benefit if no object
    definitions are changed, especially if the best plan remains the same

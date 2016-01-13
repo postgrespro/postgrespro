@@ -1,6 +1,6 @@
 <!--
 doc/src/sgml/ref/alter_sequence.sgml
-PostgreSQL documentation
+&productname; documentation
 -->
 
 <refentry id="SQL-ALTERSEQUENCE">
@@ -274,7 +274,7 @@ ALTER SEQUENCE [ IF EXISTS ] <replaceable class="parameter">name</replaceable> S
 
   <para>
    <command>ALTER SEQUENCE</command> does not affect the <function>currval</>
-   status for the sequence.  (Before <productname>PostgreSQL</productname>
+   status for the sequence.  (Before <productname>&productname;</productname>
    8.3, it sometimes did.)
   </para>
 
@@ -303,7 +303,7 @@ ALTER SEQUENCE serial RESTART WITH 105;
    standard, except for the <literal>START WITH</>,
    <literal>OWNED BY</>, <literal>OWNER TO</>, <literal>RENAME TO</>, and
    <literal>SET SCHEMA</literal> clauses, which are
-   <productname>PostgreSQL</productname> extensions.
+   <productname>&productname;</productname> extensions.
   </para>
  </refsect1>
 

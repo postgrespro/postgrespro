@@ -1,6 +1,6 @@
 <!--
 doc/src/sgml/ref/create_index.sgml
-PostgreSQL documentation
+&productname; documentation
 -->
 
 <refentry id="SQL-CREATEINDEX">
@@ -56,7 +56,7 @@ CREATE [ UNIQUE ] INDEX [ CONCURRENTLY ] [ [ IF NOT EXISTS ] <replaceable class=
   </para>
 
   <para>
-   <productname>PostgreSQL</productname> provides the index methods
+   <productname>&productname;</productname> provides the index methods
    B-tree, hash, GiST, SP-GiST, GIN, and BRIN.  Users can also define their own
    index methods, but that is fairly complicated.
   </para>
@@ -115,7 +115,7 @@ CREATE [ UNIQUE ] INDEX [ CONCURRENTLY ] [ [ IF NOT EXISTS ] <replaceable class=
       <term><literal>CONCURRENTLY</literal></term>
       <listitem>
        <para>
-        When this option is used, <productname>PostgreSQL</> will build the
+        When this option is used, <productname>&productname;</> will build the
         index without taking any locks that prevent concurrent inserts,
         updates, or deletes on the table; whereas a standard index build
         locks out writes (but not reads) on the table until it's done.
@@ -144,7 +144,7 @@ CREATE [ UNIQUE ] INDEX [ CONCURRENTLY ] [ [ IF NOT EXISTS ] <replaceable class=
        <para>
         The name of the index to be created.  No schema name can be included
         here; the index is always created in the same schema as its parent
-        table.  If the name is omitted, <productname>PostgreSQL</> chooses a
+        table.  If the name is omitted, <productname>&productname;</> chooses a
         suitable name based on the parent table's name and the indexed column
         name(s).
        </para>
@@ -409,7 +409,7 @@ CREATE [ UNIQUE ] INDEX [ CONCURRENTLY ] [ [ IF NOT EXISTS ] <replaceable class=
 
    <para>
     Creating an index can interfere with regular operation of a database.
-    Normally <productname>PostgreSQL</> locks the table to be indexed against
+    Normally <productname>&productname;</> locks the table to be indexed against
     writes and performs the entire index build with a single scan of the
     table. Other transactions can still read the table, but if they try to
     insert, update, or delete rows in the table they will block until the
@@ -420,11 +420,11 @@ CREATE [ UNIQUE ] INDEX [ CONCURRENTLY ] [ [ IF NOT EXISTS ] <replaceable class=
    </para>
 
    <para>
-    <productname>PostgreSQL</> supports building indexes without locking
+    <productname>&productname;</> supports building indexes without locking
     out writes.  This method is invoked by specifying the
     <literal>CONCURRENTLY</> option of <command>CREATE INDEX</>.
     When this option is used,
-    <productname>PostgreSQL</> must perform two scans of the table, and in
+    <productname>&productname;</> must perform two scans of the table, and in
     addition it must wait for all existing transactions that could potentially
     use the index to terminate.  Thus
     this method requires more total work than a standard index build and takes
@@ -524,7 +524,7 @@ Indexes:
    Currently, only the B-tree, GiST, GIN, and BRIN index methods support
    multicolumn indexes. Up to 32 fields can be specified by default.
    (This limit can be altered when building
-   <productname>PostgreSQL</productname>.)  Only B-tree currently
+   <productname>&productname;</productname>.)  Only B-tree currently
    supports unique indexes.
   </para>
 
@@ -567,7 +567,7 @@ Indexes:
    as you don't make it larger than the amount of memory really available,
    which would drive the machine into swapping.  For hash indexes, the
    value of <xref linkend="guc-effective-cache-size"> is also relevant to
-   index creation time: <productname>PostgreSQL</productname> will use one
+   index creation time: <productname>&productname;</productname> will use one
    of two different hash index creation methods depending on whether the
    estimated index size is more or less than <varname>effective_cache_size</>.
    For best results, make sure that this parameter is also set to something
@@ -583,7 +583,7 @@ Indexes:
   </para>
 
   <para>
-   Prior releases of <productname>PostgreSQL</productname> also had an
+   Prior releases of <productname>&productname;</productname> also had an
    R-tree index method.  This method has been removed because
    it had no significant advantages over the GiST method.
    If <literal>USING rtree</> is specified, <command>CREATE INDEX</>
@@ -675,7 +675,7 @@ CREATE INDEX CONCURRENTLY sales_quantity_index ON sales_table (quantity);
 
   <para>
    <command>CREATE INDEX</command> is a
-   <productname>PostgreSQL</productname> language extension.  There
+   <productname>&productname;</productname> language extension.  There
    are no provisions for indexes in the SQL standard.
   </para>
  </refsect1>
