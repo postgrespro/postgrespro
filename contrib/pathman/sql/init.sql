@@ -172,9 +172,15 @@ RETURNS OID AS 'pathman', 'find_range_partition' LANGUAGE C STRICT;
  * Returns min and max values for specified RANGE partition.
  */
 CREATE OR REPLACE FUNCTION get_partition_range(
-    parent_relid ANYELEMENT,
-    partition_relid ANYELEMENT)
+    parent_relid OID, partition_relid OID, dummy ANYELEMENT)
 RETURNS ANYARRAY AS 'pathman', 'get_partition_range' LANGUAGE C STRICT;
+
+/*
+ * Returns N-th range (in form of array)
+ */
+CREATE OR REPLACE FUNCTION get_range_by_idx(
+    parent_relid OID, idx INTEGER, dummy ANYELEMENT)
+RETURNS ANYARRAY AS 'pathman', 'get_range_by_idx' LANGUAGE C STRICT;
 
 /*
  * Copy rows to partitions
@@ -216,9 +222,27 @@ BEGIN
     DELETE FROM pg_pathman_rels WHERE relname = relation;
 
     /* Notify backend about changes */
-    PERFORM pg_pathman_on_remove_partitions(relation::regclass::oid);
+    PERFORM pg_pathman_on_remove_partitions(relation::regclass::integer);
 END
 $$ LANGUAGE plpgsql;
+
+
+/*
+ * Returns attribute type name for relation
+ */
+CREATE OR REPLACE FUNCTION get_attribute_type_name(
+    p_relation TEXT
+    , p_attname TEXT
+    , OUT p_atttype TEXT)
+RETURNS TEXT AS
+$$
+BEGIN
+    SELECT typname::TEXT INTO p_atttype
+    FROM pg_type JOIN pg_attribute on atttypid = "oid"
+    WHERE attrelid = p_relation::regclass::oid and attname = lower(p_attname);
+END
+$$
+LANGUAGE plpgsql;
 
 
 -- CREATE OR REPLACE FUNCTION sample_rel_trigger_func()
