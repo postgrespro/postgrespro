@@ -108,8 +108,6 @@ _PG_init(void)
 	shmem_startup_hook = my_shmem_startup;
 
 	planner_hook = my_planner_hook;
-	/* TEMP */
-	// get_relation_info_hook = my_get_relation_info;
 }
 
 void
@@ -117,8 +115,6 @@ _PG_fini(void)
 {
 	set_rel_pathlist_hook = set_rel_pathlist_hook_original;
 	shmem_startup_hook = shmem_startup_hook_original;
-	// hash_destroy(relations);
-	// hash_destroy(hash_restrictions);
 }
 
 PlannedStmt *
@@ -127,7 +123,7 @@ my_planner_hook(Query *parse, int cursorOptions, ParamListInfo boundParams)
 	PlannedStmt	  *result;
 
 	if (initialization_needed)
-		init();
+		load_config();
 
 	inheritance_disabled = false;
 	disable_inheritance(parse);
@@ -195,7 +191,6 @@ my_shmem_startup(void)
 	/* allocate shared memory objects */
 	alloc_dsm_table();
 	create_part_relations_hashtable();
-	create_hash_restrictions_hashtable();
 	create_range_restrictions_hashtable();
 
 	LWLockRelease(AddinShmemInitLock);

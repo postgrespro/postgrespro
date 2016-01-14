@@ -12,7 +12,6 @@
 
 
 HTAB   *relations = NULL;
-HTAB   *hash_restrictions = NULL;
 HTAB   *range_restrictions = NULL;
 bool	initialization_needed = true;
 
@@ -26,7 +25,7 @@ static int cmp_range_entries(const void *p1, const void *p2);
  * Initialize hashtables
  */
 void
-init(void)
+load_config(void)
 {
 	bool new_segment_created;
 
@@ -127,7 +126,6 @@ load_part_relations_hashtable(bool reinitialize)
 					prel->children_count = 0;
 				}
 				load_check_constraints(oid);
-				// load_hash_restrictions(oid);
 				break;
 		}
 	}
@@ -153,93 +151,8 @@ create_part_relations_hashtable()
 							  // &ctl, HASH_ELEM | HASH_BLOBS);
 }
 
-void
-load_hash_restrictions(Oid parent_oid)
-{
-	bool		found;
-	PartRelationInfo *prel;
-	HashRelation *hashrel;
-	HashRelationKey key;
-	int ret;
-	int i;
-	int proc;
-	bool isnull;
-
-	Datum vals[1];
-	Oid oids[1] = {INT4OID};
-	bool nulls[1] = {false};
-	vals[0] = Int32GetDatum(parent_oid);
-
-	prel = (PartRelationInfo*)
-		hash_search(relations, (const void *) &parent_oid, HASH_FIND, &found);
-
-	/* if already loaded then quit */
-	if (prel->children_count > 0)
-		return;
-
-	ret = SPI_execute_with_args("SELECT p.relfilenode, hr.hash, c.relfilenode "
-								"FROM pg_pathman_hash_rels hr "
-								"JOIN pg_class p ON p.relname = hr.parent "
-								"JOIN pg_class c ON c.relname = hr.child "
-								"WHERE p.relfilenode = $1",
-								1, oids, vals, nulls, true, 0);
-	proc = SPI_processed;
-
-	if (ret > 0 && SPI_tuptable != NULL)
-    {
-    	TupleDesc tupdesc = SPI_tuptable->tupdesc;
-        SPITupleTable *tuptable = SPI_tuptable;
-        Oid *children;
-
-        /* allocate an array of children Oids */
-        alloc_dsm_array(&prel->children, sizeof(Oid), proc);
-        children = (Oid *) dsm_array_get_pointer(&prel->children);
-
-        for (i=0; i<proc; i++)
-        {
-            HeapTuple tuple = tuptable->vals[i];
-			int child_oid = DatumGetObjectId(SPI_getbinval(tuple, tupdesc, 3, &isnull));
-
-			key.parent_oid = DatumGetObjectId(SPI_getbinval(tuple, tupdesc, 1, &isnull));
-			key.hash = DatumGetInt32(SPI_getbinval(tuple, tupdesc, 2, &isnull));
-
-			hashrel = (HashRelation *)
-				hash_search(hash_restrictions, (void *) &key, HASH_ENTER, &found);
-			hashrel->child_oid = child_oid;
-
-			/* appending children to PartRelationInfo */
-			// prel->children[prel->children_count++] = child_oid;
-			children[prel->children_count++] = child_oid;
-        }
-    }
-
-	// SPI_finish();
-}
-
-/*
- * Create hash restrictions table
- */
-void
-create_hash_restrictions_hashtable()
-{
-	HASHCTL		ctl;
-
-	memset(&ctl, 0, sizeof(ctl));
-	ctl.keysize = sizeof(HashRelationKey);
-	ctl.entrysize = sizeof(HashRelation);
-
-	/* already exists, recreate */
-	if (hash_restrictions != NULL)
-		hash_destroy(hash_restrictions);
-
-	hash_restrictions = ShmemInitHash("pg_pathman hash restrictions",
-									  1024, 1024,
-									  &ctl, HASH_ELEM | HASH_BLOBS);
-}
-
 /*
  * Load and validate constraints
- * TODO: make it work for HASH partitioning
  */
 void
 load_check_constraints(Oid parent_oid)
@@ -340,10 +253,6 @@ load_check_constraints(Oid parent_oid)
 					if (!validate_hash_constraint(expr, prel, &hash))
 						/* TODO: elog() */
 						continue;
-
-					hashrel = (HashRelation *)
-						hash_search(hash_restrictions, (void *) &hash, HASH_ENTER, &found);
-					hashrel->child_oid = con->conrelid;
 					children[hash] = con->conrelid;
 			}
 		}
@@ -521,7 +430,6 @@ remove_relation_info(Oid relid)
 			{
 				key.parent_oid = relid;
 				key.hash = i;
-				hash_search(hash_restrictions, (const void *) &key, HASH_REMOVE, 0);
 			}
 			free_dsm_array(&prel->children);
 			break;
