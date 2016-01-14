@@ -5,6 +5,12 @@ CREATE TABLE hash_rel (
     value   INTEGER);
 SELECT create_hash_partitions('hash_rel', 'value', 3);
 
+CREATE TABLE range_rel (
+    id SERIAL PRIMARY KEY,
+    dt TIMESTAMP,
+    txt TEXT);
+SELECT create_range_partitions('range_rel', 'dt', '2015-01-01'::DATE, '1 month'::INTERVAL, 3);
+
 CREATE TABLE num_range_rel (
     id SERIAL PRIMARY KEY,
     txt TEXT);
@@ -52,9 +58,20 @@ EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE (id >= 500 AND id < 1500) 
 SELECT split_range_partition('num_range_rel_1', 500);
 EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE id BETWEEN 100 AND 700;
 
+SELECT split_range_partition('range_rel_1', '2015-01-15'::DATE);
+
 /* Merge two partitions into one */
 SELECT merge_range_partitions('num_range_rel_1', 'num_range_rel_' || currval('num_range_rel_seq'));
 EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE id BETWEEN 100 AND 700;
+
+SELECT merge_range_partitions('range_rel_1', 'range_rel_' || currval('range_rel_seq'));
+
+/* Append and prepend partitions */
+SELECT append_partition('num_range_rel');
+SELECT prepend_partition('num_range_rel');
+
+SELECT append_partition('range_rel');
+SELECT prepend_partition('range_rel');
 
 /*
  * Clean up

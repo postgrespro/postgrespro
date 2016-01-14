@@ -18,7 +18,7 @@ BEGIN
     FROM pg_class WHERE relname = v_relation;
 
     IF EXISTS (SELECT * FROM pg_pathman_rels WHERE relname = v_relation) THEN
-        RAISE EXCEPTION 'Reltion "%s" has already been partitioned', v_relation;
+        RAISE EXCEPTION 'Reltion "%" has already been partitioned', v_relation;
     END IF;
 
     EXECUTE format('DROP SEQUENCE IF EXISTS %s_seq', v_relation);
@@ -61,7 +61,7 @@ BEGIN
     FROM pg_class WHERE relname = v_relation;
 
     IF EXISTS (SELECT * FROM pg_pathman_rels WHERE relname = v_relation) THEN
-        RAISE EXCEPTION 'Reltion "%s" has already been partitioned', v_relation;
+        RAISE EXCEPTION 'Reltion "%" has already been partitioned', v_relation;
     END IF;
 
     EXECUTE format('DROP SEQUENCE IF EXISTS %s_seq', v_relation);
@@ -379,10 +379,6 @@ BEGIN
     END IF;
 
     v_atttype := get_attribute_type_name(v_parent_relid1::regclass::text, v_attname);
-    -- SELECT typname INTO v_atttype
-    -- FROM pg_type
-    -- JOIN pg_attribute on atttypid = "oid"
-    -- WHERE attrelid = 'num_range_rel'::regclass::oid and attname = lower(v_attname);
 
     EXECUTE format('SELECT merge_range_partitions_internal($1, $2 , $3, NULL::%s)', v_atttype)
     USING v_parent_relid1, v_part1_relid , v_part2_relid;
