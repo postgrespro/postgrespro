@@ -1,3 +1,5 @@
+\set VERBOSITY terse
+
 CREATE EXTENSION pathman;
 
 CREATE TABLE hash_rel (

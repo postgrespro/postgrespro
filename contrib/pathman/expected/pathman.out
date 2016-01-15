@@ -1,3 +1,4 @@
+\set VERBOSITY terse
 CREATE EXTENSION pathman;
 CREATE TABLE hash_rel (
     id      SERIAL PRIMARY KEY,
@@ -290,9 +291,6 @@ NOTICE:  function hash_rel_hash_update_trigger_func() does not exist, skipping
 
 DROP TABLE hash_rel CASCADE;
 NOTICE:  drop cascades to 3 other objects
-DETAIL:  drop cascades to table hash_rel_0
-drop cascades to table hash_rel_1
-drop cascades to table hash_rel_2
 SELECT drop_range_partitions('num_range_rel');
  drop_range_partitions 
 -----------------------
