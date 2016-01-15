@@ -58,8 +58,6 @@ any per-connection actions.
 
 ## Usage
 
-
-
 If you want to save the query plan is necessary to set the variable:
 
 ```SQL
@@ -125,7 +123,7 @@ CREATE TABLE
 INSERT 0 3 
 => set sr_plan.write_mode = true;
 SET
-=> select a,b  from test_table where a = _p(1);
+=> select a,b from test_table where a = _p(1);
  a | b
 ---+---
  1 | 1
@@ -135,7 +133,6 @@ SET
 SET
 
 ```
-
 
 Now plan for query from our table is saved with parameter. So,
 if we enable saved plan in this table, this plan would be used for query
