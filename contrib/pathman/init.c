@@ -190,36 +190,36 @@ load_check_constraints(Oid parent_oid)
 	proc = SPI_processed;
 
 	if (ret > 0 && SPI_tuptable != NULL)
-    {
-    	// TupleDesc tupdesc = SPI_tuptable->tupdesc;
-        SPITupleTable *tuptable = SPI_tuptable;
-        Oid *children;
-        RangeEntry *ranges;
-        Datum min;
-        Datum max;
+	{
+		// TupleDesc tupdesc = SPI_tuptable->tupdesc;
+		SPITupleTable *tuptable = SPI_tuptable;
+		Oid *children;
+		RangeEntry *ranges;
+		Datum min;
+		Datum max;
 		int hash;
 		HashRelation *hashrel;
 
-        alloc_dsm_array(&prel->children, sizeof(Oid), proc);
-        children = (Oid *) dsm_array_get_pointer(&prel->children);
+		alloc_dsm_array(&prel->children, sizeof(Oid), proc);
+		children = (Oid *) dsm_array_get_pointer(&prel->children);
 
-        if (prel->parttype == PT_RANGE)
-        {
+		if (prel->parttype == PT_RANGE)
+		{
 			rangerel = (RangeRelation *)
 				hash_search(range_restrictions, (void *) &parent_oid, HASH_ENTER, &found);
 
-	        alloc_dsm_array(&rangerel->ranges, sizeof(RangeEntry), proc);
-	        ranges = (RangeEntry *) dsm_array_get_pointer(&rangerel->ranges);
-	    }
+			alloc_dsm_array(&rangerel->ranges, sizeof(RangeEntry), proc);
+			ranges = (RangeEntry *) dsm_array_get_pointer(&rangerel->ranges);
+		}
 
-        for (i=0; i<proc; i++)
-        {
+		for (i=0; i<proc; i++)
+		{
 			RangeEntry	re;
-            HeapTuple	tuple = tuptable->vals[i];
-            bool		isnull;
-            Datum		val;
-            char	   *conbin;
-            Expr	   *expr;
+			HeapTuple	tuple = tuptable->vals[i];
+			bool		isnull;
+			Datum		val;
+			char	   *conbin;
+			Expr	   *expr;
 
 			// HeapTuple	reltuple;
 			// Form_pg_class pg_class_tuple;
@@ -269,7 +269,7 @@ load_check_constraints(Oid parent_oid)
 		}
 
 		/* TODO: check if some ranges overlap! */
-    }
+	}
 }
 
 
