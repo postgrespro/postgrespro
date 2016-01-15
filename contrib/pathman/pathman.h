@@ -178,7 +178,7 @@ LWLock *dsm_init_lock;
 // void *get_dsm_array(const ArrayPtr* ptr);
 
 void alloc_dsm_table(void);
-void create_dsm_segment(size_t block_size);
+bool init_dsm_segment(size_t block_size);
 void init_dsm_table(Table *tbl, dsm_handle h, size_t block_size);
 void alloc_dsm_array(DsmArray *arr, size_t entry_size, size_t length);
 void free_dsm_array(DsmArray *arr);

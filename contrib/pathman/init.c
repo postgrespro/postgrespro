@@ -145,10 +145,7 @@ create_part_relations_hashtable()
 	if (relations != NULL)
 		hash_destroy(relations);
 
-	relations = ShmemInitHash("Partitioning relation info",
-							  1024, 1024,
-							  &ctl, HASH_ELEM);
-							  // &ctl, HASH_ELEM | HASH_BLOBS);
+	relations = ShmemInitHash("Partitioning relation info", 1024, &ctl, HASH_ELEM);
 }
 
 /*
@@ -163,7 +160,6 @@ load_check_constraints(Oid parent_oid)
 	int ret;
 	int i;
 	int proc;
-	bool arg1_isnull, arg2_isnull;
 
 	Datum vals[1];
 	Oid oids[1] = {INT4OID};
@@ -177,11 +173,6 @@ load_check_constraints(Oid parent_oid)
 	if (prel->children.length > 0)
 		return;
 
-	// /* if already loaded then quit */
-	// if (prel->children_count > 0)
-	// 	return;
-
-	// SPI_connect();
 	ret = SPI_execute_with_args("select pg_constraint.* "
 								"from pg_constraint "
 								"join pg_inherits on inhrelid = conrelid "
@@ -191,14 +182,12 @@ load_check_constraints(Oid parent_oid)
 
 	if (ret > 0 && SPI_tuptable != NULL)
 	{
-		// TupleDesc tupdesc = SPI_tuptable->tupdesc;
 		SPITupleTable *tuptable = SPI_tuptable;
 		Oid *children;
 		RangeEntry *ranges;
 		Datum min;
 		Datum max;
 		int hash;
-		HashRelation *hashrel;
 
 		alloc_dsm_array(&prel->children, sizeof(Oid), proc);
 		children = (Oid *) dsm_array_get_pointer(&prel->children);
@@ -292,7 +281,6 @@ static bool
 validate_range_constraint(Expr *expr, PartRelationInfo *prel, Datum *min, Datum *max)
 {
 	TypeCacheEntry *tce;
-	int strategy;
 	BoolExpr *boolexpr = (BoolExpr *) expr;
 	OpExpr *opexpr;
 
@@ -305,7 +293,6 @@ validate_range_constraint(Expr *expr, PartRelationInfo *prel, Datum *min, Datum 
 		return false;
 
 	tce = lookup_type_cache(prel->atttype, TYPECACHE_EQ_OPR | TYPECACHE_LT_OPR | TYPECACHE_GT_OPR);
-	// strategy = get_op_opfamily_strategy(boolexpr->opno, tce->btree_opf);
 
 	/* check that left operand is >= operator */
 	opexpr = (OpExpr *) linitial(boolexpr->args);
@@ -400,8 +387,7 @@ create_range_restrictions_hashtable()
 	ctl.keysize = sizeof(int);
 	ctl.entrysize = sizeof(RangeRelation);
 	range_restrictions = ShmemInitHash("pg_pathman range restrictions",
-									   1024, 1024,
-									   &ctl, HASH_ELEM | HASH_BLOBS);
+									   1024, &ctl, HASH_ELEM | HASH_BLOBS);
 }
 
 /*
@@ -411,9 +397,8 @@ void
 remove_relation_info(Oid relid)
 {
 	PartRelationInfo   *prel;
-	HashRelationKey		key;
+	// HashRelationKey		key;
 	RangeRelation	   *rangerel;
-	int i;
 
 	prel = (PartRelationInfo *)
 		hash_search(relations, (const void *) &relid, HASH_FIND, 0);
@@ -426,11 +411,11 @@ remove_relation_info(Oid relid)
 	switch (prel->parttype)
 	{
 		case PT_HASH:
-			for (i=0; i<prel->children_count; i++)
-			{
-				key.parent_oid = relid;
-				key.hash = i;
-			}
+			// for (i=0; i<prel->children_count; i++)
+			// {
+			// 	key.parent_oid = relid;
+			// 	key.hash = i;
+			// }
 			free_dsm_array(&prel->children);
 			break;
 		case PT_RANGE:

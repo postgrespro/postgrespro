@@ -309,13 +309,8 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti,
 	RelOptInfo    *childrel;
 	Index		childRTindex;
 	AppendRelInfo *appinfo;
-	PartRelationInfo *prel;
-
 	Node *node;
 	ListCell *lc, *lc2;
-
-	prel = (PartRelationInfo *)
-			hash_search(relations, (const void *) &rte->relid, HASH_FIND, 0);
 
 	/* Create RangeTblEntry for child relation */
 	childrte = copyObject(rte);
@@ -960,7 +955,11 @@ set_plain_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
 	required_outer = rel->lateral_relids;
 
 	/* Consider sequential scan */
-	path = create_seqscan_path(root, rel, required_outer, 0);
+	path = create_seqscan_path(root, rel, required_outer);
+	/*
+	 * 9.6 version:
+	 * path = create_seqscan_path(root, rel, required_outer, 0);
+	 */
 	add_path(rel, path);
 	set_pathkeys(root, rel, path);
 
@@ -1174,11 +1173,11 @@ get_partition_range(PG_FUNCTION_ARGS)
 	int		child_oid = DatumGetInt32(PG_GETARG_DATUM(1));
 	int nelems = 2;
 	Datum *elems;
-	Oid elemtype = INT4OID;
 	PartRelationInfo   *prel;
 	RangeRelation	   *rangerel;
 	RangeEntry		   *ranges;
 	TypeCacheEntry	   *tce;
+	ArrayType		   *arr;
 	bool	found;
 	int 	i;
 
@@ -1208,9 +1207,8 @@ get_partition_range(PG_FUNCTION_ARGS)
 		elems[0] = ranges[i].min;
 		elems[1] = ranges[i].max;
 
-		ArrayType *arr =
-			construct_array(elems, nelems, prel->atttype,
-							tce->typlen, tce->typbyval, tce->typalign);
+		arr = construct_array(elems, nelems, prel->atttype,
+							  tce->typlen, tce->typbyval, tce->typalign);
 		PG_RETURN_ARRAYTYPE_P(arr);
 	}
 
