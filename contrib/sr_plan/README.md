@@ -21,7 +21,7 @@ So, mako preprocessor is used to generate C files serialize.c and
 deserialize.c.
 
 If you want to modify these files, you'll needed to alter mako templates
-and regenerate files, so you'll need to install maco, python >= 3.2 and
+and regenerate files, so you'll need to install mako, python >= 3.2 and
 pycparser modules.
 
 If you only have a Python you can use the virtual environment:
