@@ -546,7 +546,7 @@ RETURNS VOID AS
 $$
 DECLARE
     v_func TEXT := '
-        CREATE OR REPLACE FUNCTION %s_range_insert_trigger_func()
+        CREATE OR REPLACE FUNCTION %s_insert_trigger_func()
         RETURNS TRIGGER
         AS $body$
         DECLARE
@@ -567,7 +567,7 @@ DECLARE
     v_trigger TEXT := '
         CREATE TRIGGER %s_insert_trigger
         BEFORE INSERT ON %1$s
-        FOR EACH ROW EXECUTE PROCEDURE %1$s_range_insert_trigger_func();';
+        FOR EACH ROW EXECUTE PROCEDURE %1$s_insert_trigger_func();';
 BEGIN
     v_func := format(v_func, v_relation, v_attname);
     v_trigger := format(v_trigger, v_relation);
