@@ -9,6 +9,7 @@
 #include "access/htup_details.h"
 #include "utils/builtins.h"
 #include "utils/typcache.h"
+#include "utils/lsyscache.h"
 
 
 HTAB   *relations = NULL;

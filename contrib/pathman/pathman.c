@@ -43,7 +43,7 @@ static shmem_startup_hook_type shmem_startup_hook_original = NULL;
 
 void _PG_init(void);
 void _PG_fini(void);
-static void my_shmem_startup(void);
+static void pathman_shmem_startup(void);
 static void my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte);
 static PlannedStmt * my_planner_hook(Query *parse, int cursorOptions, ParamListInfo boundParams);
 
@@ -106,7 +106,7 @@ _PG_init(void)
 	set_rel_pathlist_hook_original = set_rel_pathlist_hook;
 	set_rel_pathlist_hook = my_hook;
 	shmem_startup_hook_original = shmem_startup_hook;
-	shmem_startup_hook = my_shmem_startup;
+	shmem_startup_hook = pathman_shmem_startup;
 
 	planner_hook = my_planner_hook;
 }
@@ -179,8 +179,11 @@ disable_inheritance(Query *parse)
 	}
 }
 
+/*
+ * Shared memory startup hook
+ */
 static void
-my_shmem_startup(void)
+pathman_shmem_startup(void)
 {
 	/* initialize locks */
 	RequestAddinLWLocks(2);
@@ -195,6 +198,10 @@ my_shmem_startup(void)
 	create_range_restrictions_hashtable();
 
 	LWLockRelease(AddinShmemInitLock);
+
+	/* Invoke original hook if needed */
+	if (shmem_startup_hook_original != NULL)
+		shmem_startup_hook_original();
 }
 
 /*
@@ -205,7 +212,7 @@ my_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 {
 	PartRelationInfo *prel = NULL;
 
-	/* This works on for SELECT queries */
+	/* This works only for SELECT queries */
 	if (root->parse->commandType != CMD_SELECT || !inheritance_disabled)
 		return;
 
@@ -585,6 +592,8 @@ handle_binary_opexpr(const PartRelationInfo *prel, WrapperNode *result,
 	int					i,
 						int_value,
 						strategy;
+	bool				is_less,
+						is_greater;
 	FmgrInfo		   *cmp_func;
 	const OpExpr	   *expr = (const OpExpr *)result->orig;
 	TypeCacheEntry	   *tce;
@@ -672,15 +681,10 @@ handle_binary_opexpr(const PartRelationInfo *prel, WrapperNode *result,
 					re = &ranges[i];
 					cmp_min = FunctionCall2(cmp_func, value, re->min);
 					cmp_max = FunctionCall2(cmp_func, value, re->max);
-					if (cmp_min < 0 || (cmp_min == 0 && strategy == BTLessStrategyNumber))
-					{
-						endidx = i - 1;
-					}
-					else if (cmp_max > 0 || (cmp_max >= 0 && strategy != BTLessStrategyNumber))
-					{
-						startidx = i + 1;
-					}
-					else
+					is_less = (cmp_min < 0 || (cmp_min == 0 && strategy == BTLessStrategyNumber));
+					is_greater = (cmp_max > 0 || (cmp_max >= 0 && strategy != BTLessStrategyNumber));
+
+					if (!is_less && !is_greater)
 					{
 						if (strategy == BTGreaterEqualStrategyNumber && cmp_min == 0)
 							lossy = false;
@@ -691,6 +695,19 @@ handle_binary_opexpr(const PartRelationInfo *prel, WrapperNode *result,
 						found = true;
 						break;
 					}
+
+					/* If we still didn't find partition then it doesn't exist */
+					if (startidx == endidx)
+					{
+						result->rangeset = NIL;
+						return;
+					}
+
+					if (is_less)
+						endidx = i - 1;
+					else if (is_greater)
+						startidx = i + 1;
+
 					/* for debug's sake */
 					Assert(++counter < 100);
 				}
@@ -757,39 +774,40 @@ make_hash(const PartRelationInfo *prel, int value)
  * foundPtr to false.
  */
 static int
-range_binary_search(const RangeRelation *rangerel, FmgrInfo *cmp_func, Datum value, bool *fountPtr)
+range_binary_search(const RangeRelation *rangerel, FmgrInfo *cmp_func, Datum value, bool *foundPtr)
 {
-	int		i;
-	int		startidx = 0;
-	int		endidx = rangerel->ranges.length-1;
-	int		counter = 0;
 	RangeEntry *ranges = dsm_array_get_pointer(&rangerel->ranges);
 	RangeEntry *re;
+	int			cmp_min,
+				cmp_max,
+				i,
+				startidx = 0,
+				endidx = rangerel->ranges.length-1,
+				counter = 0;
 
-	*fountPtr = false;
+	*foundPtr = false;
 	while (true)
 	{
 		i = startidx + (endidx - startidx) / 2;
-		if (i >= 0 && i < rangerel->ranges.length)
-		{
-			re = &ranges[i];
-			if (check_le(cmp_func, re->min, value) && check_lt(cmp_func, value, re->max))
-			{
-				*fountPtr = true;
-				break;
-			}
-			
-			/* if we still didn't find position then it is not in array */
-			if (startidx == endidx)
-				return i;
+		Assert(i >= 0 && i < rangerel->ranges.length);
+		re = &ranges[i];
+		cmp_min = FunctionCall2(cmp_func, value, re->min);
+		cmp_max = FunctionCall2(cmp_func, value, re->max);
 
-			if (check_lt(cmp_func, value, re->min))
-				endidx = i - 1;
-			else if (check_ge(cmp_func, value, re->max))
-				startidx = i + 1;
-		}
-		else
+		if (cmp_min >= 0 && cmp_max < 0)
+		{
+			*foundPtr = true;
 			break;
+		}
+
+		if (startidx == endidx)
+			return i;
+
+		if (cmp_min < 0)
+			endidx = i - 1;
+		else if (cmp_max >= 0)
+			startidx = i + 1;
+
 		/* for debug's sake */
 		Assert(++counter < 100);
 	}
@@ -1171,15 +1189,15 @@ get_partition_range(PG_FUNCTION_ARGS)
 {
 	int		parent_oid = DatumGetInt32(PG_GETARG_DATUM(0));
 	int		child_oid = DatumGetInt32(PG_GETARG_DATUM(1));
-	int nelems = 2;
-	Datum *elems;
+	int		nelems = 2;
+	int 	i;
+	bool	found = false;
+	Datum			   *elems;
 	PartRelationInfo   *prel;
 	RangeRelation	   *rangerel;
 	RangeEntry		   *ranges;
 	TypeCacheEntry	   *tce;
 	ArrayType		   *arr;
-	bool	found;
-	int 	i;
 
 	prel = (PartRelationInfo *)
 		hash_search(relations, (const void *) &parent_oid, HASH_FIND, NULL);

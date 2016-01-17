@@ -8,28 +8,6 @@ CREATE TABLE IF NOT EXISTS @extschema@.pg_pathman_rels (
     parttype   INTEGER
 );
 
-/*
- * Relations using hash strategy
- */
--- CREATE TABLE IF NOT EXISTS @extschema@.pg_pathman_hash_rels (
---     id         SERIAL PRIMARY KEY,
---     parent     VARCHAR(127),
---     hash       INTEGER,
---     child      VARCHAR(127)
--- );
-
-/*
- * Relations using range strategy
- */
--- CREATE TABLE IF NOT EXISTS @extschema@.pg_pathman_range_rels (
---     id         SERIAL PRIMARY KEY,
---     parent     VARCHAR(127),
---     min_num    DOUBLE PRECISION,
---     max_num    DOUBLE PRECISION,
---     min_dt     TIMESTAMP,
---     max_dt     TIMESTAMP,
---     child      VARCHAR(127) 
--- );
 
 CREATE OR REPLACE FUNCTION pg_pathman_on_create_partitions(relid INTEGER)
 RETURNS VOID AS 'pathman', 'on_partitions_created' LANGUAGE C STRICT;
