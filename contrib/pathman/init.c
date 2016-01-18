@@ -65,10 +65,10 @@ load_part_relations_hashtable(bool reinitialize)
 		return;
 	}
 
-	ret = SPI_exec("SELECT pg_class.relfilenode, pg_attribute.attnum, pg_pathman_rels.parttype, pg_attribute.atttypid "
-				   "FROM pg_pathman_rels "
-				   "JOIN pg_class ON pg_class.relname = pg_pathman_rels.relname "
-				   "JOIN pg_attribute ON pg_attribute.attname = pg_pathman_rels.attname "
+	ret = SPI_exec("SELECT pg_class.relfilenode, pg_attribute.attnum, pathman_config.parttype, pg_attribute.atttypid "
+				   "FROM pathman_config "
+				   "JOIN pg_class ON pg_class.relname = pathman_config.relname "
+				   "JOIN pg_attribute ON pg_attribute.attname = pathman_config.attname "
 				   "AND attrelid = pg_class.relfilenode", 0);
 	proc = SPI_processed;
 

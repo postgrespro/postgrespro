@@ -17,7 +17,7 @@ BEGIN
     relid := relfilenode FROM pg_class WHERE relname = relation;
     attnum := pg_attribute.attnum FROM pg_attribute WHERE attrelid = relid AND attname = attribute;
 
-    IF EXISTS (SELECT * FROM pg_pathman_rels WHERE relname = relation) THEN
+    IF EXISTS (SELECT * FROM pathman_config WHERE relname = relation) THEN
         RAISE EXCEPTION 'Reltion "%s" has already been partitioned', relation;
     END IF;
 
@@ -44,7 +44,7 @@ BEGIN
         -- INSERT INTO pg_pathman_hash_rels (parent, hash, child)
         -- VALUES (relation, partnum, format('%s_%s', relation, partnum));
     END LOOP;
-    INSERT INTO pg_pathman_rels (relname, attname, parttype)
+    INSERT INTO pathman_config (relname, attname, parttype)
     VALUES (relation, attribute, 1);
 
     /* Create triggers */
@@ -52,7 +52,7 @@ BEGIN
     /* TODO: вернуть */
     -- PERFORM create_hash_update_trigger(relation, attribute, partitions_count);
     /* Notify backend about changes */
-    PERFORM pg_pathman_on_create_partitions(relid);
+    PERFORM on_create_partitions(relid);
 END
 $$ LANGUAGE plpgsql;
 
@@ -124,11 +124,11 @@ DECLARE
 BEGIN
     /* Drop trigger first */
     PERFORM drop_hash_triggers(relation);
-    DELETE FROM pg_pathman_rels WHERE relname = relation;
+    DELETE FROM pathman_config WHERE relname = relation;
     -- EXECUTE format('DROP TABLE %s CASCADE', relation);
 
     /* Notify backend about changes */
-    PERFORM pg_pathman_on_remove_partitions(relation::regclass::integer);
+    PERFORM on_remove_partitions(relation::regclass::integer);
 END
 $$ LANGUAGE plpgsql;
 
@@ -141,8 +141,8 @@ $$
 BEGIN
     EXECUTE format('DROP TRIGGER IF EXISTS %s_insert_trigger ON %1$s', relation);
     EXECUTE format('DROP FUNCTION IF EXISTS %s_hash_insert_trigger_func()', relation);
-    EXECUTE format('DROP TRIGGER IF EXISTS %s_update_trigger ON %1$s', relation);
-    EXECUTE format('DROP FUNCTION IF EXISTS %s_hash_update_trigger_func()', relation);
+    -- EXECUTE format('DROP TRIGGER IF EXISTS %s_update_trigger ON %1$s', relation);
+    -- EXECUTE format('DROP FUNCTION IF EXISTS %s_hash_update_trigger_func()', relation);
 END
 $$ LANGUAGE plpgsql;
 

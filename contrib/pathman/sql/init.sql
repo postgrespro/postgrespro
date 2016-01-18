@@ -1,7 +1,7 @@
 /*
  * Relations using partitioning
  */
-CREATE TABLE IF NOT EXISTS @extschema@.pg_pathman_rels (
+CREATE TABLE IF NOT EXISTS @extschema@.pathman_config (
     id         SERIAL PRIMARY KEY,
     relname    VARCHAR(127),
     attname    VARCHAR(127),
@@ -9,13 +9,13 @@ CREATE TABLE IF NOT EXISTS @extschema@.pg_pathman_rels (
 );
 
 
-CREATE OR REPLACE FUNCTION pg_pathman_on_create_partitions(relid INTEGER)
+CREATE OR REPLACE FUNCTION on_create_partitions(relid INTEGER)
 RETURNS VOID AS 'pathman', 'on_partitions_created' LANGUAGE C STRICT;
 
-CREATE OR REPLACE FUNCTION pg_pathman_on_update_partitions(relid INTEGER)
+CREATE OR REPLACE FUNCTION on_update_partitions(relid INTEGER)
 RETURNS VOID AS 'pathman', 'on_partitions_updated' LANGUAGE C STRICT;
 
-CREATE OR REPLACE FUNCTION pg_pathman_on_remove_partitions(relid INTEGER)
+CREATE OR REPLACE FUNCTION on_remove_partitions(relid INTEGER)
 RETURNS VOID AS 'pathman', 'on_partitions_removed' LANGUAGE C STRICT;
 
 CREATE OR REPLACE FUNCTION find_range_partition(relid OID, value ANYELEMENT)
@@ -45,12 +45,12 @@ DECLARE
     rec RECORD;
 BEGIN
     FOR rec IN  (SELECT child.relname, pg_constraint.consrc
-                 FROM pg_pathman_rels
-                 JOIN pg_class AS parent ON parent.relname = pg_pathman_rels.relname
+                 FROM pathman_config
+                 JOIN pg_class AS parent ON parent.relname = pathman_config.relname
                  JOIN pg_inherits ON inhparent = parent.relfilenode
                  JOIN pg_constraint ON conrelid = inhrelid AND contype='c'
                  JOIN pg_class AS child ON child.relfilenode = inhrelid
-                 WHERE pg_pathman_rels.relname = p_parent)
+                 WHERE pathman_config.relname = p_parent)
     LOOP
         RAISE NOTICE 'Copying data to % (condition: %)', rec.relname, rec.consrc;
         EXECUTE format('WITH part_data AS (
@@ -72,7 +72,7 @@ CREATE OR REPLACE FUNCTION disable_partitioning(IN relation TEXT)
 RETURNS VOID AS
 $$
 BEGIN
-    DELETE FROM pg_pathman_rels WHERE relname = relation;
+    DELETE FROM pathman_config WHERE relname = relation;
     EXECUTE format('DROP TRIGGER %s_insert_trigger_func ON %1$s', relation);
 
     /* Notify backend about changes */
@@ -133,6 +133,6 @@ LANGUAGE plpgsql;
 -- $$ LANGUAGE plpgsql;
 
 /* sample data */
--- insert into pg_pathman_rels (oid, attnum, parttype) values (49350, 2, 1);
+-- insert into pathman_config (oid, attnum, parttype) values (49350, 2, 1);
 -- insert into pg_pathman_hash_rels (parent_oid, hash, child_oid) values (49350, 1, 49355);
 -- insert into pg_pathman_hash_rels (parent_oid, hash, child_oid) values (49350, 0, 49360);

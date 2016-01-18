@@ -17,14 +17,14 @@ BEGIN
     SELECT relfilenode INTO v_relid
     FROM pg_class WHERE relname = v_relation;
 
-    IF EXISTS (SELECT * FROM pg_pathman_rels WHERE relname = v_relation) THEN
+    IF EXISTS (SELECT * FROM pathman_config WHERE relname = v_relation) THEN
         RAISE EXCEPTION 'Reltion "%" has already been partitioned', v_relation;
     END IF;
 
     EXECUTE format('DROP SEQUENCE IF EXISTS %s_seq', v_relation);
     EXECUTE format('CREATE SEQUENCE %s_seq START 1', v_relation);
 
-    INSERT INTO pg_pathman_rels (relname, attname, parttype)
+    INSERT INTO pathman_config (relname, attname, parttype)
     VALUES (v_relation, v_attribute, 2);
 
     /* create first partition */
@@ -40,7 +40,7 @@ BEGIN
     PERFORM create_range_insert_trigger(v_relation, v_attribute);
     -- PERFORM create_hash_update_trigger(relation, attribute, partitions_count);
     /* Notify backend about changes */
-    PERFORM pg_pathman_on_create_partitions(v_relid);
+    PERFORM on_create_partitions(v_relid);
 END
 $$ LANGUAGE plpgsql;
 
@@ -60,14 +60,14 @@ BEGIN
     SELECT relfilenode INTO v_relid
     FROM pg_class WHERE relname = v_relation;
 
-    IF EXISTS (SELECT * FROM pg_pathman_rels WHERE relname = v_relation) THEN
+    IF EXISTS (SELECT * FROM pathman_config WHERE relname = v_relation) THEN
         RAISE EXCEPTION 'Reltion "%" has already been partitioned', v_relation;
     END IF;
 
     EXECUTE format('DROP SEQUENCE IF EXISTS %s_seq', v_relation);
     EXECUTE format('CREATE SEQUENCE %s_seq START 1', v_relation);
 
-    INSERT INTO pg_pathman_rels (relname, attname, parttype)
+    INSERT INTO pathman_config (relname, attname, parttype)
     VALUES (v_relation, v_attribute, 2);
 
     /* create first partition */
@@ -83,100 +83,13 @@ BEGIN
     PERFORM create_range_insert_trigger(v_relation, v_attribute);
     -- PERFORM create_hash_update_trigger(relation, attribute, partitions_count);
     /* Notify backend about changes */
-    PERFORM pg_pathman_on_create_partitions(v_relid);
+    PERFORM on_create_partitions(v_relid);
 END
 $$ LANGUAGE plpgsql;
 
-/*
- * Create additional partitions for existing RANGE partitioning
- */
--- CREATE OR REPLACE FUNCTION append_range_partitions(
---     v_relation TEXT
---     , v_interval TEXT
---     , v_premake INTEGER)
--- RETURNS VOID AS
--- $$
--- DECLARE
---     v_attribute TEXT;
---     v_type TEXT;
---     v_dt TIMESTAMP;
---     v_num DOUBLE PRECISION;
---     v_relid INTEGER;
--- BEGIN
---     /* get an attribute name config */
---     v_attribute := attname FROM pg_pathman_rels WHERE relname = v_relation;
---     RAISE NOTICE 'v_attribute = %', v_attribute;
-
---     /* get relation oid */
---     v_relid := relfilenode FROM pg_class WHERE relname = v_relation;
-
---     /* get range type: time or numeral */
---     SELECT max(max_dt), max(max_num) INTO v_dt, v_num
---     FROM pg_pathman_range_rels WHERE parent = v_relation;
---     IF NOT v_dt IS NULL THEN
---         v_type := 'time';
---     ELSIF NOT v_num IS NULL THEN
---         v_type := 'num';
---     END IF;
-
---     /* create partitions */
---     PERFORM append_range_partitions_internal(v_relation, v_interval, v_premake);
-
---     /* recreate triggers */
---     PERFORM drop_range_triggers(v_relation);
---     PERFORM create_range_insert_trigger(v_relation, v_attribute, v_type);
-
---     PERFORM pg_pathman_on_update_partitions(v_relid);
--- END
--- $$ LANGUAGE plpgsql;
 
 /*
- * Create additional partitions for existing RANGE partitioning
- * (function for internal use)
- */
--- CREATE OR REPLACE FUNCTION append_range_partitions_internal(
---     v_relation TEXT
---     , v_interval TEXT
---     , v_premake INTEGER)
--- RETURNS VOID AS
--- $$
--- DECLARE
---     v_part_timestamp TIMESTAMP;
---     v_part_num DOUBLE PRECISION;
---     v_type TEXT;
---     i INTEGER;
--- BEGIN
---     SELECT max(max_dt), max(max_num)
---     INTO v_part_timestamp, v_part_num
---     FROM pg_pathman_range_rels
---     WHERE parent = v_relation;
-
---     /* Create partitions and update pg_pathman configuration */
---     if NOT v_part_timestamp IS NULL THEN
---         FOR i IN 0..v_premake-1
---         LOOP
---             PERFORM create_single_range_partition(v_relation
---                                                   , 'time'
---                                                   , v_part_timestamp::TEXT
---                                                   , v_interval);
---             v_part_timestamp := v_part_timestamp + v_interval::INTERVAL;
---         END LOOP;
---     ELSIF NOT v_part_num IS NULL THEN
---         /* Numerical range partitioning */
---         FOR i IN 0..v_premake-1
---         LOOP
---             PERFORM create_single_range_partition(v_relation
---                                                   , 'num'
---                                                   , v_part_num::TEXT
---                                                   , v_interval);
---             v_part_num := v_part_num + v_interval::DOUBLE PRECISION;
---         END LOOP;
---     END IF;
--- END
--- $$ LANGUAGE plpgsql;
-
-/*
- * Creates range condition. Utility function.
+ * Formats range condition. Utility function.
  */
 CREATE OR REPLACE FUNCTION get_range_condition(
     p_attname TEXT
@@ -226,7 +139,7 @@ DECLARE
     -- v_type TEXT;
     v_cond TEXT;
 BEGIN
-    v_attname := attname FROM pg_pathman_rels
+    v_attname := attname FROM pathman_config
                  WHERE relname = p_parent_relname;
 
     /* get next value from sequence */
@@ -280,7 +193,7 @@ BEGIN
                       WHERE inhrelid = v_child_relid;
 
     SELECT attname, parttype INTO v_attname, v_part_type
-    FROM pg_pathman_rels
+    FROM pathman_config
     WHERE relname = v_parent_relid::regclass::text;
 
     /* Check if this is RANGE partition */
@@ -330,7 +243,7 @@ BEGIN
                    , v_cond);
 
     /* Tell backend to reload configuration */
-    PERFORM pg_pathman_on_update_partitions(v_parent_relid::INTEGER);
+    PERFORM on_update_partitions(v_parent_relid::INTEGER);
 
     RAISE NOTICE 'Done!';
 END
@@ -340,10 +253,7 @@ LANGUAGE plpgsql;
 
 /*
  * Merge RANGE partitions
- * 
- * Note: we had to have at least one argument of type 
  */
-    -- , OUT p_range1 ANYARRAY
 CREATE OR REPLACE FUNCTION merge_range_partitions(
     p_partition1 TEXT
     , p_partition2 TEXT)
@@ -370,7 +280,7 @@ BEGIN
     END IF;
 
     SELECT attname, parttype INTO v_attname, v_part_type
-    FROM pg_pathman_rels
+    FROM pathman_config
     WHERE relname = v_parent_relid1::regclass::text;
 
     /* Check if this is RANGE partition */
@@ -384,7 +294,7 @@ BEGIN
     USING v_parent_relid1, v_part1_relid , v_part2_relid;
 
     /* Tell backend to reload configuration */
-    PERFORM pg_pathman_on_update_partitions(v_parent_relid1::INTEGER);
+    PERFORM on_update_partitions(v_parent_relid1::INTEGER);
 
     RAISE NOTICE 'Done!';
 END
@@ -411,7 +321,7 @@ DECLARE
     v_attname TEXT;
     v_cond TEXT;
 BEGIN
-    SELECT attname INTO v_attname FROM pg_pathman_rels
+    SELECT attname INTO v_attname FROM pathman_config
     WHERE relname = p_parent_relid::regclass::text;
 
     /*
@@ -466,7 +376,7 @@ DECLARE
     v_attname TEXT;
     v_atttype TEXT;
 BEGIN
-    v_attname := attname FROM pg_pathman_rels WHERE relname = p_relation;
+    v_attname := attname FROM pathman_config WHERE relname = p_relation;
     v_atttype := get_attribute_type_name(p_relation, v_attname);
     EXECUTE format('SELECT append_partition_internal($1, NULL::%s)', v_atttype)
     USING p_relation;
@@ -489,7 +399,7 @@ BEGIN
                                           , p_range[2] + (p_range[2] - p_range[1]));
 
     /* Tell backend to reload configuration */
-    PERFORM pg_pathman_on_update_partitions(p_relation::regclass::integer);
+    PERFORM on_create_partitions(p_relation::regclass::integer);
     RAISE NOTICE 'Done!';
 END
 $$
@@ -506,7 +416,7 @@ DECLARE
     v_attname TEXT;
     v_atttype TEXT;
 BEGIN
-    v_attname := attname FROM pg_pathman_rels WHERE relname = p_relation;
+    v_attname := attname FROM pathman_config WHERE relname = p_relation;
     v_atttype := get_attribute_type_name(p_relation, v_attname);
     EXECUTE format('SELECT prepend_partition_internal($1, NULL::%s)', v_atttype)
     USING p_relation;
@@ -529,7 +439,7 @@ BEGIN
                                           , p_range[1]);
 
     /* Tell backend to reload configuration */
-    PERFORM pg_pathman_on_update_partitions(p_relation::regclass::integer);
+    PERFORM on_create_partitions(p_relation::regclass::integer);
     RAISE NOTICE 'Done!';
 END
 $$
@@ -599,11 +509,11 @@ BEGIN
         EXECUTE format('DROP TABLE %s', v_rec.tbl);
     END LOOP;
 
-    DELETE FROM pg_pathman_rels WHERE relname = relation;
+    DELETE FROM pathman_config WHERE relname = relation;
     -- DELETE FROM pg_pathman_range_rels WHERE parent = relation;
 
     /* Notify backend about changes */
-    PERFORM pg_pathman_on_remove_partitions(v_relid);
+    PERFORM on_remove_partitions(v_relid);
 END
 $$ LANGUAGE plpgsql;
 
