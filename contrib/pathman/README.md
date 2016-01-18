@@ -32,16 +32,16 @@ WHERE id = 150
 
 Based on partitioning type and operator the `pathman` searches corresponding partitions and builds the plan.
 
-## Функции pathman
+## Pathman Functions
 
-### Создание секций
+### Partitions Creation
 ```
 CREATE FUNCTION create_hash_partitions(
     relation TEXT,
     attribute TEXT,
     partitions_count INTEGER)
 ```
-Выполняет HASH-секционирование таблицы `relation` по целочисленному полю `attribute`. Создает `partitions_count` дочерних секций, а также триггер на вставку. Данные из родительской таблицы не копируются автоматически в дочерние. Миграцию данных можно выполнить с помощью функции `partition_data()` (см. ниже), либо вручную.
+Performs HASH partitioning for `relation` by integer key `attribute`. Creates `partitions_count` partitions and trigger on INSERT. Data doesn't automatically copied from parent table to partitions. Use `partition_data()` function (see below) to migrate data.
 
 ```
 CREATE FUNCTION create_range_partitions(
@@ -51,7 +51,7 @@ CREATE FUNCTION create_range_partitions(
     interval ANYELEMENT,
     premake INTEGER)
 ```
-Выполняет RANGE-секционирование таблицы `relation` по полю `attribute`. Аргумент `start_value` задает начальное значение, `interval` -- диапазон значений внутри одной секции, `premake` -- количество заранее создаваемых секций (если 0, то будет создана единственная секция).
+Performs RANGE partitioning for `relation` by partitioning key `attribute`. `start_value` argument specifies initial value, `interval` sets the range of values in a single partition, `premake` is the number of premade partitions (the only one partition will be created if `premake` is 0).
 ```
 CREATE FUNCTION create_range_partitions(
     relation TEXT,
@@ -60,23 +60,23 @@ CREATE FUNCTION create_range_partitions(
     interval INTERVAL,
     premake INTEGER)
 ```
-Аналогично предыдущей с тем лишь отличием, что данная функция предназначена для секционирования по полю типа `DATE` или `TIMESTAMP`.
+Same as above but suitable for `DATE` and `TIMESTAMP` partitioning keys.
 
-### Миграция данных
+### Data migration
 ```
 CREATE FUNCTION partition_data(parent text)
 ```
-Копирует данные из родительской таблицы `parent` в дочерние секции.
+Copies data from parent table to its partitions.
 
-### Управление секциями
+### Partitions management
 ```
 CREATE FUNCTION split_range_partition(partition TEXT, value ANYELEMENT)
 ```
-Разбивает RANGE секцию `partition` на две секции по значению `value`.
+Splits RANGE `partition` in two by `value`.
 ```
 CREATE FUNCTION merge_range_partitions(partition1 TEXT, partition2 TEXT)
 ```
-Объединяет две смежные RANGE секции. Данные из `partition2` копируются в `partition1`, после чего секция `partition2` удаляется.
+Merge two adjacent RANGE partitions. Данные из `partition2` копируются в `partition1`, после чего секция `partition2` удаляется.
 ```
 CREATE FUNCTION append_partition(p_relation TEXT)
 ```
