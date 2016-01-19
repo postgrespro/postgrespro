@@ -67,7 +67,7 @@ load_part_relations_hashtable(bool reinitialize)
 
 	ret = SPI_exec("SELECT pg_class.relfilenode, pg_attribute.attnum, pathman_config.parttype, pg_attribute.atttypid "
 				   "FROM pathman_config "
-				   "JOIN pg_class ON pg_class.relname = pathman_config.relname "
+				   "JOIN pg_class ON pg_class.relfilenode = pathman_config.relname::regclass::oid "
 				   "JOIN pg_attribute ON pg_attribute.attname = pathman_config.attname "
 				   "AND attrelid = pg_class.relfilenode", 0);
 	proc = SPI_processed;

@@ -7,15 +7,8 @@ CREATE OR REPLACE FUNCTION create_hash_partitions(
     , partitions_count INTEGER
 ) RETURNS VOID AS
 $$
-DECLARE
-    row       INTEGER;
-    q         TEXT;
-    relid     INTEGER;
-    attnum    INTEGER;
-    child_oid INTEGER;
 BEGIN
-    relid := relfilenode FROM pg_class WHERE relname = relation;
-    attnum := pg_attribute.attnum FROM pg_attribute WHERE attrelid = relid AND attname = attribute;
+    relation := lower(relation);
 
     IF EXISTS (SELECT * FROM pathman_config WHERE relname = relation) THEN
         RAISE EXCEPTION 'Reltion "%s" has already been partitioned', relation;
@@ -38,11 +31,6 @@ BEGIN
                        , attribute
                        , partitions_count
                        , partnum);
-
-        -- EXECUTE format('CREATE TABLE %s_%s () INHERITS (%1$s)', relation, partnum);
-        -- child_oid := relfilenode FROM pg_class WHERE relname = format('%s_%s', relation, partnum);
-        -- INSERT INTO pg_pathman_hash_rels (parent, hash, child)
-        -- VALUES (relation, partnum, format('%s_%s', relation, partnum));
     END LOOP;
     INSERT INTO pathman_config (relname, attname, parttype)
     VALUES (relation, attribute, 1);
@@ -51,6 +39,7 @@ BEGIN
     PERFORM create_hash_insert_trigger(relation, attribute, partitions_count);
     /* TODO: вернуть */
     -- PERFORM create_hash_update_trigger(relation, attribute, partitions_count);
+
     /* Notify backend about changes */
     PERFORM on_create_partitions(relid);
 END
@@ -80,7 +69,6 @@ DECLARE
         CREATE TRIGGER %s_insert_trigger
         BEFORE INSERT ON %1$s
         FOR EACH ROW EXECUTE PROCEDURE %1$s_hash_insert_trigger_func();';
-    relid INTEGER;
     fields TEXT;
     fields_format TEXT;
     insert_stmt TEXT;
@@ -89,10 +77,9 @@ BEGIN
     PERFORM drop_hash_triggers(relation);
 
     /* determine fields for INSERT */
-    relid := relfilenode FROM pg_class WHERE relname = relation;
     SELECT string_agg('NEW.' || attname, ', '), string_agg('$' || attnum, ', ')
     FROM pg_attribute
-    WHERE attrelid=relid AND attnum>0
+    WHERE attrelid=relation::regclass::oid AND attnum>0
     INTO fields, fields_format;
 
     /* generate INSERT statement for trigger */
@@ -100,12 +87,11 @@ BEGIN
                          , relation
                          , fields_format
                          , fields);
-    -- insert_stmt = format('EXECUTE format(''INSERT INTO %s_%%s VALUES (NEW.*)'', hash);', relation);
 
     /* format and create new trigger for relation */
     func := format(func, relation, attr, partitions_count, insert_stmt);
 
-    trigger := format(trigger, relation);
+    trigger := format(trigger, relation::regclass::text);
     EXECUTE func;
     EXECUTE trigger;
 END
@@ -139,8 +125,8 @@ CREATE OR REPLACE FUNCTION drop_hash_triggers(IN relation TEXT)
 RETURNS VOID AS
 $$
 BEGIN
-    EXECUTE format('DROP TRIGGER IF EXISTS %s_insert_trigger ON %1$s', relation);
-    EXECUTE format('DROP FUNCTION IF EXISTS %s_hash_insert_trigger_func()', relation);
+    EXECUTE format('DROP TRIGGER IF EXISTS %s_insert_trigger ON %1$s', relation::regclass::text);
+    EXECUTE format('DROP FUNCTION IF EXISTS %s_hash_insert_trigger_func()', relation::regclass::text);
     -- EXECUTE format('DROP TRIGGER IF EXISTS %s_update_trigger ON %1$s', relation);
     -- EXECUTE format('DROP FUNCTION IF EXISTS %s_hash_update_trigger_func()', relation);
 END
