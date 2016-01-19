@@ -1,0 +1,59 @@
+<!-- doc/src/sgml/hunspell-ru-ru.sgml -->
+
+<sect1 id="hunspell-ru-ru" xreflabel="hunspell_ru_ru">
+ <title>hunspell_ru_ru</title>
+
+ <indexterm zone="hunspell-ru-ru">
+  <primary>hunspell_ru_ru</primary>
+ </indexterm>
+
+ <para>
+  <filename>hunspell_ru_ru</filename> provides Russian <application>Hunspell</>
+  dictionary.  During installation the module, following actions are performed:
+ </para>
+
+ <itemizedlist>
+  <listitem>
+   <para>
+    Dictionary and affixes files are copied to the
+    <filename>$SHAREDIR/tsearch_data</filename> directory.
+   </para>
+  </listitem>
+  <listitem>
+   <para>
+    <literal>public.russian_hunspell</literal> dictionary is created:
+
+<programlisting>
+CREATE TEXT SEARCH DICTIONARY public.russian_hunspell (
+    TEMPLATE = ispell,
+    DictFile = ru_ru,
+    AffFile = ru_ru,
+    StopWords = russian
+);
+</programlisting>
+
+   </para>
+  </listitem>
+  <listitem>
+   <para>
+    <literal>public.russian</literal> text search configuration is created:
+
+<programlisting>
+CREATE TEXT SEARCH CONFIGURATION public.russian (
+    COPY = pg_catalog.simple
+);
+
+ALTER TEXT SEARCH CONFIGURATION public.russian
+    ALTER MAPPING FOR asciiword, asciihword, hword_asciipart
+    WITH public.russian_hunspell, pg_catalog.english_stem;
+
+ALTER TEXT SEARCH CONFIGURATION public.russian
+    ALTER MAPPING FOR word, hword, hword_part
+    WITH public.russian_hunspell, pg_catalog.russian_stem;
+</programlisting>
+
+   </para>
+  </listitem>
+ </itemizedlist>
+
+</sect1>

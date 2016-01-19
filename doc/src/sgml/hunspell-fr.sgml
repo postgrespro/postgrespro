@@ -1,0 +1,56 @@
+<!-- doc/src/sgml/hunspell-fr.sgml -->
+
+<sect1 id="hunspell-fr" xreflabel="hunspell_fr">
+ <title>hunspell_fr</title>
+
+ <indexterm zone="hunspell-fr">
+  <primary>hunspell_fr</primary>
+ </indexterm>
+
+ <para>
+  <filename>hunspell_fr</filename> provides French <application>Hunspell</>
+  dictionary.  During installation the module, following actions are performed:
+ </para>
+
+ <itemizedlist>
+  <listitem>
+   <para>
+    Dictionary and affixes files are copied to the
+    <filename>$SHAREDIR/tsearch_data</filename> directory.
+   </para>
+  </listitem>
+  <listitem>
+   <para>
+    <literal>public.french_hunspell</literal> dictionary is created:
+
+<programlisting>
+CREATE TEXT SEARCH DICTIONARY public.french_hunspell (
+    TEMPLATE = ispell,
+    DictFile = fr,
+    AffFile = fr,
+    StopWords = french
+);
+</programlisting>
+
+   </para>
+  </listitem>
+  <listitem>
+   <para>
+    <literal>public.french</literal> text search configuration is created:
+
+<programlisting>
+CREATE TEXT SEARCH CONFIGURATION public.french (
+    COPY = pg_catalog.simple
+);
+
+ALTER TEXT SEARCH CONFIGURATION public.french
+    ALTER MAPPING FOR asciiword, asciihword, hword_asciipart,
+        word, hword, hword_part
+    WITH public.french_hunspell, pg_catalog.french_stem;
+</programlisting>
+
+   </para>
+  </listitem>
+ </itemizedlist>
+
+</sect1>
