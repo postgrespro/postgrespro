@@ -110,7 +110,8 @@
        Returns the current similarity threshold used by the <literal>%</>
        operator.  This sets the minimum similarity between
        two words for them to be considered similar enough to
-       be misspellings of each other, for example.
+       be misspellings of each other, for example
+       (<emphasis>deprecated</emphasis>).
       </entry>
      </row>
      <row>
@@ -119,25 +120,7 @@
       <entry>
        Sets the current similarity threshold that is used by the <literal>%</>
        operator.  The threshold must be between 0 and 1 (default is 0.3).
-       Returns the same value passed in.
-      </entry>
-     </row>
-     <row>
-      <entry><function>show_substring_limit()</function><indexterm><primary>show_substring_limit</primary></indexterm></entry>
-      <entry><type>real</type></entry>
-      <entry>
-       Returns the current similarity threshold used by the <literal>&lt;%</>
-       operator.  This sets the minimum substring similarity between
-       two phrases.
-      </entry>
-     </row>
-     <row>
-      <entry><function>set_substring_limit(real)</function><indexterm><primary>set_substring_limit</primary></indexterm></entry>
-      <entry><type>real</type></entry>
-      <entry>
-       Sets the current substring similarity threshold that is used by
-       the <literal>&lt;%</> operator.  The threshold must be between
-       0 and 1 (default is 0.6).  Returns the same value passed in.
+       Returns the same value passed in (<emphasis>deprecated</emphasis>).
       </entry>
      </row>
     </tbody>
@@ -162,7 +145,7 @@
       <entry>
        Returns <literal>true</> if its arguments have a similarity that is
        greater than the current similarity threshold set by
-       <function>set_limit</>.
+       <varname>pg_trgm.limit</>.
       </entry>
      </row>
      <row>
@@ -171,7 +154,7 @@
       <entry>
        Returns <literal>true</> if its arguments have a substring similarity
        that is greater than the current substring similarity threshold set by
-       <function>set_substring_limit</>.
+       <varname>pg_trgm.substring_limit</> parameter.
       </entry>
      </row>
      <row>
@@ -185,6 +168,43 @@
     </tbody>
    </tgroup>
   </table>
+ </sect2>
+
+ <sect2>
+  <title>GUC Parameters</title>
+
+  <variablelist>
+   <varlistentry id="guc-pgtrgm-limit" xreflabel="pg_trgm.limit">
+    <term>
+     <varname>pg_trgm.limit</> (<type>real</type>)
+     <indexterm>
+      <primary><varname>pg_trgm.limit</> configuration parameter</primary>
+     </indexterm>
+    </term>
+    <listitem>
+     <para>
+      Sets the current similarity threshold that is used by the <literal>%</>
+      operator.  The threshold must be between 0 and 1 (default is 0.3).
+     </para>
+    </listitem>
+   </varlistentry>
+
+   <varlistentry id="guc-pgtrgm-substring-limit" xreflabel="pg_trgm.substring_limit">
+    <term>
+     <varname>pg_trgm.substring_limit</> (<type>real</type>)
+     <indexterm>
+      <primary><varname>pg_trgm.substring_limit</> configuration parameter</primary>
+     </indexterm>
+    </term>
+    <listitem>
+     <para>
+      Sets the current substring similarity threshold that is used by
+      the <literal>&lt;%</> operator.  The threshold must be between
+      0 and 1 (default is 0.6).
+     </para>
+    </listitem>
+   </varlistentry>
+  </variablelist>
  </sect2>
 
  <sect2>
@@ -257,7 +277,7 @@ SELECT t, substring_similarity('<replaceable>word</>', t) AS sml
   </para>
 
   <para>
-   Beginning in <productname>&productname;</> 9.1, these index types also support
+   Beginning in <productname>PostgreSQL</> 9.1, these index types also support
    index searches for <literal>LIKE</> and <literal>ILIKE</>, for example
 <programlisting>
 SELECT * FROM test_trgm WHERE t LIKE '%foo%bar';
@@ -269,7 +289,7 @@ SELECT * FROM test_trgm WHERE t LIKE '%foo%bar';
   </para>
 
   <para>
-   Beginning in <productname>&productname;</> 9.3, these index types also support
+   Beginning in <productname>PostgreSQL</> 9.3, these index types also support
    index searches for regular-expression matches
    (<literal>~</> and <literal>~*</> operators), for example
 <programlisting>
