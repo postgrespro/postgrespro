@@ -301,4 +301,5 @@ test=# SELECT anyarray_elemtype(array_in('{1,2,3}', 'int'::regtype, -1));
                 </listitem>
             </varlistentry>
         </variablelist>
+    </sect2>
 </sect1>
