@@ -1,0 +1,1 @@
+CREATE EXTENSION hunspell_nl_nl;

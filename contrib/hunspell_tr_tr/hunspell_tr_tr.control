@@ -1,0 +1,5 @@
+# hunspell_tr_tr extension
+comment = 'Turkish Hunspell Dictionary'
+default_version = '1.0'
+module_pathname = '$libdir/hunspell_tr_tr'
+relocatable = true
