@@ -21,6 +21,7 @@
 #include "storage/ipc.h"
 #include "catalog/pg_operator.h"
 #include "catalog/pg_type.h"
+#include "foreign/fdwapi.h"
 
 PG_MODULE_MAGIC;
 
@@ -118,6 +119,7 @@ _PG_fini(void)
 	shmem_startup_hook = shmem_startup_hook_original;
 }
 
+/* TODO: rename and write a descritption */
 PlannedStmt *
 my_planner_hook(Query *parse, int cursorOptions, ParamListInfo boundParams)
 {
@@ -129,6 +131,9 @@ my_planner_hook(Query *parse, int cursorOptions, ParamListInfo boundParams)
 	inheritance_disabled = false;
 	disable_inheritance(parse);
 	result = standard_planner(parse, cursorOptions, boundParams);
+
+	/* TODO: invoke original hook */
+
 	return result;
 }
 
@@ -318,10 +323,17 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti,
 	AppendRelInfo *appinfo;
 	Node *node;
 	ListCell *lc, *lc2;
+	Relation	newrelation;
 
-	/* Create RangeTblEntry for child relation */
+	newrelation = heap_open(childOid, NoLock);
+
+	/*
+	 * Create RangeTblEntry for child relation.
+	 * This code partially based on expand_inherited_rtentry() function.
+	 */
 	childrte = copyObject(rte);
 	childrte->relid = childOid;
+	childrte->relkind = newrelation->rd_rel->relkind;
 	childrte->inh = false;
 	childrte->requiredPerms = 0;
 	root->parse->rtable = lappend(root->parse->rtable, childrte);
@@ -329,7 +341,8 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti,
 	root->simple_rte_array[childRTindex] = childrte;
 
 	/* Create RelOptInfo */
-	childrel = build_simple_rel(root, childRTindex, RELOPT_BASEREL);
+	childrel = build_simple_rel(root, childRTindex, RELOPT_OTHER_MEMBER_REL);
+	// childrel = build_simple_rel(root, childRTindex, RELOPT_BASEREL);
 
 	/* copy targetlist */
 	childrel->reltargetlist = NIL;
@@ -380,8 +393,10 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti,
 	root->append_rel_list = lappend(root->append_rel_list, appinfo);
 	root->total_table_pages += (double) childrel->pages;
 
-	ereport(LOG,
-			(errmsg("Relation %u appended", childOid)));
+	heap_close(newrelation, NoLock);
+
+	// ereport(LOG,
+	// 		(errmsg("Relation %u appended", childOid)));
 }
 
 /* Convert wrapper into expression for given index */
@@ -392,7 +407,7 @@ wrapper_make_expression(WrapperNode *wrap, int index, bool *alwaysTrue)
 
 	*alwaysTrue = false;
 	/*
-	 * TODO: use faster algorithm using knowledge than we enumerate indexes
+	 * TODO: use faster algorithm using knowledge that we enumerate indexes
 	 * sequntially.
 	 */
 	found = irange_list_find(wrap->rangeset, index, &lossy);
@@ -989,6 +1004,34 @@ set_plain_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
 }
 
 /*
+ * set_foreign_size
+ *		Set size estimates for a foreign table RTE
+ */
+static void
+set_foreign_size(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
+{
+	/* Mark rel with estimated output rows, width, etc */
+	set_foreign_size_estimates(root, rel);
+
+	/* Let FDW adjust the size estimates, if it can */
+	rel->fdwroutine->GetForeignRelSize(root, rel, rte->relid);
+
+	/* ... but do not let it set the rows estimate to zero */
+	rel->rows = clamp_row_est(rel->rows);
+}
+
+/*
+ * set_foreign_pathlist
+ *		Build access paths for a foreign table RTE
+ */
+static void
+set_foreign_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
+{
+	/* Call the FDW's GetForeignPaths function to generate path(s) */
+	rel->fdwroutine->GetForeignPaths(root, rel, rte->relid);
+}
+
+/*
  * set_append_rel_pathlist
  *	  Build access paths for an "append relation"
  */
@@ -1027,8 +1070,15 @@ set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
 		/*
 		 * Compute the child's access paths.
 		 */
-		// set_rel_pathlist(root, childrel, childRTindex, childRTE);
-		set_plain_rel_pathlist(root, childrel, childRTE);
+		if (childRTE->relkind == RELKIND_FOREIGN_TABLE)
+		{
+			set_foreign_size(root, childrel, childRTE);
+			set_foreign_pathlist(root, childrel, childRTE);
+		}
+		else
+		{
+			set_plain_rel_pathlist(root, childrel, childRTE);
+		}
 		set_cheapest(childrel);
 
 		/*
