@@ -30,6 +30,18 @@ CHECK ( id >= 200 AND id < 300 )
 WHERE id = 150
 ```
 
+## Installation
+
+Для установки pathman выполните в директории раширения команду:
+```
+make install
+```
+Затем модифицируйте параметр shared_preload_libraries в конфигурационном файле postgres.conf:
+```
+shared_preload_libraries = 'pathman'
+```
+Для вступления изменений в силу потребуется перезагрузка сервера PostgreSQL.
+
 ## Функции pathman
 
 ### Создание секций

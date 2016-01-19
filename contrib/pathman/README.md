@@ -32,6 +32,18 @@ WHERE id = 150
 
 Based on partitioning type and operator the `pathman` searches corresponding partitions and builds the plan.
 
+## Installation
+
+To install pathman run:
+```
+make install
+```
+from its directory. Then modify shared_preload_libraries parameter in postgres.conf as following:
+```
+shared_preload_libraries = 'pathman'
+```
+It will require to restart the PostgreSQL instance.
+
 ## Pathman Functions
 
 ### Partitions Creation
@@ -76,64 +88,67 @@ Splits RANGE `partition` in two by `value`.
 ```
 CREATE FUNCTION merge_range_partitions(partition1 TEXT, partition2 TEXT)
 ```
-Merge two adjacent RANGE partitions. Данные из `partition2` копируются в `partition1`, после чего секция `partition2` удаляется.
+Merge two adjacent RANGE partitions. Data from `partition2` is copied to `partition1`. Then the `partition2` is removed.
 ```
 CREATE FUNCTION append_partition(p_relation TEXT)
 ```
-Добавляет новую секцию в конец списка секций. Диапазон значений устанавливается равным последней секции.
+Appends new partition with the range equal to the range of the previous partition.
 ```
 CREATE FUNCTION prepend_partition(p_relation TEXT)
 ```
-Добавляет новую секцию в начало списка секций.
+Prepends new partition with the range equal to the range of the first partition.
 ```
 CREATE FUNCTION disable_partitioning(relation TEXT)
 ```
-Отключает механизм секционирования `pathman` для заданной таблицы и удаляет триггер на вставку. При этом созданные ранее секции остаются без изменений.
+Disables `pathman` partitioning mechanism for the specified parent table and removes an insert trigger. Partitions itself remain unchanged.
 
-## Примеры использования
+## Examples
 ### HASH
-Рассмотрим пример секционирования таблицы, используя HASH-стратегию на примере таблицы.
+Consider an example of HASH partitioning. First create a table with some integer column:
 ```
 CREATE TABLE hash_rel (
     id      SERIAL PRIMARY KEY,
     value   INTEGER);
 INSERT INTO hash_rel (value) SELECT g FROM generate_series(1, 10000) as g;
 ```
-Разобьем таблицу `hash_rel` на 100 секций по полю `value`:
+Then run create_hash_partitions() function with appropriate arguments:
 ```
 SELECT create_hash_partitions('hash_rel', 'value', 100);
 ```
-Перенсем данные из родительской таблицы в дочерние секции.
+This will create new partitions but data will still be in the parent table. To move data to the corresponding partitions use partition_data() function:
 ```
 SELECT partition_data('hash_rel');
 ```
 ### RANGE
-Пример секционирования таблицы с использованием стратегии RANGE.
+Consider an example of RANGE partitioning. Create a table with numerical or date or timestamp column:
 ```
 CREATE TABLE range_rel (
     id SERIAL PRIMARY KEY,
     dt TIMESTAMP);
 INSERT INTO range_rel (dt) SELECT g FROM generate_series('2010-01-01'::date, '2015-12-31'::date, '1 day') as g;
 ```
-Разобьем таблицу на 60 секций так, чтобы каждая секция содержала данные за один месяц:
+Run create_range_partitions() function to create partitions so that each partition would contain data for one month:
 ```
 SELECT create_range_partitions('range_rel', 'dt', '2010-01-01'::date, '1 month'::interval, 59);
 ```
-> Значение `premake` равно 59, а не 60, т.к. 1 секция создается независимо от значения `premake`
-
-Перенсем данные из родительской таблицы в дочерние секции.
+It will create 60 partitions (one partition is created regardless of `premake` parameter). Now move data from the parent to partitions.
 ```
 SELECT partition_data('range_rel');
 ```
-Объединим секции первые две секции:
+To merge to adjacent partitions run merge_range_partitions() function:
 ```
 SELECT merge_range_partitions('range_rel_1', 'range_rel_2');
 ```
-Разделим первую секцию на две по дате '2010-02-15':
+To split partition use split_range_partition() function:
 ```
 SELECT split_range_partition('range_rel_1', '2010-02-15'::date);
 ```
-Добавим новую секцию в конец списка секций:
+Now let's create new partition. You can use append_partition() or prepend_partition() functions:
 ```
-SELECT append_partition('range_rel')
+SELECT append_partition('range_rel');
+SELECT append_partition('range_rel');
 ```
+
+## Author
+Ildar Musin <i.musin@postgrespro.ru> Postgres Professional Ltd., Russia
+This module is sponsored by Postgres Professional Ltd., Russia
