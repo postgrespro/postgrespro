@@ -1,0 +1,56 @@
+<!-- doc/src/sgml/hunspell-nl-nl.sgml -->
+
+<sect1 id="hunspell-nl-nl" xreflabel="hunspell_nl_nl">
+ <title>hunspell_nl_nl</title>
+
+ <indexterm zone="hunspell-nl-nl">
+  <primary>hunspell_nl_nl</primary>
+ </indexterm>
+
+ <para>
+  <filename>hunspell_nl_nl</filename> provides Dutch <application>Hunspell</>
+  dictionary.  During installation the module, following actions are performed:
+ </para>
+
+ <itemizedlist>
+  <listitem>
+   <para>
+    Dictionary and affixes files are copied to the
+    <filename>$SHAREDIR/tsearch_data</filename> directory.
+   </para>
+  </listitem>
+  <listitem>
+   <para>
+    <literal>public.dutch_hunspell</literal> dictionary is created:
+
+<programlisting>
+CREATE TEXT SEARCH DICTIONARY public.dutch_hunspell (
+    TEMPLATE = ispell,
+    DictFile = nl_nl,
+    AffFile = nl_nl,
+    StopWords = dutch
+);
+</programlisting>
+
+   </para>
+  </listitem>
+  <listitem>
+   <para>
+    <literal>public.dutch</literal> text search configuration is created:
+
+<programlisting>
+CREATE TEXT SEARCH CONFIGURATION public.dutch (
+    COPY = pg_catalog.simple
+);
+
+ALTER TEXT SEARCH CONFIGURATION public.dutch
+    ALTER MAPPING FOR asciiword, asciihword, hword_asciipart,
+        word, hword, hword_part
+    WITH public.dutch_hunspell, pg_catalog.dutch_stem;
+</programlisting>
+
+   </para>
+  </listitem>
+ </itemizedlist>
+
+</sect1>
