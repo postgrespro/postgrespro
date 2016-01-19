@@ -16,6 +16,7 @@ SUBDIRS = \
 		dblink		\
 		dict_int	\
 		dict_xsyn	\
+		dump_stat   \
 		earthdistance	\
 		file_fdw	\
 		fuzzystrmatch	\
