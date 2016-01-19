@@ -1,6 +1,6 @@
 <!--
 doc/src/sgml/ref/create_extension.sgml
-PostgreSQL documentation
+&productname; documentation
 -->
 
 <refentry id="SQL-CREATEEXTENSION">
@@ -77,7 +77,7 @@ CREATE EXTENSION [ IF NOT EXISTS ] <replaceable class="parameter">extension_name
       <listitem>
        <para>
         The name of the extension to be
-        installed. <productname>PostgreSQL</productname> will create the
+        installed. <productname>&productname;</productname> will create the
         extension using details from the file
         <literal>SHAREDIR/extension/</literal><replaceable class="parameter">extension_name</replaceable><literal>.control</literal>.
        </para>
@@ -133,7 +133,7 @@ CREATE EXTENSION [ IF NOT EXISTS ] <replaceable class="parameter">extension_name
         extension's author, and might vary if there is more than one version
         of the old-style module that can be upgraded into an extension.
         For the standard additional modules supplied with pre-9.1
-        <productname>PostgreSQL</productname>, use <literal>unpackaged</>
+        <productname>&productname;</productname>, use <literal>unpackaged</>
         for <replaceable class="parameter">old_version</replaceable> when
         updating a module to extension style.
        </para>
@@ -149,7 +149,7 @@ CREATE EXTENSION [ IF NOT EXISTS ] <replaceable class="parameter">extension_name
    Before you can use <command>CREATE EXTENSION</> to load an extension
    into a database, the extension's supporting files must be installed.
    Information about installing the extensions supplied with
-   <productname>PostgreSQL</productname> can be found in
+   <productname>&productname;</productname> can be found in
    <link linkend="contrib">Additional Supplied Modules</link>.
   </para>
 
@@ -193,7 +193,7 @@ CREATE EXTENSION hstore SCHEMA public FROM unpackaged;
   <title>Compatibility</title>
 
   <para>
-   <command>CREATE EXTENSION</command> is a <productname>PostgreSQL</>
+   <command>CREATE EXTENSION</command> is a <productname>&productname;</>
    extension.
   </para>
  </refsect1>

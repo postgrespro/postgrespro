@@ -1,6 +1,6 @@
 <!--
 doc/src/sgml/ref/create_opclass.sgml
-PostgreSQL documentation
+&productname; documentation
 -->
 
 <refentry id="SQL-CREATEOPCLASS">
@@ -264,7 +264,7 @@ CREATE OPERATOR CLASS <replaceable class="parameter">name</replaceable> [ DEFAUL
   </para>
 
   <para>
-   Before <productname>PostgreSQL</productname> 8.4, the <literal>OPERATOR</>
+   Before <productname>&productname;</productname> 8.4, the <literal>OPERATOR</>
    clause could include a <literal>RECHECK</> option.  This is no longer
    supported because whether an index operator is <quote>lossy</> is now
    determined on-the-fly at run time.  This allows efficient handling of
@@ -304,7 +304,7 @@ CREATE OPERATOR CLASS gist__int_ops
 
   <para>
    <command>CREATE OPERATOR CLASS</command> is a
-   <productname>PostgreSQL</productname> extension.  There is no
+   <productname>&productname;</productname> extension.  There is no
    <command>CREATE OPERATOR CLASS</command> statement in the SQL
    standard.
   </para>

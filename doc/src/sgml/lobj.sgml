@@ -7,7 +7,7 @@
   <indexterm><primary>BLOB</><see>large object</></>
 
    <para>
-    <productname>PostgreSQL</productname> has a <firstterm>large object</>
+    <productname>&productname;</productname> has a <firstterm>large object</>
     facility, which provides stream-style access to user data that is stored
     in a special large-object structure.  Streaming access is useful
     when working with data values that are too large to manipulate
@@ -16,10 +16,10 @@
 
    <para>
     This chapter describes the implementation and the programming and
-    query language interfaces to <productname>PostgreSQL</productname>
+    query language interfaces to <productname>&productname;</productname>
     large object data.  We use the <application>libpq</application> C
     library for the examples in this chapter, but most programming
-    interfaces native to <productname>PostgreSQL</productname> support
+    interfaces native to <productname>&productname;</productname> support
     equivalent functionality.  Other interfaces might use the large
     object interface internally to provide generic support for large
     values.  This is not described here.
@@ -43,7 +43,7 @@
    </para>
 
    <para>
-    <productname>PostgreSQL</productname> also supports a storage system called
+    <productname>&productname;</productname> also supports a storage system called
     <link
     linkend="storage-toast"><quote><acronym>TOAST</acronym></quote></link>,
     which automatically stores values
@@ -81,7 +81,7 @@
    </para>
 
    <para>
-    As of <productname>PostgreSQL</> 9.0, large objects have an owner
+    As of <productname>&productname;</> 9.0, large objects have an owner
     and a set of access permissions, which can be managed using
     <xref linkend="sql-grant"> and
     <xref linkend="sql-revoke">.
@@ -101,9 +101,9 @@
 
    <para>
     This section describes the facilities that
-    <productname>PostgreSQL</productname>'s <application>libpq</>
+    <productname>&productname;</productname>'s <application>libpq</>
     client interface library provides for accessing large objects.
-    The <productname>PostgreSQL</productname> large object interface is
+    The <productname>&productname;</productname> large object interface is
     modeled after the <acronym>Unix</acronym> file-system interface, with
     analogues of <function>open</function>,  <function>read</function>,
     <function>write</function>,
@@ -144,7 +144,7 @@ Oid lo_creat(PGconn *conn, int mode);
      or <symbol>InvalidOid</symbol> (zero) on failure.
 
      <replaceable class="parameter">mode</replaceable> is unused and
-     ignored as of <productname>PostgreSQL</productname> 8.1; however, for
+     ignored as of <productname>&productname;</productname> 8.1; however, for
      backward compatibility with earlier releases it is best to
      set it to <symbol>INV_READ</symbol>, <symbol>INV_WRITE</symbol>,
      or <symbol>INV_READ</symbol> <literal>|</> <symbol>INV_WRITE</symbol>.
@@ -176,7 +176,7 @@ Oid lo_create(PGconn *conn, Oid lobjId);
     </para>
 
     <para>
-     <function>lo_create</> is new as of <productname>PostgreSQL</productname>
+     <function>lo_create</> is new as of <productname>&productname;</productname>
      8.1; if this function is run against an older server version, it will
      fail and return <symbol>InvalidOid</symbol>.
     </para>
@@ -225,7 +225,7 @@ Oid lo_import_with_oid(PGconn *conn, const char *filename, Oid lobjId);
     </para>
 
     <para>
-     <function>lo_import_with_oid</> is new as of <productname>PostgreSQL</productname>
+     <function>lo_import_with_oid</> is new as of <productname>&productname;</productname>
      8.4 and uses <function>lo_create</function> internally which is new in 8.1; if this function is run against 8.0 or before, it will
      fail and return <symbol>InvalidOid</symbol>.
     </para>
@@ -389,7 +389,7 @@ pg_int64 lo_lseek64(PGconn *conn, int fd, pg_int64 offset, int whence);
 </para>
 
 <para>
-     <function>lo_lseek64</> is new as of <productname>PostgreSQL</productname>
+     <function>lo_lseek64</> is new as of <productname>&productname;</productname>
      9.3.  If this function is run against an older server version, it will
      fail and return -1.
 </para>
@@ -424,7 +424,7 @@ pg_int64 lo_tell64(PGconn *conn, int fd);
 </para>
 
 <para>
-     <function>lo_tell64</> is new as of <productname>PostgreSQL</productname>
+     <function>lo_tell64</> is new as of <productname>&productname;</productname>
      9.3.  If this function is run against an older server version, it will
      fail and return -1.
 </para>
@@ -473,13 +473,13 @@ int lo_truncate64(PGcon *conn, int fd, pg_int64 len);
 </para>
 
 <para>
-     <function>lo_truncate</> is new as of <productname>PostgreSQL</productname>
+     <function>lo_truncate</> is new as of <productname>&productname;</productname>
      8.3; if this function is run against an older server version, it will
      fail and return -1.
 </para>
 
 <para>
-     <function>lo_truncate64</> is new as of <productname>PostgreSQL</productname>
+     <function>lo_truncate64</> is new as of <productname>&productname;</productname>
      9.3; if this function is run against an older server version, it will
      fail and return -1.
 </para>
@@ -670,7 +670,7 @@ SELECT lo_export(image.raster, '/tmp/motd') FROM image
  * testlo.c
  *    test using large objects with libpq
  *
- * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2015, &productname; Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *

@@ -1,6 +1,6 @@
 <!-- doc/src/sgml/catalogs.sgml -->
 <!--
- Documentation of the system catalogs, directed toward PostgreSQL developers
+ Documentation of the system catalogs, directed toward &productname; developers
  -->
 
 <chapter id="catalogs">
@@ -10,7 +10,7 @@
    The system catalogs are the place where a relational database
    management system stores schema metadata, such as information about
    tables and columns, and internal bookkeeping information.
-   <productname>PostgreSQL</productname>'s system catalogs are regular
+   <productname>&productname;</productname>'s system catalogs are regular
    tables.  You can drop and recreate the tables, add columns, insert
    and update values, and severely mess up your system that way.
    Normally, one should not change the system catalogs by hand, there
@@ -1477,7 +1477,7 @@
        followed by a 32-character hexadecimal MD5 hash.  The MD5 hash
        will be of the user's password concatenated to their user name.
        For example, if user <literal>joe</> has password <literal>xyzzy</>,
-       <productname>PostgreSQL</> will store the md5 hash of
+       <productname>&productname;</> will store the md5 hash of
        <literal>xyzzyjoe</>.  A password that does not follow that
        format is assumed to be unencrypted.
       </entry>
@@ -2151,7 +2151,7 @@
    Note that the unique key on this catalog is (<structfield>collname</>,
    <structfield>collencoding</>, <structfield>collnamespace</>) not just
    (<structfield>collname</>, <structfield>collnamespace</>).
-   <productname>PostgreSQL</productname> generally ignores all
+   <productname>&productname;</productname> generally ignores all
    collations that do not have <structfield>collencoding</> equal to
    either the current database's encoding or -1, and creation of new entries
    with the same name as an entry with <structfield>collencoding</> = -1
@@ -4093,7 +4093,7 @@
   </para>
 
   <para>
-   Prior to <productname>PostgreSQL</> 9.0, there was no permission structure
+   Prior to <productname>&productname;</> 9.0, there was no permission structure
    associated with large objects.  As a result,
    <structname>pg_largeobject</structname> was publicly readable and could be
    used to obtain the OIDs (and contents) of all large objects in the system.
@@ -4728,7 +4728,7 @@
   <note>
    <para>
     It is likely that <structname>pg_pltemplate</> will be removed in some
-    future release of <productname>PostgreSQL</productname>, in favor of
+    future release of <productname>&productname;</productname>, in favor of
     keeping this knowledge about procedural languages in their respective
     extension installation scripts.
    </para>
@@ -5681,7 +5681,7 @@
    The catalog <structname>pg_shdepend</structname> records the
    dependency relationships between database objects and shared objects,
    such as roles.  This information allows
-   <productname>PostgreSQL</productname> to ensure that those objects are
+   <productname>&productname;</productname> to ensure that those objects are
    unreferenced before attempting to delete them.
   </para>
 
@@ -6500,7 +6500,7 @@
   </para>
 
   <para>
-   <productname>PostgreSQL</productname>'s text search features are
+   <productname>&productname;</productname>'s text search features are
    described at length in <xref linkend="textsearch">.
   </para>
 
@@ -6575,7 +6575,7 @@
   </para>
 
   <para>
-   <productname>PostgreSQL</productname>'s text search features are
+   <productname>&productname;</productname>'s text search features are
    described at length in <xref linkend="textsearch">.
   </para>
 
@@ -6646,7 +6646,7 @@
   </para>
 
   <para>
-   <productname>PostgreSQL</productname>'s text search features are
+   <productname>&productname;</productname>'s text search features are
    described at length in <xref linkend="textsearch">.
   </para>
 
@@ -6729,7 +6729,7 @@
   </para>
 
   <para>
-   <productname>PostgreSQL</productname>'s text search features are
+   <productname>&productname;</productname>'s text search features are
    described at length in <xref linkend="textsearch">.
   </para>
 
@@ -6826,7 +6826,7 @@
   </para>
 
   <para>
-   <productname>PostgreSQL</productname>'s text search features are
+   <productname>&productname;</productname>'s text search features are
    described at length in <xref linkend="textsearch">.
   </para>
 
@@ -7146,7 +7146,7 @@
        <structfield>typalign</structfield> is the alignment required
        when storing a value of this type.  It applies to storage on
        disk as well as most representations of the value inside
-       <productname>PostgreSQL</>.
+       <productname>&productname;</>.
        When multiple values are stored consecutively, such
        as in the representation of a complete row on disk, padding is
        inserted before a datum of this type so that it begins on the
@@ -7471,7 +7471,7 @@
   <title>System Views</title>
 
   <para>
-   In addition to the system catalogs, <productname>PostgreSQL</productname>
+   In addition to the system catalogs, <productname>&productname;</productname>
    provides a number of built-in views.  Some system views provide convenient
    access to some commonly used queries on the system catalogs.  Other views
    provide access to internal server state.
@@ -7481,7 +7481,7 @@
    The information schema (<xref linkend="information-schema">) provides
    an alternative set of views which overlap the functionality of the system
    views.  Since the information schema is SQL-standard whereas the views
-   described here are <productname>PostgreSQL</productname>-specific,
+   described here are <productname>&productname;</productname>-specific,
    it's usually better to use the information schema if it provides all
    the information you need.
   </para>
@@ -7823,7 +7823,7 @@
    <note>
     <para>
      Cursors are used internally to implement some of the components
-     of <productname>PostgreSQL</>, such as procedural languages.
+     of <productname>&productname;</>, such as procedural languages.
      Therefore, the <structname>pg_cursors</> view might include cursors
      that have not been explicitly created by the user.
     </para>
@@ -8017,7 +8017,7 @@
   <para>
    The view <structname>pg_group</structname> exists for backwards
    compatibility: it emulates a catalog that existed in
-   <productname>PostgreSQL</productname> before version 8.1.
+   <productname>&productname;</productname> before version 8.1.
    It shows the names and members of all roles that are marked as not
    <structfield>rolcanlogin</>, which is an approximation to the set
    of roles that are being used as groups.
@@ -9324,7 +9324,7 @@ SELECT * FROM pg_locks pl LEFT JOIN pg_prepared_xacts ppx
   <para>
    The view <structname>pg_shadow</structname> exists for backwards
    compatibility: it emulates a catalog that existed in
-   <productname>PostgreSQL</productname> before version 8.1.
+   <productname>&productname;</productname> before version 8.1.
    It shows properties of all roles that are marked as
    <structfield>rolcanlogin</> in
    <link linkend="catalog-pg-authid"><structname>pg_authid</structname></link>.
@@ -9759,7 +9759,7 @@ SELECT * FROM pg_locks pl LEFT JOIN pg_prepared_xacts ppx
    of time zone names that are recognized by <command>SET TIMEZONE</>,
    along with their associated abbreviations, UTC offsets,
    and daylight-savings status.  (Technically,
-   <productname>PostgreSQL</productname> uses <acronym>UT1</> rather
+   <productname>&productname;</productname> uses <acronym>UT1</> rather
    than UTC because leap seconds are not handled.)
    Unlike the abbreviations shown in <link
    linkend="view-pg-timezone-abbrevs"><structname>pg_timezone_abbrevs</structname></link>, many of these names imply a set of daylight-savings transition

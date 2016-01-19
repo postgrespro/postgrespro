@@ -13,7 +13,7 @@
 
  <refnamediv>
   <refname>pg_archivecleanup</refname>
-  <refpurpose>clean up <productname>PostgreSQL</productname> WAL archive files</refpurpose>
+  <refpurpose>clean up <productname>&productname;</productname> WAL archive files</refpurpose>
  </refnamediv>
 
  <refsynopsisdiv>
@@ -152,8 +152,8 @@ pg_archivecleanup:  removing file "archive/00000001000000370000000E"
 
   <para>
    <application>pg_archivecleanup</application> is designed to work with
-   <productname>PostgreSQL</> 8.0 and later when used as a standalone utility,
-   or with <productname>PostgreSQL</> 9.0 and later when used as an
+   <productname>&productname;</> 8.0 and later when used as a standalone utility,
+   or with <productname>&productname;</> 9.0 and later when used as an
    archive cleanup command.
   </para>
 
