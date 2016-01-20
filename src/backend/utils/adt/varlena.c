@@ -1574,6 +1574,14 @@ varstr_cmp(char *arg1, int len1, char *arg2, int len2, Oid collid)
 #ifdef USE_ICU
 	else if (pg_database_encoding_max_length() > 1)
 	{
+		/*
+		 * check collation as it done for regular way
+		 */
+		if (collid != DEFAULT_COLLATION_OID && !OidIsValid(collid))
+			ereport(ERROR,
+					(errcode(ERRCODE_INDETERMINATE_COLLATION),
+					 errmsg("could not determine which collation to use for string comparison"),
+					 errhint("Use the COLLATE clause to set the collation explicitly.")));
 		result = strcmp_icu(arg1, len1, arg2, len2);
 	}
 #endif
