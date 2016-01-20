@@ -118,6 +118,7 @@ CREATE EXTENSION <replaceable>module_name</> FROM unpackaged;
  &file-fdw;
  &fuzzystrmatch;
  &hstore;
+ &hunspell-dict
  &intagg;
  &intarray;
  &isn;

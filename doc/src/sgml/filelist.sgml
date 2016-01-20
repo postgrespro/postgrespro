@@ -119,6 +119,7 @@
 <!ENTITY file-fdw        SYSTEM "file-fdw.sgml">
 <!ENTITY fuzzystrmatch   SYSTEM "fuzzystrmatch.sgml">
 <!ENTITY hstore          SYSTEM "hstore.sgml">
+<!ENTITY hunspell-dict   SYSTEM "hunspell-dict.sgml">
 <!ENTITY intagg          SYSTEM "intagg.sgml">
 <!ENTITY intarray        SYSTEM "intarray.sgml">
 <!ENTITY isn             SYSTEM "isn.sgml">
