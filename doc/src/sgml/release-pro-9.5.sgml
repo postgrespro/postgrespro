@@ -41,6 +41,10 @@
      Dump/restore database statistics (Dmitry Ivanov)
      </para>
     </listitem>
+    <listitem>
+    <para>Some hunspell dictionaries for full-text search are bundled
+    with distribution</para>
+    </listitem>
 
    </itemizedlist>
 
@@ -202,6 +206,13 @@ Date:   Wed Dec 30 16:00:20 2015 +0300
      dump_stat contrib module. This module allows to dump table
      statistics and restore it, thus eliminate need to run VACUUM
      ANALYZE after restoration of base or server upgrade
+     </para>
+     </listitem>
+     <listitem>
+     <para>
+     Several hunspell dictionaries for full-text search are now included
+     as contrib modules and can be easily installed into the database
+     using CREATE EXTENSION command.
      </para>
      </listitem>
     </itemizedlist>
