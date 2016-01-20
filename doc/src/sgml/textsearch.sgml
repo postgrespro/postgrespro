@@ -2801,10 +2801,18 @@ largehearted
    </note>
 
    <para>
-    In the <literal>contrib</literal> directory of the <productname>PostgreSQL</>
-    distribution there are additional modules which provide
-    <application>Hunspell</> dictionaries. This modules are listed in the
-    <xref linkend="contrib">.
+    Some <application>Hunspell</> dictionaries are included in the
+    <productname>&productname;</productname> distribution in the
+    <literal>contrib</literal> directory and can be easily installed into
+    database using <command>CREATE EXTENSION</> command.  See
+    <xref linkend="hunspell-dict">.
+   </para>
+
+   <para>
+    Other dictionaries can be downloaded from the
+    <ulink url="http://extensions.openoffice.org/en/search?f[0]=field_project_tags%3A157">
+    Apache OpenOffice Extensions site</ulink> and installed as described in the
+    <xref linkend="textsearch-configuration">.
    </para>
 
   </sect2>
