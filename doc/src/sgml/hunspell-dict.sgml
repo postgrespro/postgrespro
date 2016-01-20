@@ -1,0 +1,64 @@
+<!-- doc/src/sgml/hunspell-dict.sgml -->
+
+<sect1 id="hunspell-dict" xreflabel="Hunspell Dictionaries Modules">
+ <title><application>Hunspell</> Dictionaries Modules</title>
+
+ <indexterm zone="hunspell-dict">
+  <primary>Hunspell Dictionaries</primary>
+ </indexterm>
+
+ <para>
+  These modules provide <application>Hunspell</> dictionaries for various languages.
+  Upon installation of the module into database using
+  <command>CREATE EXTENSION</> command, text search dictionary and configuration
+  objects in the public schema appear.
+ </para>
+
+ <table id="hunspell-dict-table">
+  <title>Modules</title>
+  <tgroup cols="4">
+   <thead>
+     <row>
+      <entry>Language</entry>
+      <entry>Extension name</entry>
+      <entry>Dictionary name</entry>
+      <entry>Configuration name</entry>
+     </row>
+    </thead>
+
+    <tbody>
+     <row>
+      <entry>American English</entry>
+      <entry><filename>hunspell_en_us</filename></entry>
+      <entry><literal>public.english_hunspell</literal></entry>
+      <entry><literal>public.english</literal></entry>
+     </row>
+     <row>
+      <entry>Dutch</entry>
+      <entry><filename>hunspell_nl_nl</filename></entry>
+      <entry><literal>public.dutch_hunspell</literal></entry>
+      <entry><literal>public.dutch</literal></entry>
+     </row>
+     <row>
+      <entry>French</entry>
+      <entry><filename>hunspell_fr</filename></entry>
+      <entry><literal>public.french_hunspell</literal></entry>
+      <entry><literal>public.french</literal></entry>
+     </row>
+     <row>
+      <entry>Russian</entry>
+      <entry><filename>hunspell_ru_ru</filename></entry>
+      <entry><literal>public.russian_hunspell</literal></entry>
+      <entry><literal>public.russian</literal></entry>
+     </row>
+     <row>
+      <entry>Turkish</entry>
+      <entry><filename>hunspell_tr_tr</filename></entry>
+      <entry><literal>public.turkish_hunspell</literal></entry>
+      <entry><literal>public.turkish</literal></entry>
+     </row>
+    </tbody>
+  </tgroup>
+ </table>
+
+</sect1>
