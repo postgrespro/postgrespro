@@ -21,6 +21,7 @@ RETURNS VOID AS 'pathman', 'on_partitions_removed' LANGUAGE C STRICT;
 CREATE OR REPLACE FUNCTION find_range_partition(relid OID, value ANYELEMENT)
 RETURNS OID AS 'pathman', 'find_range_partition' LANGUAGE C STRICT;
 
+
 /*
  * Returns min and max values for specified RANGE partition.
  */
@@ -28,12 +29,14 @@ CREATE OR REPLACE FUNCTION get_partition_range(
     parent_relid OID, partition_relid OID, dummy ANYELEMENT)
 RETURNS ANYARRAY AS 'pathman', 'get_partition_range' LANGUAGE C STRICT;
 
+
 /*
  * Returns N-th range (in form of array)
  */
 CREATE OR REPLACE FUNCTION get_range_by_idx(
     parent_relid OID, idx INTEGER, dummy ANYELEMENT)
 RETURNS ANYARRAY AS 'pathman', 'get_range_by_idx' LANGUAGE C STRICT;
+
 
 /*
  * Copy rows to partitions
@@ -62,7 +65,8 @@ BEGIN
     END LOOP;
     RETURN 0;
 END
-$$ LANGUAGE plpgsql;
+$$
+LANGUAGE plpgsql;
 
 
 /*
@@ -78,7 +82,8 @@ BEGIN
     /* Notify backend about changes */
     PERFORM pg_pathman_on_remove_partitions(relation::regclass::integer);
 END
-$$ LANGUAGE plpgsql;
+$$
+LANGUAGE plpgsql;
 
 
 /*
@@ -99,40 +104,32 @@ $$
 LANGUAGE plpgsql;
 
 
--- CREATE OR REPLACE FUNCTION sample_rel_trigger_func()
--- RETURNS TRIGGER AS $$
--- DECLARE
---  hash integer := 0;
---  -- q TEXT = 'INSERT INTO sample_rel_% VALUES (NEW.*)';
--- BEGIN
---  hash := NEW.val % 1000;
---  EXECUTE format('INSERT INTO sample_rel_%s VALUES ($1, $2)', hash)
---      USING NEW.id, NEW.val;
---  RETURN NULL;
--- END
--- $$ LANGUAGE plpgsql;
+/*
+ * Validates relation name. It must be fully qualified (contain schema name)
+ */
+CREATE OR REPLACE FUNCTION validate_relname(relname TEXT)
+RETURNS TEXT AS
+$$
+DECLARE
+    ret TEXT := lower(relname);
+BEGIN
+    IF NOT ret ~ '^([a-z_]+[a-z0-9_]*)\.([a-z_]+[a-z0-9_]*)$' THEN
+        RAISE EXCEPTION 'Incorrect relation name. It must be fully qualified: <schema>.<relname>';
+    END IF;
+    RETURN ret;
+END
+$$
+LANGUAGE plpgsql;
 
--- CREATE TRIGGER sample_rel_trigger
---  BEFORE INSERT ON sample_rel
---  FOR EACH ROW EXECUTE PROCEDURE sample_rel_trigger_func();
 
-
-
-/* INHERITANCE TEST */
--- CREATE OR REPLACE FUNCTION public.create_children_tables(IN relation TEXT)
--- RETURNS INTEGER AS $$
--- DECLARE
---  q TEXT := 'CREATE TABLE %s_%s (CHECK (val IN (%s))) INHERITS (%s)';
--- BEGIN
---  FOR partnum IN 0..999
---  LOOP
---      EXECUTE format(q, relation, partnum, partnum, relation);
---  END LOOP;
---  RETURN 0;
--- END
--- $$ LANGUAGE plpgsql;
-
-/* sample data */
--- insert into pathman_config (oid, attnum, parttype) values (49350, 2, 1);
--- insert into pg_pathman_hash_rels (parent_oid, hash, child_oid) values (49350, 1, 49355);
--- insert into pg_pathman_hash_rels (parent_oid, hash, child_oid) values (49350, 0, 49360);
+/*
+ *
+ */
+CREATE OR REPLACE FUNCTION get_schema_qualified_name(cls regclass)
+RETURNS TEXT AS
+$$
+BEGIN
+    RETURN relnamespace::regnamespace || '_' || relname FROM pg_class WHERE oid = cls::oid;
+END
+$$
+LANGUAGE plpgsql;
