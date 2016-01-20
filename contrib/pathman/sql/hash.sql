@@ -8,7 +8,7 @@ CREATE OR REPLACE FUNCTION create_hash_partitions(
 ) RETURNS VOID AS
 $$
 BEGIN
-    relation := lower(relation);
+    relation := validate_relname(relation);
 
     IF EXISTS (SELECT * FROM pathman_config WHERE relname = relation) THEN
         RAISE EXCEPTION 'Reltion "%s" has already been partitioned', relation;
@@ -41,7 +41,7 @@ BEGIN
     -- PERFORM create_hash_update_trigger(relation, attribute, partitions_count);
 
     /* Notify backend about changes */
-    PERFORM on_create_partitions(relid);
+    PERFORM on_create_partitions(relation::regclass::integer);
 END
 $$ LANGUAGE plpgsql;
 
@@ -67,8 +67,8 @@ DECLARE
         END $body$ LANGUAGE plpgsql;';
     trigger TEXT := '
         CREATE TRIGGER %s_insert_trigger
-        BEFORE INSERT ON %1$s
-        FOR EACH ROW EXECUTE PROCEDURE %1$s_hash_insert_trigger_func();';
+        BEFORE INSERT ON %s
+        FOR EACH ROW EXECUTE PROCEDURE %2$s_hash_insert_trigger_func();';
     fields TEXT;
     fields_format TEXT;
     insert_stmt TEXT;
@@ -90,8 +90,7 @@ BEGIN
 
     /* format and create new trigger for relation */
     func := format(func, relation, attr, partitions_count, insert_stmt);
-
-    trigger := format(trigger, relation::regclass::text);
+    trigger := format(trigger, get_schema_qualified_name(relation::regclass), relation);
     EXECUTE func;
     EXECUTE trigger;
 END
@@ -125,7 +124,9 @@ CREATE OR REPLACE FUNCTION drop_hash_triggers(IN relation TEXT)
 RETURNS VOID AS
 $$
 BEGIN
-    EXECUTE format('DROP TRIGGER IF EXISTS %s_insert_trigger ON %1$s', relation::regclass::text);
+    EXECUTE format('DROP TRIGGER IF EXISTS %s_insert_trigger ON %s'
+                   , get_schema_qualified_name(relation::regclass)
+                   , relation);
     EXECUTE format('DROP FUNCTION IF EXISTS %s_hash_insert_trigger_func()', relation::regclass::text);
     -- EXECUTE format('DROP TRIGGER IF EXISTS %s_update_trigger ON %1$s', relation);
     -- EXECUTE format('DROP FUNCTION IF EXISTS %s_hash_update_trigger_func()', relation);

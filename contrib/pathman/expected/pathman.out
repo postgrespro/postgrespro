@@ -1,51 +1,50 @@
 \set VERBOSITY terse
+CREATE SCHEMA test;
 CREATE EXTENSION pathman;
-CREATE TABLE hash_rel (
+CREATE TABLE test.hash_rel (
     id      SERIAL PRIMARY KEY,
     value   INTEGER);
-SELECT create_hash_partitions('hash_rel', 'value', 3);
-NOTICE:  trigger "hash_rel_insert_trigger" for relation "hash_rel" does not exist, skipping
-NOTICE:  function hash_rel_hash_insert_trigger_func() does not exist, skipping
-NOTICE:  trigger "hash_rel_update_trigger" for relation "hash_rel" does not exist, skipping
-NOTICE:  function hash_rel_hash_update_trigger_func() does not exist, skipping
+SELECT create_hash_partitions('test.hash_rel', 'value', 3);
+NOTICE:  trigger "test_hash_rel_insert_trigger" for relation "test.hash_rel" does not exist, skipping
+NOTICE:  function test.hash_rel_hash_insert_trigger_func() does not exist, skipping
  create_hash_partitions 
 ------------------------
  
 (1 row)
 
-CREATE TABLE range_rel (
+CREATE TABLE test.range_rel (
     id SERIAL PRIMARY KEY,
     dt TIMESTAMP,
     txt TEXT);
-SELECT create_range_partitions('range_rel', 'dt', '2015-01-01'::DATE, '1 month'::INTERVAL, 3);
+SELECT create_range_partitions('test.range_rel', 'dt', '2015-01-01'::DATE, '1 month'::INTERVAL, 3);
 NOTICE:  sequence "range_rel_seq" does not exist, skipping
  create_range_partitions 
 -------------------------
  
 (1 row)
 
-CREATE TABLE num_range_rel (
+CREATE TABLE test.num_range_rel (
     id SERIAL PRIMARY KEY,
     txt TEXT);
-SELECT create_range_partitions('num_range_rel', 'id', 0, 1000, 3);
+SELECT create_range_partitions('test.num_range_rel', 'id', 0, 1000, 3);
 NOTICE:  sequence "num_range_rel_seq" does not exist, skipping
  create_range_partitions 
 -------------------------
  
 (1 row)
 
-INSERT INTO hash_rel VALUES (1, 1);
-INSERT INTO hash_rel VALUES (2, 2);
-INSERT INTO hash_rel VALUES (3, 3);
-INSERT INTO hash_rel VALUES (4, 4);
-INSERT INTO hash_rel VALUES (5, 5);
-INSERT INTO hash_rel VALUES (6, 6);
-INSERT INTO num_range_rel SELECT g, md5(g::TEXT) FROM generate_series(1, 3000) as g;
+INSERT INTO test.hash_rel VALUES (1, 1);
+INSERT INTO test.hash_rel VALUES (2, 2);
+INSERT INTO test.hash_rel VALUES (3, 3);
+INSERT INTO test.hash_rel VALUES (4, 4);
+INSERT INTO test.hash_rel VALUES (5, 5);
+INSERT INTO test.hash_rel VALUES (6, 6);
+INSERT INTO test.num_range_rel SELECT g, md5(g::TEXT) FROM generate_series(1, 3000) as g;
 VACUUM;
 SET enable_indexscan = OFF;
 SET enable_bitmapscan = OFF;
 SET enable_seqscan = ON;
-EXPLAIN (COSTS OFF) SELECT * FROM hash_rel;
+EXPLAIN (COSTS OFF) SELECT * FROM test.hash_rel;
           QUERY PLAN          
 ------------------------------
  Append
@@ -54,7 +53,7 @@ EXPLAIN (COSTS OFF) SELECT * FROM hash_rel;
    ->  Seq Scan on hash_rel_2
 (4 rows)
 
-EXPLAIN (COSTS OFF) SELECT * FROM hash_rel WHERE value = 2;
+EXPLAIN (COSTS OFF) SELECT * FROM test.hash_rel WHERE value = 2;
           QUERY PLAN          
 ------------------------------
  Append
@@ -62,7 +61,7 @@ EXPLAIN (COSTS OFF) SELECT * FROM hash_rel WHERE value = 2;
          Filter: (value = 2)
 (3 rows)
 
-EXPLAIN (COSTS OFF) SELECT * FROM hash_rel WHERE value = 2 OR value = 1;
+EXPLAIN (COSTS OFF) SELECT * FROM test.hash_rel WHERE value = 2 OR value = 1;
           QUERY PLAN          
 ------------------------------
  Append
@@ -72,7 +71,7 @@ EXPLAIN (COSTS OFF) SELECT * FROM hash_rel WHERE value = 2 OR value = 1;
          Filter: (value = 2)
 (5 rows)
 
-EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE id > 2500;
+EXPLAIN (COSTS OFF) SELECT * FROM test.num_range_rel WHERE id > 2500;
             QUERY PLAN             
 -----------------------------------
  Append
@@ -81,7 +80,7 @@ EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE id > 2500;
    ->  Seq Scan on num_range_rel_4
 (4 rows)
 
-EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE id >= 1000 AND id < 3000;
+EXPLAIN (COSTS OFF) SELECT * FROM test.num_range_rel WHERE id >= 1000 AND id < 3000;
             QUERY PLAN             
 -----------------------------------
  Append
@@ -89,7 +88,7 @@ EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE id >= 1000 AND id < 3000;
    ->  Seq Scan on num_range_rel_3
 (3 rows)
 
-EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE id >= 1500 AND id < 2500;
+EXPLAIN (COSTS OFF) SELECT * FROM test.num_range_rel WHERE id >= 1500 AND id < 2500;
             QUERY PLAN             
 -----------------------------------
  Append
@@ -99,7 +98,7 @@ EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE id >= 1500 AND id < 2500;
          Filter: (id < 2500)
 (5 rows)
 
-EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE (id >= 500 AND id < 1500) OR (id > 2500);
+EXPLAIN (COSTS OFF) SELECT * FROM test.num_range_rel WHERE (id >= 500 AND id < 1500) OR (id > 2500);
             QUERY PLAN             
 -----------------------------------
  Append
@@ -115,7 +114,7 @@ EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE (id >= 500 AND id < 1500) 
 SET enable_indexscan = ON;
 SET enable_bitmapscan = OFF;
 SET enable_seqscan = OFF;
-EXPLAIN (COSTS OFF) SELECT * FROM hash_rel;
+EXPLAIN (COSTS OFF) SELECT * FROM test.hash_rel;
           QUERY PLAN          
 ------------------------------
  Append
@@ -124,7 +123,7 @@ EXPLAIN (COSTS OFF) SELECT * FROM hash_rel;
    ->  Seq Scan on hash_rel_2
 (4 rows)
 
-EXPLAIN (COSTS OFF) SELECT * FROM hash_rel WHERE value = 2;
+EXPLAIN (COSTS OFF) SELECT * FROM test.hash_rel WHERE value = 2;
           QUERY PLAN          
 ------------------------------
  Append
@@ -132,7 +131,7 @@ EXPLAIN (COSTS OFF) SELECT * FROM hash_rel WHERE value = 2;
          Filter: (value = 2)
 (3 rows)
 
-EXPLAIN (COSTS OFF) SELECT * FROM hash_rel WHERE value = 2 OR value = 1;
+EXPLAIN (COSTS OFF) SELECT * FROM test.hash_rel WHERE value = 2 OR value = 1;
           QUERY PLAN          
 ------------------------------
  Append
@@ -142,7 +141,7 @@ EXPLAIN (COSTS OFF) SELECT * FROM hash_rel WHERE value = 2 OR value = 1;
          Filter: (value = 2)
 (5 rows)
 
-EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE id > 2500;
+EXPLAIN (COSTS OFF) SELECT * FROM test.num_range_rel WHERE id > 2500;
                            QUERY PLAN                           
 ----------------------------------------------------------------
  Append
@@ -151,7 +150,7 @@ EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE id > 2500;
    ->  Seq Scan on num_range_rel_4
 (4 rows)
 
-EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE id >= 1000 AND id < 3000;
+EXPLAIN (COSTS OFF) SELECT * FROM test.num_range_rel WHERE id >= 1000 AND id < 3000;
             QUERY PLAN             
 -----------------------------------
  Append
@@ -159,7 +158,7 @@ EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE id >= 1000 AND id < 3000;
    ->  Seq Scan on num_range_rel_3
 (3 rows)
 
-EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE id >= 1500 AND id < 2500;
+EXPLAIN (COSTS OFF) SELECT * FROM test.num_range_rel WHERE id >= 1500 AND id < 2500;
                            QUERY PLAN                           
 ----------------------------------------------------------------
  Append
@@ -169,7 +168,7 @@ EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE id >= 1500 AND id < 2500;
          Index Cond: (id < 2500)
 (5 rows)
 
-EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE (id >= 500 AND id < 1500) OR (id > 2500);
+EXPLAIN (COSTS OFF) SELECT * FROM test.num_range_rel WHERE (id >= 500 AND id < 1500) OR (id > 2500);
                            QUERY PLAN                           
 ----------------------------------------------------------------
  Append
@@ -186,7 +185,7 @@ EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE (id >= 500 AND id < 1500) 
  * Test split and merge
  */
 /* Split first partition in half */
-SELECT split_range_partition('num_range_rel_1', 500);
+SELECT split_range_partition('test.num_range_rel_1', 500);
 NOTICE:  Creating new partition...
 NOTICE:  Copying data to new partition...
 NOTICE:  Altering original partition...
@@ -196,7 +195,7 @@ NOTICE:  Done!
  {0,1000}
 (1 row)
 
-EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE id BETWEEN 100 AND 700;
+EXPLAIN (COSTS OFF) SELECT * FROM test.num_range_rel WHERE id BETWEEN 100 AND 700;
                            QUERY PLAN                           
 ----------------------------------------------------------------
  Append
@@ -206,7 +205,7 @@ EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE id BETWEEN 100 AND 700;
          Index Cond: (id <= 700)
 (5 rows)
 
-SELECT split_range_partition('range_rel_1', '2015-01-15'::DATE);
+SELECT split_range_partition('test.range_rel_1', '2015-01-15'::DATE);
 NOTICE:  Creating new partition...
 NOTICE:  Copying data to new partition...
 NOTICE:  Altering original partition...
@@ -217,7 +216,7 @@ NOTICE:  Done!
 (1 row)
 
 /* Merge two partitions into one */
-SELECT merge_range_partitions('num_range_rel_1', 'num_range_rel_' || currval('num_range_rel_seq'));
+SELECT merge_range_partitions('test.num_range_rel_1', 'test.num_range_rel_' || currval('test.num_range_rel_seq'));
 NOTICE:  Altering first partition...
 NOTICE:  Copying data...
 NOTICE:  Dropping second partition...
@@ -227,7 +226,7 @@ NOTICE:  Done!
  
 (1 row)
 
-EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE id BETWEEN 100 AND 700;
+EXPLAIN (COSTS OFF) SELECT * FROM test.num_range_rel WHERE id BETWEEN 100 AND 700;
                            QUERY PLAN                           
 ----------------------------------------------------------------
  Append
@@ -235,7 +234,7 @@ EXPLAIN (COSTS OFF) SELECT * FROM num_range_rel WHERE id BETWEEN 100 AND 700;
          Index Cond: ((id >= 100) AND (id <= 700))
 (3 rows)
 
-SELECT merge_range_partitions('range_rel_1', 'range_rel_' || currval('range_rel_seq'));
+SELECT merge_range_partitions('test.range_rel_1', 'test.range_rel_' || currval('test.range_rel_seq'));
 NOTICE:  Altering first partition...
 NOTICE:  Copying data...
 NOTICE:  Dropping second partition...
@@ -246,7 +245,7 @@ NOTICE:  Done!
 (1 row)
 
 /* Append and prepend partitions */
-SELECT append_partition('num_range_rel');
+SELECT append_partition('test.num_range_rel');
 NOTICE:  Appending new partition...
 NOTICE:  Done!
  append_partition 
@@ -254,7 +253,7 @@ NOTICE:  Done!
  
 (1 row)
 
-SELECT prepend_partition('num_range_rel');
+SELECT prepend_partition('test.num_range_rel');
 NOTICE:  Prepending new partition...
 NOTICE:  Done!
  prepend_partition 
@@ -262,7 +261,7 @@ NOTICE:  Done!
  
 (1 row)
 
-SELECT append_partition('range_rel');
+SELECT append_partition('test.range_rel');
 NOTICE:  Appending new partition...
 NOTICE:  Done!
  append_partition 
@@ -270,7 +269,7 @@ NOTICE:  Done!
  
 (1 row)
 
-SELECT prepend_partition('range_rel');
+SELECT prepend_partition('test.range_rel');
 NOTICE:  Prepending new partition...
 NOTICE:  Done!
  prepend_partition 
@@ -281,21 +280,20 @@ NOTICE:  Done!
 /*
  * Clean up
  */
-SELECT drop_hash_partitions('hash_rel');
-NOTICE:  trigger "hash_rel_update_trigger" for relation "hash_rel" does not exist, skipping
-NOTICE:  function hash_rel_hash_update_trigger_func() does not exist, skipping
+SELECT drop_hash_partitions('test.hash_rel');
  drop_hash_partitions 
 ----------------------
  
 (1 row)
 
-DROP TABLE hash_rel CASCADE;
+DROP TABLE test.hash_rel CASCADE;
 NOTICE:  drop cascades to 3 other objects
-SELECT drop_range_partitions('num_range_rel');
+SELECT drop_range_partitions('test.num_range_rel');
  drop_range_partitions 
 -----------------------
  
 (1 row)
 
-DROP TABLE num_range_rel CASCADE;
+DROP TABLE test.num_range_rel CASCADE;
+NOTICE:  drop cascades to 6 other objects
 DROP EXTENSION pathman;

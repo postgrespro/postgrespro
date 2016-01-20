@@ -1,12 +1,11 @@
 #include "pathman.h"
 #include "executor/spi.h"
 #include "catalog/pg_type.h"
-
 #include "catalog/pg_class.h"
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_operator.h"
-#include "utils/syscache.h"
 #include "access/htup_details.h"
+#include "utils/syscache.h"
 #include "utils/builtins.h"
 #include "utils/typcache.h"
 #include "utils/lsyscache.h"

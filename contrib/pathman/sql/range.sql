@@ -1,89 +1,88 @@
 /*
- * Creates RANGE partitions for specified relation
+ * Creates RANGE partitions for specified relation based on datetime attribute
  */
 CREATE OR REPLACE FUNCTION create_range_partitions(
-    v_relation TEXT
-    , v_attribute TEXT
-    , v_start_value ANYELEMENT
-    , v_interval INTERVAL
-    , v_premake INTEGER)
+    p_relation TEXT
+    , p_attribute TEXT
+    , p_start_value ANYELEMENT
+    , p_interval INTERVAL
+    , p_premake INTEGER)
 RETURNS VOID AS
 $$
 DECLARE
-    v_relid     INTEGER;
     v_value     TEXT;
     i INTEGER;
 BEGIN
-    SELECT relfilenode INTO v_relid
-    FROM pg_class WHERE relname = v_relation;
+    p_relation := validate_relname(p_relation);
 
-    IF EXISTS (SELECT * FROM pathman_config WHERE relname = v_relation) THEN
-        RAISE EXCEPTION 'Reltion "%" has already been partitioned', v_relation;
+    IF EXISTS (SELECT * FROM pathman_config WHERE relname = p_relation) THEN
+        RAISE EXCEPTION 'Reltion "%" has already been partitioned', p_relation;
     END IF;
 
-    EXECUTE format('DROP SEQUENCE IF EXISTS %s_seq', v_relation);
-    EXECUTE format('CREATE SEQUENCE %s_seq START 1', v_relation);
+    EXECUTE format('DROP SEQUENCE IF EXISTS %s_seq', p_relation);
+    EXECUTE format('CREATE SEQUENCE %s_seq START 1', p_relation);
 
     INSERT INTO pathman_config (relname, attname, parttype)
-    VALUES (v_relation, v_attribute, 2);
+    VALUES (p_relation, p_attribute, 2);
 
     /* create first partition */
-    FOR i IN 1..v_premake+1
+    FOR i IN 1..p_premake+1
     LOOP
-        EXECUTE format('SELECT create_single_range_partition($1, $2, $3::%s);', pg_typeof(v_start_value))
-        USING v_relation, v_start_value, v_start_value + v_interval;
+        EXECUTE format('SELECT create_single_range_partition($1, $2, $3::%s);', pg_typeof(p_start_value))
+        USING p_relation, p_start_value, p_start_value + p_interval;
 
-        v_start_value := v_start_value + v_interval;
+        p_start_value := p_start_value + p_interval;
     END LOOP;
 
     /* Create triggers */
-    PERFORM create_range_insert_trigger(v_relation, v_attribute);
+    PERFORM create_range_insert_trigger(p_relation, p_attribute);
     -- PERFORM create_hash_update_trigger(relation, attribute, partitions_count);
     /* Notify backend about changes */
-    PERFORM on_create_partitions(v_relid);
+    PERFORM on_create_partitions(p_relation::regclass::integer);
 END
 $$ LANGUAGE plpgsql;
 
+/*
+ * Creates RANGE partitions for specified relation based on numerical attribute
+ */
 CREATE OR REPLACE FUNCTION create_range_partitions(
-    v_relation TEXT
-    , v_attribute TEXT
-    , v_start_value ANYELEMENT
-    , v_interval ANYELEMENT
-    , v_premake INTEGER)
+    p_relation TEXT
+    , p_attribute TEXT
+    , p_start_value ANYELEMENT
+    , p_interval ANYELEMENT
+    , p_premake INTEGER)
 RETURNS VOID AS
 $$
 DECLARE
-    v_relid     INTEGER;
     v_value     TEXT;
     i INTEGER;
 BEGIN
-    SELECT relfilenode INTO v_relid
-    FROM pg_class WHERE relname = v_relation;
+    p_relation := validate_relname(p_relation);
 
-    IF EXISTS (SELECT * FROM pathman_config WHERE relname = v_relation) THEN
-        RAISE EXCEPTION 'Reltion "%" has already been partitioned', v_relation;
+    IF EXISTS (SELECT * FROM pathman_config WHERE relname = p_relation) THEN
+        RAISE EXCEPTION 'Reltion "%" has already been partitioned', p_relation;
     END IF;
 
-    EXECUTE format('DROP SEQUENCE IF EXISTS %s_seq', v_relation);
-    EXECUTE format('CREATE SEQUENCE %s_seq START 1', v_relation);
+    EXECUTE format('DROP SEQUENCE IF EXISTS %s_seq', p_relation);
+    EXECUTE format('CREATE SEQUENCE %s_seq START 1', p_relation);
 
     INSERT INTO pathman_config (relname, attname, parttype)
-    VALUES (v_relation, v_attribute, 2);
+    VALUES (p_relation, p_attribute, 2);
 
     /* create first partition */
-    FOR i IN 1..v_premake+1
+    FOR i IN 1..p_premake+1
     LOOP
-        PERFORM create_single_range_partition(v_relation
-                                              , v_start_value
-                                              , v_start_value + v_interval);
-        v_start_value := v_start_value + v_interval;
+        PERFORM create_single_range_partition(p_relation
+                                              , p_start_value
+                                              , p_start_value + p_interval);
+        p_start_value := p_start_value + p_interval;
     END LOOP;
 
     /* Create triggers */
-    PERFORM create_range_insert_trigger(v_relation, v_attribute);
+    PERFORM create_range_insert_trigger(p_relation, p_attribute);
     -- PERFORM create_hash_update_trigger(relation, attribute, partitions_count);
     /* Notify backend about changes */
-    PERFORM on_create_partitions(v_relid);
+    PERFORM on_create_partitions(p_relation::regclass::integer);
 END
 $$ LANGUAGE plpgsql;
 
@@ -161,9 +160,10 @@ BEGIN
                    , p_parent_relname);
 
     v_cond := get_range_condition(v_attname, p_start_value, p_end_value);
-    v_sql := format('ALTER TABLE %s ADD CHECK (%s)'
-                  , v_child_relname
-                  , v_cond);
+    v_sql := format('ALTER TABLE %s ADD CONSTRAINT %s_check CHECK (%s)'
+                    , v_child_relname
+                    , get_schema_qualified_name(v_child_relname::regclass)
+                    , v_cond);
 
     EXECUTE v_sql;
     RETURN v_child_relname;
@@ -188,6 +188,8 @@ DECLARE
     v_new_partition TEXT;
     v_part_type INTEGER;
 BEGIN
+    p_partition := validate_relname(p_partition);
+
     v_parent_relid := inhparent
                       FROM pg_inherits
                       WHERE inhrelid = v_child_relid;
@@ -234,12 +236,12 @@ BEGIN
     /* Alter original partition */
     RAISE NOTICE 'Altering original partition...';
     v_cond := get_range_condition(v_attname, p_range[1], p_value);
-    EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %s_%s_check'
+    EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %s_check'
                    , p_partition
+                   , get_schema_qualified_name(p_partition::regclass));
+    EXECUTE format('ALTER TABLE %s ADD CONSTRAINT %s_check CHECK (%s)'
                    , p_partition
-                   , v_attname);
-    EXECUTE format('ALTER TABLE %s ADD CHECK (%s)'
-                   , p_partition
+                   , get_schema_qualified_name(p_partition::regclass)
                    , v_cond);
 
     /* Tell backend to reload configuration */
@@ -268,8 +270,11 @@ DECLARE
     v_part_type INTEGER;
     v_atttype TEXT;
 BEGIN
+    p_partition1 := validate_relname(p_partition1);
+    p_partition2 := validate_relname(p_partition2);
+
     IF v_part1_relid = v_part2_relid THEN
-        RAISE EXCEPTION 'Cannot merge partition with itself';
+        RAISE EXCEPTION 'Cannot merge partition to itself';
     END IF;
 
     v_parent_relid1 := inhparent FROM pg_inherits WHERE inhrelid = v_part1_relid;
@@ -344,12 +349,12 @@ BEGIN
 
     /* Alter first partition */
     RAISE NOTICE 'Altering first partition...';
-    EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %s_%s_check'
+    EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %s_check'
                    , p_part1_relid::regclass::text
+                   , get_schema_qualified_name(p_part1_relid::regclass));
+    EXECUTE format('ALTER TABLE %s ADD CONSTRAINT %s_check CHECK (%s)'
                    , p_part1_relid::regclass::text
-                   , v_attname);
-    EXECUTE format('ALTER TABLE %s ADD CHECK (%s)'
-                   , p_part1_relid::regclass::text
+                   , get_schema_qualified_name(p_part1_relid::regclass)
                    , v_cond);
 
     /* Copy data from second partition to the first one */
@@ -376,6 +381,8 @@ DECLARE
     v_attname TEXT;
     v_atttype TEXT;
 BEGIN
+    p_relation := validate_relname(p_relation);
+
     v_attname := attname FROM pathman_config WHERE relname = p_relation;
     v_atttype := get_attribute_type_name(p_relation, v_attname);
     EXECUTE format('SELECT append_partition_internal($1, NULL::%s)', v_atttype)
@@ -416,6 +423,8 @@ DECLARE
     v_attname TEXT;
     v_atttype TEXT;
 BEGIN
+    p_relation := validate_relname(p_relation);
+
     v_attname := attname FROM pathman_config WHERE relname = p_relation;
     v_atttype := get_attribute_type_name(p_relation, v_attname);
     EXECUTE format('SELECT prepend_partition_internal($1, NULL::%s)', v_atttype)
@@ -476,11 +485,11 @@ DECLARE
         $body$ LANGUAGE plpgsql;';
     v_trigger TEXT := '
         CREATE TRIGGER %s_insert_trigger
-        BEFORE INSERT ON %1$s
-        FOR EACH ROW EXECUTE PROCEDURE %1$s_insert_trigger_func();';
+        BEFORE INSERT ON %s
+        FOR EACH ROW EXECUTE PROCEDURE %2$s_insert_trigger_func();';
 BEGIN
     v_func := format(v_func, v_relation, v_attname);
-    v_trigger := format(v_trigger, v_relation);
+    v_trigger := format(v_trigger, get_schema_qualified_name(v_relation::regclass), v_relation);
 
     EXECUTE v_func;
     EXECUTE v_trigger;
@@ -525,6 +534,8 @@ CREATE OR REPLACE FUNCTION drop_range_triggers(IN relation TEXT)
 RETURNS VOID AS
 $$
 BEGIN
-    EXECUTE format('DROP TRIGGER IF EXISTS %s_insert_trigger ON %1$s CASCADE', relation);
+    EXECUTE format('DROP TRIGGER IF EXISTS %s_insert_trigger ON %s CASCADE'
+                   , get_schema_qualified_name(relation::regclass)
+                   , relation);
 END
 $$ LANGUAGE plpgsql;
