@@ -27,6 +27,12 @@
      </para>
     </listitem>
     <listitem>
+    <para>
+    Use portable implementation of the internationalization functions
+    (libicu) instead of system specific.
+    </para>
+    </listitem>
+    <listitem>
      <para>
        Contrib module pg_trgm supports substring searches (Arthur Zakirov).
      </para>
@@ -164,8 +170,19 @@ commit [90e649a7afac8c76]   Thu Dec 31 09:52:30 2015 +0300
 
    </sect3>
 
+    <sect3><title>Portability improvements</title>
 
-
+    <itemizedlist>
+    <listitem><para>
+    Use libicu instead of system specific locale handling functions.
+    This ensures same collating order on all platforms 
+    Based on patch by Palle Girgensohn
+    <ulink url="http://people.freebsd.org/~girgen/postgresql-icu/README.html"></ulink>,
+    ported to 9.5 and abbreviated sort key support added by Teodor
+    Sigaev.</para>
+    </listitem>
+    </itemizedlist>
+    </sect3>
    <sect3>
     <title>Additional Modules</title>
 

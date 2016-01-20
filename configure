@@ -9538,9 +9538,9 @@ if test "$ac_res" != no; then :
 
 else
 
-		{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing ucol_open_42" >&5
-$as_echo_n "checking for library containing ucol_open_42... " >&6; }
-if ${ac_cv_search_ucol_open_42+:} false; then :
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing ucol_open_4_2" >&5
+$as_echo_n "checking for library containing ucol_open_4_2... " >&6; }
+if ${ac_cv_search_ucol_open_4_2+:} false; then :
   $as_echo_n "(cached) " >&6
 else
   ac_func_search_save_LIBS=$LIBS
@@ -9553,11 +9553,11 @@ cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 #ifdef __cplusplus
 extern "C"
 #endif
-char ucol_open_42 ();
+char ucol_open_4_2 ();
 int
 main ()
 {
-return ucol_open_42 ();
+return ucol_open_4_2 ();
   ;
   return 0;
 }
@@ -9570,25 +9570,25 @@ for ac_lib in '' icui18n icuin; do
     LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
   fi
   if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_search_ucol_open_42=$ac_res
+  ac_cv_search_ucol_open_4_2=$ac_res
 fi
 rm -f core conftest.err conftest.$ac_objext \
     conftest$ac_exeext
-  if ${ac_cv_search_ucol_open_42+:} false; then :
+  if ${ac_cv_search_ucol_open_4_2+:} false; then :
   break
 fi
 done
-if ${ac_cv_search_ucol_open_42+:} false; then :
+if ${ac_cv_search_ucol_open_4_2+:} false; then :
 
 else
-  ac_cv_search_ucol_open_42=no
+  ac_cv_search_ucol_open_4_2=no
 fi
 rm conftest.$ac_ext
 LIBS=$ac_func_search_save_LIBS
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_ucol_open_42" >&5
-$as_echo "$ac_cv_search_ucol_open_42" >&6; }
-ac_res=$ac_cv_search_ucol_open_42
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_ucol_open_4_2" >&5
+$as_echo "$ac_cv_search_ucol_open_4_2" >&6; }
+ac_res=$ac_cv_search_ucol_open_4_2
 if test "$ac_res" != no; then :
   test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
 
@@ -10301,9 +10301,9 @@ _ACEOF
 
 else
 
-		{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for ucnv_fromUChars_42 in -licuuc" >&5
-$as_echo_n "checking for ucnv_fromUChars_42 in -licuuc... " >&6; }
-if ${ac_cv_lib_icuuc_ucnv_fromUChars_42+:} false; then :
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for ucnv_fromUChars_4_2 in -licuuc" >&5
+$as_echo_n "checking for ucnv_fromUChars_4_2 in -licuuc... " >&6; }
+if ${ac_cv_lib_icuuc_ucnv_fromUChars_4_2+:} false; then :
   $as_echo_n "(cached) " >&6
 else
   ac_check_lib_save_LIBS=$LIBS
@@ -10317,27 +10317,27 @@ cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 #ifdef __cplusplus
 extern "C"
 #endif
-char ucnv_fromUChars_42 ();
+char ucnv_fromUChars_4_2 ();
 int
 main ()
 {
-return ucnv_fromUChars_42 ();
+return ucnv_fromUChars_4_2 ();
   ;
   return 0;
 }
 _ACEOF
 if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_icuuc_ucnv_fromUChars_42=yes
+  ac_cv_lib_icuuc_ucnv_fromUChars_4_2=yes
 else
-  ac_cv_lib_icuuc_ucnv_fromUChars_42=no
+  ac_cv_lib_icuuc_ucnv_fromUChars_4_2=no
 fi
 rm -f core conftest.err conftest.$ac_objext \
     conftest$ac_exeext conftest.$ac_ext
 LIBS=$ac_check_lib_save_LIBS
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_icuuc_ucnv_fromUChars_42" >&5
-$as_echo "$ac_cv_lib_icuuc_ucnv_fromUChars_42" >&6; }
-if test "x$ac_cv_lib_icuuc_ucnv_fromUChars_42" = xyes; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_icuuc_ucnv_fromUChars_4_2" >&5
+$as_echo "$ac_cv_lib_icuuc_ucnv_fromUChars_4_2" >&6; }
+if test "x$ac_cv_lib_icuuc_ucnv_fromUChars_4_2" = xyes; then :
   cat >>confdefs.h <<_ACEOF
 #define HAVE_LIBICUUC 1
 _ACEOF
