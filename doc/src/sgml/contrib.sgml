@@ -124,6 +124,7 @@ CREATE EXTENSION <replaceable>module_name</> FROM unpackaged;
  &ltree;
  &pageinspect;
  &passwordcheck;
+ &pathman;
  &pgbuffercache;
  &pgcrypto;
  &pgfreespacemap;

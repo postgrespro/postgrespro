@@ -48,7 +48,7 @@ It will require to restart the PostgreSQL instance.
 
 ### Partitions Creation
 ```
-CREATE FUNCTION create_hash_partitions(
+create_hash_partitions(
     relation TEXT,
     attribute TEXT,
     partitions_count INTEGER)
@@ -56,7 +56,7 @@ CREATE FUNCTION create_hash_partitions(
 Performs HASH partitioning for `relation` by integer key `attribute`. Creates `partitions_count` partitions and trigger on INSERT. Data doesn't automatically copied from parent table to partitions. Use `partition_data()` function (see below) to migrate data.
 
 ```
-CREATE FUNCTION create_range_partitions(
+create_range_partitions(
     relation TEXT,
     attribute TEXT,
     start_value ANYELEMENT,
@@ -65,7 +65,7 @@ CREATE FUNCTION create_range_partitions(
 ```
 Performs RANGE partitioning for `relation` by partitioning key `attribute`. `start_value` argument specifies initial value, `interval` sets the range of values in a single partition, `premake` is the number of premade partitions (the only one partition will be created if `premake` is 0).
 ```
-CREATE FUNCTION create_range_partitions(
+create_range_partitions(
     relation TEXT,
     attribute TEXT,
     start_value ANYELEMENT,
@@ -76,29 +76,29 @@ Same as above but suitable for `DATE` and `TIMESTAMP` partitioning keys.
 
 ### Data migration
 ```
-CREATE FUNCTION partition_data(parent text)
+partition_data(parent text)
 ```
 Copies data from parent table to its partitions.
 
 ### Partitions management
 ```
-CREATE FUNCTION split_range_partition(partition TEXT, value ANYELEMENT)
+split_range_partition(partition TEXT, value ANYELEMENT)
 ```
 Splits RANGE `partition` in two by `value`.
 ```
-CREATE FUNCTION merge_range_partitions(partition1 TEXT, partition2 TEXT)
+merge_range_partitions(partition1 TEXT, partition2 TEXT)
 ```
 Merge two adjacent RANGE partitions. Data from `partition2` is copied to `partition1`. Then the `partition2` is removed.
 ```
-CREATE FUNCTION append_partition(p_relation TEXT)
+append_partition(p_relation TEXT)
 ```
 Appends new partition with the range equal to the range of the previous partition.
 ```
-CREATE FUNCTION prepend_partition(p_relation TEXT)
+prepend_partition(p_relation TEXT)
 ```
 Prepends new partition with the range equal to the range of the first partition.
 ```
-CREATE FUNCTION disable_partitioning(relation TEXT)
+disable_partitioning(relation TEXT)
 ```
 Disables `pathman` partitioning mechanism for the specified parent table and removes an insert trigger. Partitions itself remain unchanged.
 
