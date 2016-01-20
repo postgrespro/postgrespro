@@ -10,14 +10,6 @@
 
 
 #define ALL NIL
-#define MAX_PARTITIONS 1024
-
-#define OP_STRATEGY_LT 1
-#define OP_STRATEGY_LE 2
-#define OP_STRATEGY_EQ 3
-#define OP_STRATEGY_GE 4
-#define OP_STRATEGY_GT 5
-
 #define BLOCKS_COUNT 10240
 
 /*
@@ -28,22 +20,6 @@ typedef enum PartType
 	PT_HASH = 1,
 	PT_RANGE
 } PartType;
-
-/*
- * Attribute type
- */
-typedef enum AttType
-{
-	AT_INT = 1,
-	AT_DATE,
-} AttType;
-
-typedef union rng_type
-{
-	int		integer;
-	DateADT	date;
-} rng_type;
-
 
 /*
  * Dynamic shared memory array
@@ -83,9 +59,6 @@ typedef struct Table
 typedef struct PartRelationInfo
 {
 	Oid			oid;
-	// List	   *children;
-	/* TODO: is there any better solution to store children in shared memory? */
-	// Oid			children[MAX_PARTITIONS];
 	DsmArray    children;
 	int			children_count;
 	PartType	parttype;
@@ -112,13 +85,6 @@ typedef struct HashRelation
 /*
  * Child relation for RANGE partitioning
  */
-// typedef struct RangeEntry
-// {
-// 	Oid			child_oid;
-// 	rng_type	min;
-// 	rng_type	max;
-// } RangeEntry;
-
 typedef struct RangeEntry
 {
 	Oid		child_oid;
@@ -129,8 +95,6 @@ typedef struct RangeEntry
 typedef struct RangeRelation
 {
 	Oid			parent_oid;
-	// int			nranges;
-	// RangeEntry	ranges[64];
 	DsmArray    ranges;
 } RangeRelation;
 
@@ -172,11 +136,7 @@ LWLock *load_config_lock;
 LWLock *dsm_init_lock;
 
 
-// Table *init_dsm_table(size_t block_size);
-// DsmArray *alloc_dsm_array(size_t entry_size, size_t length);
-// void free_dsm_array(DsmArray *array);
-// void *get_dsm_array(const ArrayPtr* ptr);
-
+/* Dynamic shared memory functions */
 void alloc_dsm_table(void);
 bool init_dsm_segment(size_t block_size);
 void init_dsm_table(Table *tbl, dsm_handle h, size_t block_size);
@@ -186,7 +146,6 @@ void *dsm_array_get_pointer(const DsmArray* arr);
 
 
 HTAB *relations;
-HTAB *hash_restrictions;
 HTAB *range_restrictions;
 bool initialization_needed;
 
@@ -198,5 +157,8 @@ void create_range_restrictions_hashtable(void);
 void load_part_relations_hashtable(bool reinitialize);
 void load_check_constraints(Oid parent_oid);
 void remove_relation_info(Oid relid);
+
+/* utility functions */
+int range_binary_search(const RangeRelation *rangerel, FmgrInfo *cmp_func, Datum value, bool *fountPtr);
 
 #endif   /* PATHMAN_H */
