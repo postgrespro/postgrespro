@@ -1,0 +1,306 @@
+<!-- doc/src/sgml/dump_stat.sgml -->
+
+<sect1 id="dump-stat" xreflabel="dump-stat">
+    <title>dump_stat</title>
+
+    <indexterm zone="dump-stat">
+        <primary>dump_stat</primary>
+    </indexterm>
+
+    <para>
+        Модуль <filename>dump_stat</> предоставляет функции для сохранения и восстановления
+        содержимого таблицы
+        <link linkend="catalog-pg-statistic"><structname>pg_statistic</structname></link>.
+        Функция <function>dump_statistic</> возвращает набор <literal>INSERT</>-запросов,
+        которые можно выполнить на совместимом сервере для восстановления статистики.
+        Расширение должно быть установлено на целевом сервере, поскольку предоставленные им
+        функции необходимы для корректной работы сгенерированных запросов.
+    </para>
+    
+    <para>
+        Обратите внимание, что в будущем определение таблицы
+        <link linkend="catalog-pg-statistic"><structname>pg_statistic</structname></link>
+        может измениться, вследствие чего созданные ранее резервные копии статистики могут
+        стать несовместимыми с новыми версиями PostgreSQL.
+    </para>
+
+    <sect2>
+        <title>Функции</title>
+
+        <variablelist>
+            <varlistentry>
+                <term>
+                    <function>dump_statistic() returns setof text</function>
+                    <indexterm>
+                        <primary>dump_statistic</primary>
+                    </indexterm>
+                </term>
+
+                <listitem>
+                    <para>
+                        <function>dump_statistic</function> возвращает содержимое системной
+                        таблицы
+                        <link linkend="catalog-pg-statistic"><structname>pg_statistic</structname></link>
+                        в виде специально сформированных <literal>INSERT</>-запросов.
+                        Статистика для таблиц, включенных в схемы
+                        <literal>information_schema</> и <literal>pg_catalog</>
+                        отбрасывается.
+                    </para>
+                    
+                    <para>
+                        <literal>INSERT</>-запрос принимает следующий вид:
+<screen>
+WITH upsert as (
+  UPDATE pg_catalog.pg_statistic SET <replaceable class="PARAMETER">column_name</> = <replaceable class="PARAMETER">выражение</> [, ...]
+  WHERE to_schema_qualified_relation(starelid) = <replaceable class="PARAMETER">t_relname</>
+    AND to_attname(<replaceable class="PARAMETER">t_relname</>, staattnum) = <replaceable class="PARAMETER">t_attname</>
+    AND to_atttype(<replaceable class="PARAMETER">t_relname</>, staattnum) = <replaceable class="PARAMETER">t_atttype</>
+    AND stainherit = <replaceable class="PARAMETER">t_stainherit</>
+  RETURNING *)
+ins as (
+  SELECT <replaceable class="PARAMETER">выражение</> [, ...]
+  WHERE NOT EXISTS (SELECT * FROM upsert)
+    AND to_attnum(<replaceable class="PARAMETER">t_relname</>, <replaceable class="PARAMETER">t_attname</>) IS NOT NULL
+    AND to_atttype(<replaceable class="PARAMETER">t_relname</>, <replaceable class="PARAMETER">t_attname</>) = <replaceable class="PARAMETER">t_atttype</>)
+INSERT INTO pg_catalog.pg_statistic SELECT * FROM ins;
+
+где <replaceable class="PARAMETER">выражение</> может принимать следующие значения:
+
+array_in(<replaceable class="PARAMETER">array_text</>, <replaceable class="PARAMETER">имя_типа</>::regtype::oid, -1)
+<replaceable class="PARAMETER">значение</>::<replaceable class="PARAMETER">имя_типа</>
+</screen>
+                    </para>
+                    
+                    <para>
+                        Полученные запросы могут быть сохранены в файл, например:
+<screen>
+test=# \COPY (select dump_statistic()) TO 'dump_stat.sql'
+</screen>
+                    </para>
+                </listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <function>dump_statistic(schema_name text) returns setof text</function>
+                </term>
+
+                <listitem>
+                    <para>
+                        <function>dump_statistic</function> возвращает содержимое системной
+                        таблицы
+                        <link linkend="catalog-pg-statistic"><structname>pg_statistic</structname></link>
+                        в виде специально сформированных <literal>INSERT</>-запросов.
+                        Статистика для таблиц, не включенных в схему <literal>schema_name</>,
+                        отбрасывается.
+                    </para>
+                </listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <function>dump_statistic(schema_name text, table_name text) returns setof text</function>
+                </term>
+
+                <listitem>
+                    <para>
+                        <function>dump_statistic</function> возвращает содержимое системной
+                        таблицы
+                        <link linkend="catalog-pg-statistic"><structname>pg_statistic</structname></link>
+                        в виде специально сформированных <literal>INSERT</>-запросов.
+                        Результат выполнения функции содержит статистику только для таблицы
+                        <literal>schema_name.table_name</>.
+                    </para>
+                </listitem>
+            </varlistentry>
+            
+            <varlistentry>
+                <term>
+                    <function>dump_statistic(relid oid) returns setof text</function>
+                </term>
+
+                <listitem>
+                    <para>
+                        <function>dump_statistic</function> возвращает содержимое системной
+                        таблицы
+                        <link linkend="catalog-pg-statistic"><structname>pg_statistic</structname></link>
+                        в виде специально сформированных <literal>INSERT</>-запросов.
+                        Результат выполнения функции содержит статистику только для таблицы,
+                        заданной с помощью <literal>relid</>.
+                    </para>
+                </listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <function>to_schema_qualified_operator(opid oid) returns text</function>
+                    <indexterm>
+                        <primary>to_schema_qualified_operator</primary>
+                    </indexterm>
+                </term>
+
+                <listitem>
+                    <para>
+                        Возвращает полное имя оператора (предваренное именем схемы),
+                        заданного с помощью идентификатора <literal>opid</>. Пример:
+                    </para>
+<screen>
+test=# SELECT to_schema_qualified_operator('+(int,int)'::regoperator);
+          to_schema_qualified_operator          
+------------------------------------------------
+ pg_catalog.+(pg_catalog.int4, pg_catalog.int4)
+(1 row)
+</screen>
+                </listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <function>to_schema_qualified_type(typid oid) returns text</function>
+                    <indexterm>
+                        <primary>to_schema_qualified_type</primary>
+                    </indexterm>
+                </term>
+
+                <listitem>
+                    <para>
+                        Возвращает полное имя типа (предваренное именем схемы),
+                        заданного с помощью идентификатора <literal>typid</>.
+                    </para>
+                </listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <function>to_schema_qualified_relation(relid oid) returns text</function>
+                    <indexterm>
+                        <primary>to_schema_qualified_relation</primary>
+                    </indexterm>
+                </term>
+
+                <listitem>
+                    <para>
+                        Возвращает полное имя таблицы (предваренное именем схемы),
+                        заданной с помощью идентификатора <literal>relid</>.
+                    </para>
+                </listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <function>anyarray_elemtype(arr anyarray) returns oid</function>
+                    <indexterm>
+                        <primary>anyarray_elemtype</primary>
+                    </indexterm>
+                </term>
+
+                <listitem>
+                    <para>
+                        Возвращает идентификатор <literal>oid</> типа элемента массива, например:
+                    </para>
+<screen>
+test=# SELECT anyarray_elemtype(array_in('{1,2,3}', 'int'::regtype, -1));
+ anyarray_elemtype 
+-------------------
+                23
+(1 row)
+</screen>
+                </listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <function>to_attname(relation text, colnum int2) returns text</function>
+                    <indexterm>
+                        <primary>to_attname</primary>
+                    </indexterm>
+                </term>
+
+                <listitem>
+                    <para>
+                        Возвращает имя столбца таблицы <literal>relation</> под номером
+                        <literal>colnum</>.
+                    </para>
+                </listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <function>to_attnum(relation text, col text) returns int2</function>
+                    <indexterm>
+                        <primary>to_attnum</primary>
+                    </indexterm>
+                </term>
+
+                <listitem>
+                    <para>
+                        Возвращает номер столбца <literal>col</> таблицы <literal>relation</>.
+                    </para>
+                </listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <function>to_atttype(relation text, col text) returns text</function>
+                    <indexterm>
+                        <primary>to_atttype</primary>
+                    </indexterm>
+                </term>
+
+                <listitem>
+                    <para>
+                        Возвращает имя типа столбца <literal>col</> таблицы <literal>relation</>.
+                    </para>
+                </listitem>
+            </varlistentry>
+            
+            <varlistentry>
+                <term>
+                    <function>to_atttype(relation text, colnum int2) returns text</function>
+                </term>
+
+                <listitem>
+                    <para>
+                        Возвращает имя типа столбца таблицы <literal>relation</> под номером
+                        <literal>colnum</>.
+                    </para>
+                </listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <function>to_namespace(nsp text) returns oid</function>
+                    <indexterm>
+                        <primary>to_namespace</primary>
+                    </indexterm>
+                </term>
+
+                <listitem>
+                    <para>
+                        <function>to_namespace</function> имитирует приведение к
+                        системному типу
+                        <link linkend="datatype-oid"><structname>regnamespace</structname></link>
+                        , который отсутствует в PostgreSQL 9.4 (и более ранних версиях).
+                        Функция возвращает <literal>oid</> заданной схемы.
+                    </para>
+                </listitem>
+            </varlistentry>
+
+            <varlistentry>
+                <term>
+                    <function>get_namespace(relation oid) returns oid</function>
+                    <indexterm>
+                        <primary>get_namespace</primary>
+                    </indexterm>
+                </term>
+
+                <listitem>
+                    <para>
+                        <function>get_namespace</function> возвращает <literal>oid</>
+                        схемы, включающей в себя заданную таблицу.
+                    </para>
+                </listitem>
+            </varlistentry>
+        </variablelist>
+    </sect2>
+</sect1>
