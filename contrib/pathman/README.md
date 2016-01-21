@@ -75,11 +75,19 @@ create_range_partitions(
 ```
 Same as above but suitable for `DATE` and `TIMESTAMP` partitioning keys.
 
-### Data migration
+### Utilities
 ```
 partition_data(parent text)
 ```
 Copies data from parent table to its partitions.
+```
+create_hash_update_trigger(parent TEXT)
+```
+Creates the trigger on UPDATE for HASH partitions. The UPDATE trigger isn't created by default because of overhead. It is useful in cases when key attribute could be changed.
+```
+create_hash_update_trigger(parent TEXT)
+```
+Same as above for RANGE sections.
 
 ### Partitions management
 ```

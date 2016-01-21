@@ -51,7 +51,7 @@ shared_preload_libraries = 'pathman'
 
 ### Создание секций
 ```
-CREATE FUNCTION create_hash_partitions(
+create_hash_partitions(
     relation TEXT,
     attribute TEXT,
     partitions_count INTEGER)
@@ -59,7 +59,7 @@ CREATE FUNCTION create_hash_partitions(
 Выполняет HASH-секционирование таблицы `relation` по целочисленному полю `attribute`. Создает `partitions_count` дочерних секций, а также триггер на вставку. Данные из родительской таблицы не копируются автоматически в дочерние. Миграцию данных можно выполнить с помощью функции `partition_data()` (см. ниже), либо вручную.
 
 ```
-CREATE FUNCTION create_range_partitions(
+create_range_partitions(
     relation TEXT,
     attribute TEXT,
     start_value ANYELEMENT,
@@ -68,7 +68,7 @@ CREATE FUNCTION create_range_partitions(
 ```
 Выполняет RANGE-секционирование таблицы `relation` по полю `attribute`. Аргумент `start_value` задает начальное значение, `interval` -- диапазон значений внутри одной секции, `premake` -- количество заранее создаваемых секций (если 0, то будет создана единственная секция).
 ```
-CREATE FUNCTION create_range_partitions(
+create_range_partitions(
     relation TEXT,
     attribute TEXT,
     start_value ANYELEMENT,
@@ -77,31 +77,39 @@ CREATE FUNCTION create_range_partitions(
 ```
 Аналогично предыдущей с тем лишь отличием, что данная функция предназначена для секционирования по полю типа `DATE` или `TIMESTAMP`.
 
-### Миграция данных
+### Утилиты
 ```
-CREATE FUNCTION partition_data(parent text)
+partition_data(parent text)
 ```
 Копирует данные из родительской таблицы `parent` в дочерние секции.
+```
+create_hash_update_trigger(parent TEXT)
+```
+Создает триггер на UPDATE для HASH секций. По-умолчанию триггер на обновление данных не создается, т.к. это создает дополнительные накладные расходы. Триггер полезен только в том случае, когда меняется значение ключевого аттрибута.
+```
+create_hash_update_trigger(parent TEXT)
+```
+Аналогично предыдущей, но для RANGE секций.
 
 ### Управление секциями
 ```
-CREATE FUNCTION split_range_partition(partition TEXT, value ANYELEMENT)
+split_range_partition(partition TEXT, value ANYELEMENT)
 ```
 Разбивает RANGE секцию `partition` на две секции по значению `value`.
 ```
-CREATE FUNCTION merge_range_partitions(partition1 TEXT, partition2 TEXT)
+merge_range_partitions(partition1 TEXT, partition2 TEXT)
 ```
 Объединяет две смежные RANGE секции. Данные из `partition2` копируются в `partition1`, после чего секция `partition2` удаляется.
 ```
-CREATE FUNCTION append_partition(p_relation TEXT)
+append_partition(p_relation TEXT)
 ```
 Добавляет новую секцию в конец списка секций. Диапазон значений устанавливается равным последней секции.
 ```
-CREATE FUNCTION prepend_partition(p_relation TEXT)
+prepend_partition(p_relation TEXT)
 ```
 Добавляет новую секцию в начало списка секций.
 ```
-CREATE FUNCTION disable_partitioning(relation TEXT)
+disable_partitioning(relation TEXT)
 ```
 Отключает механизм секционирования `pathman` для заданной таблицы и удаляет триггер на вставку. При этом созданные ранее секции остаются без изменений.
 
