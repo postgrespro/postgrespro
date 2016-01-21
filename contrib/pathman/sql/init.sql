@@ -105,7 +105,7 @@ LANGUAGE plpgsql;
 
 
 /*
- * Validates relation name. It must be fully qualified (contain schema name)
+ * Validates relation name. It must be schema qualified
  */
 CREATE OR REPLACE FUNCTION @extschema@.validate_relname(relname TEXT)
 RETURNS TEXT AS

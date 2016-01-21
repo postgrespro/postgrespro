@@ -37,8 +37,8 @@ BEGIN
 
     /* Create triggers */
     PERFORM @extschema@.create_hash_insert_trigger(relation, attribute, partitions_count);
-    /* TODO: вернуть */
-    -- PERFORM create_hash_update_trigger(relation, attribute, partitions_count);
+    /* Do not create update trigger by default */
+    -- PERFORM @extschema@.create_hash_update_trigger(relation, attribute, partitions_count);
 
     /* Notify backend about changes */
     PERFORM @extschema@.on_create_partitions(relation::regclass::oid);
@@ -105,12 +105,21 @@ $$
 DECLARE
     relid INTEGER;
     partitions_count INTEGER;
-    q TEXT := 'DROP TABLE %s_%s';
+    rec RECORD;
+    num INTEGER := 0;
 BEGIN
     /* Drop trigger first */
     PERFORM @extschema@.drop_hash_triggers(relation);
     DELETE FROM @extschema@.pathman_config WHERE relname = relation;
     -- EXECUTE format('DROP TABLE %s CASCADE', relation);
+    
+    -- FOR rec in (SELECT * FROM pg_inherits WHERE inhparent = relation::regclass::oid)
+    -- LOOP
+    --     EXECUTE format('DROP FUNCTION IF EXISTS %s_hash_update_trigger_func() CASCADE'
+    --                    , @extschema@.get_schema_qualified_name(relation::regclass)
+    --                    , num);
+    --     num := num + 1;
+    -- END LOOP;
 
     /* Notify backend about changes */
     PERFORM @extschema@.on_remove_partitions(relation::regclass::oid);
@@ -124,19 +133,18 @@ CREATE OR REPLACE FUNCTION @extschema@.drop_hash_triggers(IN relation TEXT)
 RETURNS VOID AS
 $$
 BEGIN
-    EXECUTE format('DROP TRIGGER IF EXISTS %s_insert_trigger ON %s'
-                   , @extschema@.get_schema_qualified_name(relation::regclass)
-                   , relation);
-    EXECUTE format('DROP FUNCTION IF EXISTS %s_hash_insert_trigger_func()', relation::regclass::text);
-    -- EXECUTE format('DROP TRIGGER IF EXISTS %s_update_trigger ON %1$s', relation);
-    -- EXECUTE format('DROP FUNCTION IF EXISTS %s_hash_update_trigger_func()', relation);
+    EXECUTE format('DROP FUNCTION IF EXISTS %s_hash_insert_trigger_func() CASCADE'
+                   , relation::regclass::text);
+    EXECUTE format('DROP FUNCTION IF EXISTS %s_hash_update_trigger_func() CASCADE'
+                   , relation::regclass::text);
 END
 $$ LANGUAGE plpgsql;
 
+/*
+ * Creates an update trigger
+ */
 CREATE OR REPLACE FUNCTION @extschema@.create_hash_update_trigger(
-    IN relation TEXT
-    , IN attr TEXT
-    , IN partitions_count INTEGER)
+    IN relation TEXT)
 RETURNS VOID AS
 $$
 DECLARE
@@ -155,21 +163,24 @@ DECLARE
             EXECUTE q USING %7$s;
             RETURN NULL;
         END $body$ LANGUAGE plpgsql';
-    trigger TEXT := 'CREATE TRIGGER %s_update_trigger ' ||  
-        'BEFORE UPDATE ON %1$s_%s ' ||
-        'FOR EACH ROW EXECUTE PROCEDURE %1$s_update_trigger_func()';
+    trigger TEXT := 'CREATE TRIGGER %s_%s_update_trigger ' ||  
+        'BEFORE UPDATE ON %s_%2$s ' ||
+        'FOR EACH ROW EXECUTE PROCEDURE %3$s_update_trigger_func()';
     att_names   TEXT;
     old_fields  TEXT;
     new_fields  TEXT;
     att_val_fmt TEXT;
     att_fmt     TEXT;
     relid       INTEGER;
+    partitions_count INTEGER;
+    attr        TEXT;
 BEGIN
-    relid := relfilenode FROM pg_class WHERE relname = relation;
+    relid := relation::regclass::oid;
     SELECT string_agg(attname, ', '),
            string_agg('OLD.' || attname, ', '),
            string_agg('NEW.' || attname, ', '),
-           string_agg(attname || '=$' || attnum, ' AND '),
+           string_agg('CASE WHEN NOT $' || attnum || ' IS NULL THEN ' || attname || ' = $' || attnum ||
+                      ' ELSE ' || attname || ' IS NULL END', ' AND '),
            string_agg('$' || attnum, ', ')
     FROM pg_attribute
     WHERE attrelid=relid AND attnum>0
@@ -179,11 +190,16 @@ BEGIN
            att_val_fmt,
            att_fmt;
 
+    attr := attname FROM @extschema@.pathman_config WHERE relname = relation;
+    partitions_count := COUNT(*) FROM pg_inherits WHERE inhparent = relation::regclass::oid;
     EXECUTE format(func, relation, attr, partitions_count, att_val_fmt,
                    old_fields, att_fmt, new_fields);
     FOR num IN 0..partitions_count-1
     LOOP
-        EXECUTE format(trigger, relation, num);
+        EXECUTE format(trigger
+                       , @extschema@.get_schema_qualified_name(relation::regclass)
+                       , num
+                       , relation);
     END LOOP;
 END
 $$ LANGUAGE plpgsql;

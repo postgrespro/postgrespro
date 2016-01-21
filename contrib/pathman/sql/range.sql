@@ -499,6 +499,75 @@ $$ LANGUAGE plpgsql;
 
 
 /*
+ * Creates an update trigger
+ */
+CREATE OR REPLACE FUNCTION @extschema@.create_range_update_trigger(
+    IN relation TEXT)
+RETURNS VOID AS
+$$
+DECLARE
+    func TEXT := '
+        CREATE OR REPLACE FUNCTION %s_update_trigger_func()
+        RETURNS TRIGGER AS
+        $body$
+        DECLARE
+            old_oid INTEGER;
+            new_oid INTEGER;
+            q TEXT;
+        BEGIN
+            old_oid := TG_RELID;
+            new_oid := @extschema@.find_range_partition(''%1$s''::regclass::oid, NEW.%2$s);
+            IF old_oid = new_oid THEN RETURN NEW; END IF;
+            q := format(''DELETE FROM %%s WHERE %4$s'', old_oid::regclass::text);
+            EXECUTE q USING %5$s;
+            q := format(''INSERT INTO %%s VALUES (%6$s)'', new_oid::regclass::text);
+            EXECUTE q USING %7$s;
+            RETURN NULL;
+        END $body$ LANGUAGE plpgsql';
+    trigger TEXT := 'CREATE TRIGGER %s_update_trigger ' ||  
+        'BEFORE UPDATE ON %s ' ||
+        'FOR EACH ROW EXECUTE PROCEDURE %s_update_trigger_func()';
+    att_names   TEXT;
+    old_fields  TEXT;
+    new_fields  TEXT;
+    att_val_fmt TEXT;
+    att_fmt     TEXT;
+    relid       INTEGER;
+    rec         RECORD;
+    num         INTEGER := 0;
+    attr        TEXT;
+BEGIN
+    relid := relation::regclass::oid;
+    SELECT string_agg(attname, ', '),
+           string_agg('OLD.' || attname, ', '),
+           string_agg('NEW.' || attname, ', '),
+           string_agg('CASE WHEN NOT $' || attnum || ' IS NULL THEN ' || attname || ' = $' || attnum ||
+                      ' ELSE ' || attname || ' IS NULL END', ' AND '),
+           string_agg('$' || attnum, ', ')
+    FROM pg_attribute
+    WHERE attrelid=relid AND attnum>0
+    INTO   att_names,
+           old_fields,
+           new_fields,
+           att_val_fmt,
+           att_fmt;
+
+    attr := attname FROM @extschema@.pathman_config WHERE relname = relation;
+    EXECUTE format(func, relation, attr, 0, att_val_fmt,
+                   old_fields, att_fmt, new_fields);
+    FOR rec in (SELECT * FROM pg_inherits WHERE inhparent = relation::regclass::oid)
+    LOOP
+        EXECUTE format(trigger
+                       , @extschema@.get_schema_qualified_name(relation::regclass)
+                       , rec.inhrelid::regclass
+                       , relation);
+        num := num + 1;
+    END LOOP;
+END
+$$ LANGUAGE plpgsql;
+
+
+/*
  * Drop partitions
  */
 CREATE OR REPLACE FUNCTION @extschema@.drop_range_partitions(IN relation TEXT)

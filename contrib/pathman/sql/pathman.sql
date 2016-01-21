@@ -19,6 +19,8 @@ CREATE TABLE test.num_range_rel (
     id SERIAL PRIMARY KEY,
     txt TEXT);
 SELECT pathman.create_range_partitions('test.num_range_rel', 'id', 0, 1000, 3);
+INSERT INTO test.num_range_rel SELECT g, md5(g::TEXT) FROM generate_series(1, 3000) as g;
+VACUUM;
 
 INSERT INTO test.hash_rel VALUES (1, 1);
 INSERT INTO test.hash_rel VALUES (2, 2);
@@ -27,8 +29,16 @@ INSERT INTO test.hash_rel VALUES (4, 4);
 INSERT INTO test.hash_rel VALUES (5, 5);
 INSERT INTO test.hash_rel VALUES (6, 6);
 
-INSERT INTO test.num_range_rel SELECT g, md5(g::TEXT) FROM generate_series(1, 3000) as g;
-VACUUM;
+/* update triggers test */
+SELECT pathman.create_hash_update_trigger('test.hash_rel');
+UPDATE test.hash_rel SET value = 7 WHERE value = 6;
+EXPLAIN (COSTS OFF) SELECT * FROM test.hash_rel WHERE value = 7;
+SELECT * FROM test.hash_rel WHERE value = 7;
+
+SELECT pathman.create_range_update_trigger('test.num_range_rel');
+UPDATE test.num_range_rel SET id = 3001 WHERE id = 1;
+EXPLAIN (COSTS OFF) SELECT * FROM test.num_range_rel WHERE id = 3001;
+SELECT * FROM test.num_range_rel WHERE id = 3001;
 
 SET enable_indexscan = OFF;
 SET enable_bitmapscan = OFF;
