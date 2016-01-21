@@ -9,6 +9,7 @@
 #include "utils/builtins.h"
 #include "utils/typcache.h"
 #include "utils/lsyscache.h"
+#include "utils/bytea.h"
 
 
 HTAB   *relations = NULL;
@@ -19,7 +20,7 @@ bool	initialization_needed = true;
 static bool validate_range_constraint(Expr *, PartRelationInfo *, Datum *, Datum *);
 static bool validate_hash_constraint(Expr *expr, PartRelationInfo *prel, int *hash);
 static int cmp_range_entries(const void *p1, const void *p2);
-
+static char *get_extension_schema();
 
 /*
  * Initialize hashtables
@@ -33,42 +34,67 @@ load_config(void)
 	new_segment_created = init_dsm_segment(32);
 
 	LWLockAcquire(load_config_lock, LW_EXCLUSIVE);
-	load_part_relations_hashtable(new_segment_created);
+	load_relations_hashtable(new_segment_created);
 	LWLockRelease(load_config_lock);
 }
 
-static bool
-check_extension()
+/*
+ * Returns extension schema name or NULL. Caller is responsible for freeing
+ * the memory.
+ */
+static char *
+get_extension_schema()
 {
-	SPI_exec("SELECT * FROM pg_extension WHERE extname = 'pathman'", 0);
-	return SPI_processed > 0;
+	int ret;
+	bool isnull;
+
+	ret = SPI_exec("SELECT extnamespace::regnamespace::text FROM pg_extension WHERE extname = 'pathman'", 0);
+	if (ret > 0 && SPI_tuptable != NULL)
+	{
+		TupleDesc tupdesc = SPI_tuptable->tupdesc;
+		SPITupleTable *tuptable = SPI_tuptable;
+		HeapTuple tuple = tuptable->vals[0];
+		Datum datum = SPI_getbinval(tuple, tupdesc, 1, &isnull);
+
+		if (isnull)
+			return NULL;
+
+		return TextDatumGetCString(datum);
+	}
+	return NULL;
 }
 
 void
-load_part_relations_hashtable(bool reinitialize)
+load_relations_hashtable(bool reinitialize)
 {
+	int			ret,
+				i,
+				proc;
+	bool		isnull;
+	List	   *part_oids = NIL;
+	ListCell   *lc;
+	char	   *schema;
 	PartRelationInfo *prel;
-	int ret;
-	int i;
-	int proc;
-	bool isnull;
-	List *part_oids = NIL;
-	ListCell *lc;
+	char		sql[] = "SELECT pg_class.relfilenode, pg_attribute.attnum, pathman_config.parttype, pg_attribute.atttypid "
+						"FROM %s.pathman_config "
+						"JOIN pg_class ON pg_class.relfilenode = pathman_config.relname::regclass::oid "
+						"JOIN pg_attribute ON pg_attribute.attname = pathman_config.attname "
+						"AND attrelid = pg_class.relfilenode";
+	char *query;
 
 	SPI_connect();
+	schema = get_extension_schema();
 
-	/* if extension wasn't created then just quit */
-	if (!check_extension())
+	/* if extension doesn't exist then just quit */
+	if (!schema)
 	{
 		SPI_finish();
 		return;
 	}
 
-	ret = SPI_exec("SELECT pg_class.relfilenode, pg_attribute.attnum, pathman_config.parttype, pg_attribute.atttypid "
-				   "FROM pathman_config "
-				   "JOIN pg_class ON pg_class.relfilenode = pathman_config.relname::regclass::oid "
-				   "JOIN pg_attribute ON pg_attribute.attname = pathman_config.attname "
-				   "AND attrelid = pg_class.relfilenode", 0);
+	/* put schema name to the query */
+	query = psprintf(sql, schema);
+	ret = SPI_exec(query, 0);
 	proc = SPI_processed;
 
 	if (ret > 0 && SPI_tuptable != NULL)
@@ -94,6 +120,7 @@ load_part_relations_hashtable(bool reinitialize)
 			// prinfo->children = NIL;
 		}
 	}
+	pfree(query);
 
 	/* load children information */
 	foreach(lc, part_oids)
@@ -133,7 +160,7 @@ load_part_relations_hashtable(bool reinitialize)
 }
 
 void
-create_part_relations_hashtable()
+create_relations_hashtable()
 {
 	HASHCTL		ctl;
 

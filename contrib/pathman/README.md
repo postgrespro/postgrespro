@@ -34,11 +34,12 @@ Based on partitioning type and operator the `pathman` searches corresponding par
 
 ## Installation
 
-To install pathman run:
+To install pathman run in psql:
 ```
-make install
+CREATE SCHEMA pathman;
+CREATE EXTENSION pathman SCHEMA pathman;
 ```
-from its directory. Then modify shared_preload_libraries parameter in postgres.conf as following:
+Then modify shared_preload_libraries parameter in postgres.conf as following:
 ```
 shared_preload_libraries = 'pathman'
 ```

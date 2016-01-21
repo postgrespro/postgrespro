@@ -1,10 +1,11 @@
 \set VERBOSITY terse
+CREATE SCHEMA pathman;
+CREATE EXTENSION pathman SCHEMA pathman;
 CREATE SCHEMA test;
-CREATE EXTENSION pathman;
 CREATE TABLE test.hash_rel (
     id      SERIAL PRIMARY KEY,
     value   INTEGER);
-SELECT create_hash_partitions('test.hash_rel', 'value', 3);
+SELECT pathman.create_hash_partitions('test.hash_rel', 'value', 3);
 NOTICE:  trigger "test_hash_rel_insert_trigger" for relation "test.hash_rel" does not exist, skipping
 NOTICE:  function test.hash_rel_hash_insert_trigger_func() does not exist, skipping
  create_hash_partitions 
@@ -16,7 +17,7 @@ CREATE TABLE test.range_rel (
     id SERIAL PRIMARY KEY,
     dt TIMESTAMP,
     txt TEXT);
-SELECT create_range_partitions('test.range_rel', 'dt', '2015-01-01'::DATE, '1 month'::INTERVAL, 3);
+SELECT pathman.create_range_partitions('test.range_rel', 'dt', '2015-01-01'::DATE, '1 month'::INTERVAL, 3);
 NOTICE:  sequence "range_rel_seq" does not exist, skipping
  create_range_partitions 
 -------------------------
@@ -26,7 +27,7 @@ NOTICE:  sequence "range_rel_seq" does not exist, skipping
 CREATE TABLE test.num_range_rel (
     id SERIAL PRIMARY KEY,
     txt TEXT);
-SELECT create_range_partitions('test.num_range_rel', 'id', 0, 1000, 3);
+SELECT pathman.create_range_partitions('test.num_range_rel', 'id', 0, 1000, 3);
 NOTICE:  sequence "num_range_rel_seq" does not exist, skipping
  create_range_partitions 
 -------------------------
@@ -185,7 +186,7 @@ EXPLAIN (COSTS OFF) SELECT * FROM test.num_range_rel WHERE (id >= 500 AND id < 1
  * Test split and merge
  */
 /* Split first partition in half */
-SELECT split_range_partition('test.num_range_rel_1', 500);
+SELECT pathman.split_range_partition('test.num_range_rel_1', 500);
 NOTICE:  Creating new partition...
 NOTICE:  Copying data to new partition...
 NOTICE:  Altering original partition...
@@ -205,7 +206,7 @@ EXPLAIN (COSTS OFF) SELECT * FROM test.num_range_rel WHERE id BETWEEN 100 AND 70
          Index Cond: (id <= 700)
 (5 rows)
 
-SELECT split_range_partition('test.range_rel_1', '2015-01-15'::DATE);
+SELECT pathman.split_range_partition('test.range_rel_1', '2015-01-15'::DATE);
 NOTICE:  Creating new partition...
 NOTICE:  Copying data to new partition...
 NOTICE:  Altering original partition...
@@ -216,7 +217,7 @@ NOTICE:  Done!
 (1 row)
 
 /* Merge two partitions into one */
-SELECT merge_range_partitions('test.num_range_rel_1', 'test.num_range_rel_' || currval('test.num_range_rel_seq'));
+SELECT pathman.merge_range_partitions('test.num_range_rel_1', 'test.num_range_rel_' || currval('test.num_range_rel_seq'));
 NOTICE:  Altering first partition...
 NOTICE:  Copying data...
 NOTICE:  Dropping second partition...
@@ -234,7 +235,7 @@ EXPLAIN (COSTS OFF) SELECT * FROM test.num_range_rel WHERE id BETWEEN 100 AND 70
          Index Cond: ((id >= 100) AND (id <= 700))
 (3 rows)
 
-SELECT merge_range_partitions('test.range_rel_1', 'test.range_rel_' || currval('test.range_rel_seq'));
+SELECT pathman.merge_range_partitions('test.range_rel_1', 'test.range_rel_' || currval('test.range_rel_seq'));
 NOTICE:  Altering first partition...
 NOTICE:  Copying data...
 NOTICE:  Dropping second partition...
@@ -245,7 +246,7 @@ NOTICE:  Done!
 (1 row)
 
 /* Append and prepend partitions */
-SELECT append_partition('test.num_range_rel');
+SELECT pathman.append_partition('test.num_range_rel');
 NOTICE:  Appending new partition...
 NOTICE:  Done!
  append_partition 
@@ -253,7 +254,7 @@ NOTICE:  Done!
  
 (1 row)
 
-SELECT prepend_partition('test.num_range_rel');
+SELECT pathman.prepend_partition('test.num_range_rel');
 NOTICE:  Prepending new partition...
 NOTICE:  Done!
  prepend_partition 
@@ -261,7 +262,7 @@ NOTICE:  Done!
  
 (1 row)
 
-SELECT append_partition('test.range_rel');
+SELECT pathman.append_partition('test.range_rel');
 NOTICE:  Appending new partition...
 NOTICE:  Done!
  append_partition 
@@ -269,7 +270,7 @@ NOTICE:  Done!
  
 (1 row)
 
-SELECT prepend_partition('test.range_rel');
+SELECT pathman.prepend_partition('test.range_rel');
 NOTICE:  Prepending new partition...
 NOTICE:  Done!
  prepend_partition 
@@ -280,7 +281,7 @@ NOTICE:  Done!
 /*
  * Clean up
  */
-SELECT drop_hash_partitions('test.hash_rel');
+SELECT pathman.drop_hash_partitions('test.hash_rel');
  drop_hash_partitions 
 ----------------------
  
@@ -288,12 +289,11 @@ SELECT drop_hash_partitions('test.hash_rel');
 
 DROP TABLE test.hash_rel CASCADE;
 NOTICE:  drop cascades to 3 other objects
-SELECT drop_range_partitions('test.num_range_rel');
+SELECT pathman.drop_range_partitions('test.num_range_rel');
  drop_range_partitions 
 -----------------------
  
 (1 row)
 
 DROP TABLE test.num_range_rel CASCADE;
-NOTICE:  drop cascades to 6 other objects
 DROP EXTENSION pathman;

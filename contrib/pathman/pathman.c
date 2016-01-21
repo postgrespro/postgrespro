@@ -192,7 +192,7 @@ pathman_shmem_startup(void)
 
 	/* allocate shared memory objects */
 	alloc_dsm_table();
-	create_part_relations_hashtable();
+	create_relations_hashtable();
 	create_range_restrictions_hashtable();
 
 	LWLockRelease(AddinShmemInitLock);
@@ -203,7 +203,7 @@ pathman_shmem_startup(void)
 }
 
 /*
- * The hook function. All the magic goes here
+ * Main hook. All the magic goes here
  */
 void
 pathman_set_rel_pathlist_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)

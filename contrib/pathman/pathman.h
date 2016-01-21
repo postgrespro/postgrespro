@@ -151,10 +151,10 @@ bool initialization_needed;
 
 /* initialization functions */
 void load_config(void);
-void create_part_relations_hashtable(void);
+void create_relations_hashtable(void);
 void create_hash_restrictions_hashtable(void);
 void create_range_restrictions_hashtable(void);
-void load_part_relations_hashtable(bool reinitialize);
+void load_relations_hashtable(bool reinitialize);
 void load_check_constraints(Oid parent_oid);
 void remove_relation_info(Oid relid);
 

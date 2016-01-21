@@ -21,7 +21,7 @@ on_partitions_created(PG_FUNCTION_ARGS)
 
 	/* Reload config */
 	/* TODO: reload just the specified relation */
-	load_part_relations_hashtable(false);
+	load_relations_hashtable(false);
 
 	LWLockRelease(load_config_lock);
 
@@ -42,7 +42,7 @@ on_partitions_updated(PG_FUNCTION_ARGS)
 	{
 		LWLockAcquire(load_config_lock, LW_EXCLUSIVE);
 		remove_relation_info(relid);
-		load_part_relations_hashtable(false);
+		load_relations_hashtable(false);
 		LWLockRelease(load_config_lock);
 	}
 

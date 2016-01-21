@@ -9,23 +9,23 @@ CREATE TABLE IF NOT EXISTS @extschema@.pathman_config (
 );
 
 
-CREATE OR REPLACE FUNCTION on_create_partitions(relid INTEGER)
+CREATE OR REPLACE FUNCTION @extschema@.on_create_partitions(relid OID)
 RETURNS VOID AS 'pathman', 'on_partitions_created' LANGUAGE C STRICT;
 
-CREATE OR REPLACE FUNCTION on_update_partitions(relid INTEGER)
+CREATE OR REPLACE FUNCTION @extschema@.on_update_partitions(relid OID)
 RETURNS VOID AS 'pathman', 'on_partitions_updated' LANGUAGE C STRICT;
 
-CREATE OR REPLACE FUNCTION on_remove_partitions(relid INTEGER)
+CREATE OR REPLACE FUNCTION @extschema@.on_remove_partitions(relid OID)
 RETURNS VOID AS 'pathman', 'on_partitions_removed' LANGUAGE C STRICT;
 
-CREATE OR REPLACE FUNCTION find_range_partition(relid OID, value ANYELEMENT)
+CREATE OR REPLACE FUNCTION @extschema@.find_range_partition(relid OID, value ANYELEMENT)
 RETURNS OID AS 'pathman', 'find_range_partition' LANGUAGE C STRICT;
 
 
 /*
  * Returns min and max values for specified RANGE partition.
  */
-CREATE OR REPLACE FUNCTION get_partition_range(
+CREATE OR REPLACE FUNCTION @extschema@.get_partition_range(
     parent_relid OID, partition_relid OID, dummy ANYELEMENT)
 RETURNS ANYARRAY AS 'pathman', 'get_partition_range' LANGUAGE C STRICT;
 
@@ -33,7 +33,7 @@ RETURNS ANYARRAY AS 'pathman', 'get_partition_range' LANGUAGE C STRICT;
 /*
  * Returns N-th range (in form of array)
  */
-CREATE OR REPLACE FUNCTION get_range_by_idx(
+CREATE OR REPLACE FUNCTION @extschema@.get_range_by_idx(
     parent_relid OID, idx INTEGER, dummy ANYELEMENT)
 RETURNS ANYARRAY AS 'pathman', 'get_range_by_idx' LANGUAGE C STRICT;
 
@@ -41,19 +41,19 @@ RETURNS ANYARRAY AS 'pathman', 'get_range_by_idx' LANGUAGE C STRICT;
 /*
  * Copy rows to partitions
  */
-CREATE OR REPLACE FUNCTION partition_data(p_parent text)
+CREATE OR REPLACE FUNCTION @extschema@.partition_data(p_parent text)
 RETURNS bigint AS
 $$
 DECLARE
     rec RECORD;
 BEGIN
     FOR rec IN  (SELECT child.relname, pg_constraint.consrc
-                 FROM pathman_config
-                 JOIN pg_class AS parent ON parent.relname = pathman_config.relname
+                 FROM @extschema@.pathman_config
+                 JOIN pg_class AS parent ON parent.relname = @extschema@.pathman_config.relname
                  JOIN pg_inherits ON inhparent = parent.relfilenode
                  JOIN pg_constraint ON conrelid = inhrelid AND contype='c'
                  JOIN pg_class AS child ON child.relfilenode = inhrelid
-                 WHERE pathman_config.relname = p_parent)
+                 WHERE @extschema@.pathman_config.relname = p_parent)
     LOOP
         RAISE NOTICE 'Copying data to % (condition: %)', rec.relname, rec.consrc;
         EXECUTE format('WITH part_data AS (
@@ -72,11 +72,11 @@ LANGUAGE plpgsql;
 /*
  * Disable pathman partitioning for specified relation
  */
-CREATE OR REPLACE FUNCTION disable_partitioning(IN relation TEXT)
+CREATE OR REPLACE FUNCTION @extschema@.disable_partitioning(IN relation TEXT)
 RETURNS VOID AS
 $$
 BEGIN
-    DELETE FROM pathman_config WHERE relname = relation;
+    DELETE FROM @extschema@.pathman_config WHERE relname = relation;
     EXECUTE format('DROP TRIGGER %s_insert_trigger_func ON %1$s', relation);
 
     /* Notify backend about changes */
@@ -89,7 +89,7 @@ LANGUAGE plpgsql;
 /*
  * Returns attribute type name for relation
  */
-CREATE OR REPLACE FUNCTION get_attribute_type_name(
+CREATE OR REPLACE FUNCTION @extschema@.get_attribute_type_name(
     p_relation TEXT
     , p_attname TEXT
     , OUT p_atttype TEXT)
@@ -107,7 +107,7 @@ LANGUAGE plpgsql;
 /*
  * Validates relation name. It must be fully qualified (contain schema name)
  */
-CREATE OR REPLACE FUNCTION validate_relname(relname TEXT)
+CREATE OR REPLACE FUNCTION @extschema@.validate_relname(relname TEXT)
 RETURNS TEXT AS
 $$
 DECLARE
@@ -125,7 +125,7 @@ LANGUAGE plpgsql;
 /*
  *
  */
-CREATE OR REPLACE FUNCTION get_schema_qualified_name(cls regclass)
+CREATE OR REPLACE FUNCTION @extschema@.get_schema_qualified_name(cls regclass)
 RETURNS TEXT AS
 $$
 BEGIN

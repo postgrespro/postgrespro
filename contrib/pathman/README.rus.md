@@ -35,9 +35,11 @@ WHERE id = 150
 
 ## Installation
 
-Для установки pathman выполните в директории расширения команду:
+Для установки pathman выполните в командной строке:
 ```
-make install
+CREATE SCHEMA pathman;
+CREATE EXTENSION pathman SCHEMA pathman;
+
 ```
 Затем модифицируйте параметр shared_preload_libraries в конфигурационном файле postgres.conf:
 ```
