@@ -74,19 +74,29 @@ SELECT * FROM ts_debug('public.english', 'abilities');
 
   <para>
    Or you can create your own text search configuration. For example, with
-   the created dictionary and with the <literal>simple</> dictionary:
+   the created dictionaries and with the <literal>Snowball</> dictionary you can
+   create mixed russian-english configuration:
 
 <programlisting>
-CREATE TEXT SEARCH CONFIGURATION public.english (
+CREATE TEXT SEARCH CONFIGURATION public.russian_en (
   COPY = pg_catalog.simple
 );
 
-ALTER TEXT SEARCH CONFIGURATION public.english
-  ALTER MAPPING FOR asciiword, asciihword, hword_asciipart,
-    word, hword, hword_part
-  WITH public.english_hunspell;
+ALTER TEXT SEARCH CONFIGURATION public.russian_en
+  ALTER MAPPING FOR asciiword, asciihword, hword_asciipart
+  WITH public.english_hunspell, pg_catalog.english_stem;
+
+ALTER TEXT SEARCH CONFIGURATION public.russian_en
+  ALTER MAPPING FOR word, hword, hword_part
+  WITH public.russian_hunspell, pg_catalog.russian_stem;
 </programlisting>
 
+  </para>
+
+  <para>
+   You can create mixed dictionaries only for languages with different alphabets.
+   If languages have similar alphabets then <productname>&productname;</> can not
+   decide which dictionary should be used.
   </para>
 
   <para>

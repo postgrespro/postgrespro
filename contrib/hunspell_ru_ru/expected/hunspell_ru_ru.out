@@ -1,50 +1,78 @@
 CREATE EXTENSION hunspell_ru_ru;
 CREATE TABLE table1(name varchar);
-INSERT INTO table1 VALUES ('распространённости'), ('межнационального'),
-						('включается'), ('значу'), ('зевнув'),
-						('зевоты'), ('землей'), ('волчатами'), ('мойтесь');
-SELECT ts_lexize('public.russian_hunspell', name) FROM table1;
-      ts_lexize       
-----------------------
- {распространённость}
- {межнациональный}
- {включаться}
- {значить}
- {зевнуть}
- {зевота}
- {земля}
- {волчонок}
- {мыться}
+INSERT INTO table1 VALUES ('земля'), ('землей'), ('землями'), ('земли'),
+						('туши'), ('тушь'), ('туша'), ('тушат'),
+						('тушью');
+SELECT d.* FROM table1 AS t, LATERAL ts_debug('public.russian', t.name) AS d;
+ alias |    description    |  token  |          dictionaries           |    dictionary    |        lexemes         
+-------+-------------------+---------+---------------------------------+------------------+------------------------
+ word  | Word, all letters | земля   | {russian_hunspell,russian_stem} | russian_hunspell | {земля}
+ word  | Word, all letters | землей  | {russian_hunspell,russian_stem} | russian_hunspell | {земля}
+ word  | Word, all letters | землями | {russian_hunspell,russian_stem} | russian_hunspell | {земля}
+ word  | Word, all letters | земли   | {russian_hunspell,russian_stem} | russian_hunspell | {земля}
+ word  | Word, all letters | туши    | {russian_hunspell,russian_stem} | russian_hunspell | {туша,тушь,тушить,туш}
+ word  | Word, all letters | тушь    | {russian_hunspell,russian_stem} | russian_hunspell | {тушь}
+ word  | Word, all letters | туша    | {russian_hunspell,russian_stem} | russian_hunspell | {туша,тушить,туш}
+ word  | Word, all letters | тушат   | {russian_hunspell,russian_stem} | russian_hunspell | {тушить}
+ word  | Word, all letters | тушью   | {russian_hunspell,russian_stem} | russian_hunspell | {тушь}
 (9 rows)
 
 CREATE INDEX name_idx ON table1 USING GIN (to_tsvector('public.russian', "name"));
-SELECT d.* FROM table1 AS t, LATERAL ts_debug('public.russian', t.name) AS d;
- alias |    description    |       token        |          dictionaries           |    dictionary    |       lexemes        
--------+-------------------+--------------------+---------------------------------+------------------+----------------------
- word  | Word, all letters | распространённости | {russian_hunspell,russian_stem} | russian_hunspell | {распространённость}
- word  | Word, all letters | межнационального   | {russian_hunspell,russian_stem} | russian_hunspell | {межнациональный}
- word  | Word, all letters | включается         | {russian_hunspell,russian_stem} | russian_hunspell | {включаться}
- word  | Word, all letters | значу              | {russian_hunspell,russian_stem} | russian_hunspell | {значить}
- word  | Word, all letters | зевнув             | {russian_hunspell,russian_stem} | russian_hunspell | {зевнуть}
- word  | Word, all letters | зевоты             | {russian_hunspell,russian_stem} | russian_hunspell | {зевота}
- word  | Word, all letters | землей             | {russian_hunspell,russian_stem} | russian_hunspell | {земля}
- word  | Word, all letters | волчатами          | {russian_hunspell,russian_stem} | russian_hunspell | {волчонок}
- word  | Word, all letters | мойтесь            | {russian_hunspell,russian_stem} | russian_hunspell | {мыться}
-(9 rows)
+SELECT * FROM table1 WHERE to_tsvector('public.russian', name)
+	@@ to_tsquery('public.russian', 'землей');
+  name   
+---------
+ земля
+ землей
+ землями
+ земли
+(4 rows)
+
+SELECT * FROM table1 WHERE to_tsvector('public.russian', name)
+	@@ to_tsquery('public.russian', 'тушь');
+ name  
+-------
+ туши
+ тушь
+ тушью
+(3 rows)
+
+SELECT * FROM table1 WHERE to_tsvector('public.russian', name)
+	@@ to_tsquery('public.russian', 'туша');
+ name  
+-------
+ туши
+ туша
+ тушат
+(3 rows)
 
 DROP INDEX name_idx;
 CREATE INDEX name_idx ON table1 USING GIST (to_tsvector('public.russian', "name"));
-SELECT d.* FROM table1 AS t, LATERAL ts_debug('public.russian', t.name) AS d;
- alias |    description    |       token        |          dictionaries           |    dictionary    |       lexemes        
--------+-------------------+--------------------+---------------------------------+------------------+----------------------
- word  | Word, all letters | распространённости | {russian_hunspell,russian_stem} | russian_hunspell | {распространённость}
- word  | Word, all letters | межнационального   | {russian_hunspell,russian_stem} | russian_hunspell | {межнациональный}
- word  | Word, all letters | включается         | {russian_hunspell,russian_stem} | russian_hunspell | {включаться}
- word  | Word, all letters | значу              | {russian_hunspell,russian_stem} | russian_hunspell | {значить}
- word  | Word, all letters | зевнув             | {russian_hunspell,russian_stem} | russian_hunspell | {зевнуть}
- word  | Word, all letters | зевоты             | {russian_hunspell,russian_stem} | russian_hunspell | {зевота}
- word  | Word, all letters | землей             | {russian_hunspell,russian_stem} | russian_hunspell | {земля}
- word  | Word, all letters | волчатами          | {russian_hunspell,russian_stem} | russian_hunspell | {волчонок}
- word  | Word, all letters | мойтесь            | {russian_hunspell,russian_stem} | russian_hunspell | {мыться}
-(9 rows)
+SELECT * FROM table1 WHERE to_tsvector('public.russian', name)
+	@@ to_tsquery('public.russian', 'землей');
+  name   
+---------
+ земля
+ землей
+ землями
+ земли
+(4 rows)
+
+SELECT * FROM table1 WHERE to_tsvector('public.russian', name)
+	@@ to_tsquery('public.russian', 'тушь');
+ name  
+-------
+ туши
+ тушь
+ тушью
+(3 rows)
+
+SELECT * FROM table1 WHERE to_tsvector('public.russian', name)
+	@@ to_tsquery('public.russian', 'туша');
+ name  
+-------
+ туши
+ туша
+ тушат
+(3 rows)
 

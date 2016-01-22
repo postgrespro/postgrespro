@@ -16,7 +16,7 @@ CREATE TEXT SEARCH CONFIGURATION public.russian (
 
 ALTER TEXT SEARCH CONFIGURATION public.russian
     ALTER MAPPING FOR asciiword, asciihword, hword_asciipart
-    WITH public.russian_hunspell, pg_catalog.english_stem;
+    WITH pg_catalog.english_stem;
 
 ALTER TEXT SEARCH CONFIGURATION public.russian
     ALTER MAPPING FOR word, hword, hword_part
