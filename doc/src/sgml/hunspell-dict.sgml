@@ -51,12 +51,6 @@
       <entry><literal>public.russian_hunspell</literal></entry>
       <entry><literal>public.russian</literal></entry>
      </row>
-     <row>
-      <entry>Turkish</entry>
-      <entry><filename>hunspell_tr_tr</filename></entry>
-      <entry><literal>public.turkish_hunspell</literal></entry>
-      <entry><literal>public.turkish</literal></entry>
-     </row>
     </tbody>
   </tgroup>
  </table>

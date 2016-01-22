@@ -25,7 +25,6 @@ SUBDIRS = \
 		hunspell_fr	\
 		hunspell_nl_nl	\
 		hunspell_ru_ru	\
-		hunspell_tr_tr	\
 		intagg		\
 		intarray	\
 		isn		\

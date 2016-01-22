@@ -1,79 +1,57 @@
 CREATE EXTENSION hunspell_fr;
-SELECT ts_lexize('french_hunspell', 'beau');
- ts_lexize 
------------
- {beau}
-(1 row)
-
-SELECT ts_lexize('french_hunspell', 'antérieur');
-  ts_lexize   
---------------
- {antérieure}
-(1 row)
-
-SELECT ts_lexize('french_hunspell', 'fraternel');
-   ts_lexize   
----------------
- {fraternelle}
-(1 row)
-
-SELECT ts_lexize('french_hunspell', 'plaît');
- ts_lexize 
------------
- {plaire}
-(1 row)
-
-SELECT ts_lexize('french_hunspell', 'm''appelle');
- ts_lexize 
------------
- {appeler}
-(1 row)
-
-SELECT ts_lexize('french_hunspell', 'l''anglais');
- ts_lexize  
-------------
- {anglaise}
-(1 row)
-
-SELECT ts_lexize('french_hunspell', 'comprends');
-  ts_lexize   
---------------
- {comprendre}
-(1 row)
-
-SELECT ts_lexize('french_hunspell', 'désolée');
- ts_lexize 
------------
- {désoler}
-(1 row)
-
-SELECT ts_lexize('french_hunspell', 'cents');
- ts_lexize 
------------
- {cent}
-(1 row)
-
-SELECT ts_lexize('french_hunspell', 'grammairiens');
+CREATE TABLE table1(name varchar);
+INSERT INTO table1 VALUES ('beau'), ('antérieur'), ('fraternel'),
+						('plaît'), ('comprends'), ('désolée'),
+						('cents'), ('grammairiens'), ('résistèrent'),
+						('derniers'), ('rapprochent');
+SELECT ts_lexize('public.french_hunspell', name) FROM table1;
     ts_lexize    
 -----------------
+ {beau}
+ {antérieure}
+ {fraternelle}
+ {plaire}
+ {comprendre}
+ {désoler}
+ {cent}
  {grammairienne}
-(1 row)
-
-SELECT ts_lexize('french_hunspell', 'résistèrent');
- ts_lexize  
-------------
  {résister}
-(1 row)
-
-SELECT ts_lexize('french_hunspell', 'derniers');
- ts_lexize  
-------------
  {dernière}
-(1 row)
-
-SELECT ts_lexize('french_hunspell', 'rapprochent');
-  ts_lexize   
---------------
  {rapprocher}
-(1 row)
+(11 rows)
+
+CREATE INDEX name_idx ON table1 USING GIN (to_tsvector('public.french', "name"));
+SELECT d.* FROM table1 AS t, LATERAL ts_debug('public.french', t.name) AS d;
+   alias   |    description    |    token     |         dictionaries          |   dictionary    |     lexemes     
+-----------+-------------------+--------------+-------------------------------+-----------------+-----------------
+ asciiword | Word, all ASCII   | beau         | {french_hunspell,french_stem} | french_hunspell | {beau}
+ word      | Word, all letters | antérieur    | {french_hunspell,french_stem} | french_hunspell | {antérieure}
+ asciiword | Word, all ASCII   | fraternel    | {french_hunspell,french_stem} | french_hunspell | {fraternelle}
+ word      | Word, all letters | plaît        | {french_hunspell,french_stem} | french_hunspell | {plaire}
+ asciiword | Word, all ASCII   | comprends    | {french_hunspell,french_stem} | french_hunspell | {comprendre}
+ word      | Word, all letters | désolée      | {french_hunspell,french_stem} | french_hunspell | {désoler}
+ asciiword | Word, all ASCII   | cents        | {french_hunspell,french_stem} | french_hunspell | {cent}
+ asciiword | Word, all ASCII   | grammairiens | {french_hunspell,french_stem} | french_hunspell | {grammairienne}
+ word      | Word, all letters | résistèrent  | {french_hunspell,french_stem} | french_hunspell | {résister}
+ asciiword | Word, all ASCII   | derniers     | {french_hunspell,french_stem} | french_hunspell | {dernière}
+ asciiword | Word, all ASCII   | rapprochent  | {french_hunspell,french_stem} | french_hunspell | {rapprocher}
+(11 rows)
+
+DROP INDEX name_idx;
+CREATE INDEX name_idx ON table1 USING GIST (to_tsvector('public.french', "name"));
+SELECT d.* FROM table1 AS t, LATERAL ts_debug('public.french', t.name) AS d;
+   alias   |    description    |    token     |         dictionaries          |   dictionary    |     lexemes     
+-----------+-------------------+--------------+-------------------------------+-----------------+-----------------
+ asciiword | Word, all ASCII   | beau         | {french_hunspell,french_stem} | french_hunspell | {beau}
+ word      | Word, all letters | antérieur    | {french_hunspell,french_stem} | french_hunspell | {antérieure}
+ asciiword | Word, all ASCII   | fraternel    | {french_hunspell,french_stem} | french_hunspell | {fraternelle}
+ word      | Word, all letters | plaît        | {french_hunspell,french_stem} | french_hunspell | {plaire}
+ asciiword | Word, all ASCII   | comprends    | {french_hunspell,french_stem} | french_hunspell | {comprendre}
+ word      | Word, all letters | désolée      | {french_hunspell,french_stem} | french_hunspell | {désoler}
+ asciiword | Word, all ASCII   | cents        | {french_hunspell,french_stem} | french_hunspell | {cent}
+ asciiword | Word, all ASCII   | grammairiens | {french_hunspell,french_stem} | french_hunspell | {grammairienne}
+ word      | Word, all letters | résistèrent  | {french_hunspell,french_stem} | french_hunspell | {résister}
+ asciiword | Word, all ASCII   | derniers     | {french_hunspell,french_stem} | french_hunspell | {dernière}
+ asciiword | Word, all ASCII   | rapprochent  | {french_hunspell,french_stem} | french_hunspell | {rapprocher}
+(11 rows)
 
