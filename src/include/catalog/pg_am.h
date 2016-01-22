@@ -51,7 +51,7 @@ CATALOG(pg_am,2601)
 	bool		amstorage;		/* can storage type differ from column type? */
 	bool		amclusterable;	/* does AM support cluster command? */
 	bool		ampredlocks;	/* does AM handle predicate locks? */
-	bool		amcanincluding;	/* does AM support INCLUDING columns? */
+	bool		amcaninclude;	/* does AM support INCLUDING columns? */
 	Oid			amkeytype;		/* type of data in index, or InvalidOid */
 	regproc		aminsert;		/* "insert this tuple" function */
 	regproc		ambeginscan;	/* "prepare for index scan" function */
@@ -96,7 +96,7 @@ typedef FormData_pg_am *Form_pg_am;
 #define Anum_pg_am_amstorage			12
 #define Anum_pg_am_amclusterable		13
 #define Anum_pg_am_ampredlocks			14
-#define Anum_pg_am_amcanincluding		15
+#define Anum_pg_am_amcaninclude			15
 #define Anum_pg_am_amkeytype			16
 #define Anum_pg_am_aminsert				17
 #define Anum_pg_am_ambeginscan			18

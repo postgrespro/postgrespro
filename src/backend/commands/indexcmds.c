@@ -320,8 +320,8 @@ DefineIndex(Oid relationId,
 	Datum		reloptions;
 	int16	   *coloptions;
 	IndexInfo  *indexInfo;
-	int			numberOfAttributes,
-				numberOfKeyAttributes;
+	int			numberOfAttributes;
+	int			numberOfKeyAttributes;
 	TransactionId limitXmin;
 	VirtualTransactionId *old_snapshots;
 	ObjectAddress address;
@@ -336,7 +336,6 @@ DefineIndex(Oid relationId,
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
 				 errmsg("included columns must not intersect with key columns")));
-
 	/*
 	 * count attributes in index
 	 */
@@ -351,7 +350,7 @@ DefineIndex(Oid relationId,
 	 * we have one list with all columns. Later we can determine which of these
 	 * are key columns, and which are just part of the INCLUDING list by check the list
 	 * position. A list item in a position less than ii_NumIndexKeyAttrs is part of
-	 * the indexed columns, and anything equal to and over is part of the
+	 * the key columns, and anything equal to and over is part of the
 	 * INCLUDING columns.
 	 */
 	stmt->indexParams = list_concat(stmt->indexParams, stmt->indexIncludingParams);
@@ -488,7 +487,6 @@ DefineIndex(Oid relationId,
 	 * look up the access method, verify it can handle the requested features
 	 */
 	accessMethodName = stmt->accessMethod;
-
 	tuple = SearchSysCache1(AMNAME, PointerGetDatum(accessMethodName));
 	if (!HeapTupleIsValid(tuple))
 	{
@@ -523,6 +521,11 @@ DefineIndex(Oid relationId,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 			   errmsg("access method \"%s\" does not support unique indexes",
 					  accessMethodName)));
+	if (list_length(stmt->indexIncludingParams) > 0 && !accessMethodForm->amcaninclude)
+		ereport(ERROR,
+		(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+		errmsg("access method \"%s\" does not support included columns",
+				accessMethodName)));
 	if (numberOfAttributes > 1 && !accessMethodForm->amcanmulticol)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
@@ -533,12 +536,6 @@ DefineIndex(Oid relationId,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 		errmsg("access method \"%s\" does not support exclusion constraints",
 			   accessMethodName)));
-
-	if (list_length(stmt->indexIncludingParams) > 0 && !accessMethodForm->amcanincluding)
-		ereport(ERROR,
-		(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-		errmsg("access method \"%s\" does not support included columns",
-				accessMethodName)));
 
 	amcanorder = accessMethodForm->amcanorder;
 	amoptions = accessMethodForm->amoptions;
@@ -988,16 +985,15 @@ ComputeIndexAttrs(IndexInfo *indexInfo,
 	ListCell   *nextExclOp;
 	ListCell   *lc;
 	int			attn;
+	int 		nkeycols = indexInfo->ii_NumIndexKeyAttrs;
 
 	/* Allocate space for exclusion operator info, if needed */
 	if (exclusionOpNames)
 	{
-		int			ncols = list_length(attList);
-
-		Assert(list_length(exclusionOpNames) == ncols);
-		indexInfo->ii_ExclusionOps = (Oid *) palloc(sizeof(Oid) * ncols);
-		indexInfo->ii_ExclusionProcs = (Oid *) palloc(sizeof(Oid) * ncols);
-		indexInfo->ii_ExclusionStrats = (uint16 *) palloc(sizeof(uint16) * ncols);
+		Assert(list_length(exclusionOpNames) == nkeycols);
+		indexInfo->ii_ExclusionOps = (Oid *) palloc(sizeof(Oid) * nkeycols);
+		indexInfo->ii_ExclusionProcs = (Oid *) palloc(sizeof(Oid) * nkeycols);
+		indexInfo->ii_ExclusionStrats = (uint16 *) palloc(sizeof(uint16) * nkeycols);
 		nextExclOp = list_head(exclusionOpNames);
 	}
 	else
@@ -1050,6 +1046,11 @@ ComputeIndexAttrs(IndexInfo *indexInfo,
 			Node	   *expr = attribute->expr;
 
 			Assert(expr != NULL);
+
+			if (attn >= nkeycols)
+				ereport(ERROR,
+					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+						errmsg("Expressions in INCLUDING clause are not supported")));
 			atttype = exprType(expr);
 			attcollation = exprCollation(expr);
 
@@ -1130,6 +1131,11 @@ ComputeIndexAttrs(IndexInfo *indexInfo,
 		/*
 		 * Identify the opclass to use.
 		 */
+		if (attn >= nkeycols)
+		{
+			attn++;
+			continue;
+		}
 		classOidP[attn] = GetIndexOpClass(attribute->opclass,
 										  atttype,
 										  accessMethodName,

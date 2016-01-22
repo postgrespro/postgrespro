@@ -107,7 +107,7 @@ bool
 _bt_doinsert(Relation rel, IndexTuple itup,
 			 IndexUniqueCheck checkUnique, Relation heapRel)
 {
-	bool		is_unique;
+	bool		is_unique = false;
 	int			nkeyatts;
 	ScanKey		itup_scankey;
 	BTStack		stack;
@@ -117,7 +117,6 @@ _bt_doinsert(Relation rel, IndexTuple itup,
 	Assert(rel->rd_index->indnatts != 0);
 	Assert(rel->rd_index->indnkeyatts != 0);
 	nkeyatts = IndexRelationGetNumberOfKeyAttributes(rel);
-	is_unique = false;
 
 	/* we need an insertion scan key to do our search, so build one */
 	itup_scankey = _bt_mkscankey(rel, itup);
@@ -254,9 +253,6 @@ _bt_check_unique(Relation rel, IndexTuple itup, Relation heapRel,
 	BTPageOpaque opaque;
 	Buffer		nbuf = InvalidBuffer;
 	bool		found = false;
-
-	Assert(rel->rd_index->indnatts != 0);
-	Assert(rel->rd_index->indnkeyatts != 0);
 
 	/* Assume unique until we find a duplicate */
 	*is_unique = true;
@@ -1977,8 +1973,11 @@ _bt_newroot(Relation rel, Buffer lbuf, Buffer rbuf)
 	itemid = PageGetItemId(lpage, P_HIKEY);
 	right_item_sz = ItemIdGetLength(itemid);
 	item = (IndexTuple) PageGetItem(lpage, itemid);
-	right_item = CopyIndexTuple(item);
-	right_item = index_reform_tuple(rel, right_item, rel->rd_index->indnatts, rel->rd_index->indnkeyatts);
+
+	if (rel->rd_index->indnatts != rel->rd_index->indnkeyatts)
+		right_item = index_reform_tuple(rel, item, rel->rd_index->indnatts, rel->rd_index->indnkeyatts);
+	else
+		right_item = CopyIndexTuple(item);
 	ItemPointerSet(&(right_item->t_tid), rbkno, P_HIKEY);
 
 	/* NO EREPORT(ERROR) from here till newroot op is logged */

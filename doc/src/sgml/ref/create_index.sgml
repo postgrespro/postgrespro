@@ -157,7 +157,7 @@ CREATE [ UNIQUE ] INDEX [ CONCURRENTLY ] [ [ IF NOT EXISTS ] <replaceable class=
         <literal>INCLUDING</> clause, on which the uniqueness is not enforced upon.
         It's the same with other constraints (PRIMARY KEY and EXCLUDE). This can
         also can be used for non-unique indexes as any columns which are not required
-        for the searching or ordering of records can defined in the
+        for the searching or ordering of records can be included in the
         <literal>INCLUDING</> clause, which can slightly reduce the size of the index,
         due to storing included attributes only in leaf index pages.
         Currently, only the B-tree access method supports this feature.

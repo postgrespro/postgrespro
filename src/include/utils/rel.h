@@ -352,7 +352,7 @@ typedef struct ViewOptions
 
 /*
  * IndexRelationGetNumberOfKeyAttributes
- *		Returns the number of key attributes in a relation.
+ *		Returns the number of key attributes in an index.
  */
 #define IndexRelationGetNumberOfKeyAttributes(relation) \
 		((relation)->rd_index->indnkeyatts)

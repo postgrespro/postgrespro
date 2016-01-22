@@ -209,34 +209,23 @@ get_relation_info(PlannerInfo *root, Oid relationObjectId, bool inhparent,
 			info->ncolumns = ncolumns = index->indnatts;
 			info->nkeycolumns = nkeycolumns = index->indnkeyatts;
 
-			/* TODO
-			 * All these arrays below still have length = ncolumns.
-			 * Fix, when optional opclass functionality will be added.
-			 *
-			 * Generally, any column could be returned by IndexOnlyScan.
-			 * Even if it doesn't have opclass for that type of index.
-			 *
-			 * For example,
-			 * we have an index "create index on tbl(c1) including c2".
-			 * If there's no suitable oplass on c2
-			 * query "select c2 from tbl where c2 < 10" can't use index-only scan
-			 * and query "select c2 from tbl where c1 < 10" can.
-			 * But now it doesn't because of requirement that
-			 * each indexed column must have an opclass.
-			 */
 			info->indexkeys = (int *) palloc(sizeof(int) * ncolumns);
 			info->indexcollations = (Oid *) palloc(sizeof(Oid) * ncolumns);
-			info->opfamily = (Oid *) palloc(sizeof(Oid) * ncolumns);
-			info->opcintype = (Oid *) palloc(sizeof(Oid) * ncolumns);
+			info->opfamily = (Oid *) palloc(sizeof(Oid) * nkeycolumns);
+			info->opcintype = (Oid *) palloc(sizeof(Oid) * nkeycolumns);
 			info->canreturn = (bool *) palloc(sizeof(bool) * ncolumns);
 
 			for (i = 0; i < ncolumns; i++)
 			{
 				info->indexkeys[i] = index->indkey.values[i];
 				info->indexcollations[i] = indexRelation->rd_indcollation[i];
+				info->canreturn[i] = index_can_return(indexRelation, i + 1);
+			}
+
+			for (i = 0; i < nkeycolumns; i++)
+			{
 				info->opfamily[i] = indexRelation->rd_opfamily[i];
 				info->opcintype[i] = indexRelation->rd_opcintype[i];
-				info->canreturn[i] = index_can_return(indexRelation, i + 1);
 			}
 
 			info->relam = indexRelation->rd_rel->relam;
@@ -260,10 +249,10 @@ get_relation_info(PlannerInfo *root, Oid relationObjectId, bool inhparent,
 				Assert(indexRelation->rd_am->amcanorder);
 
 				info->sortopfamily = info->opfamily;
-				info->reverse_sort = (bool *) palloc(sizeof(bool) * ncolumns);
-				info->nulls_first = (bool *) palloc(sizeof(bool) * ncolumns);
+				info->reverse_sort = (bool *) palloc(sizeof(bool) * nkeycolumns);
+				info->nulls_first = (bool *) palloc(sizeof(bool) * nkeycolumns);
 
-				for (i = 0; i < ncolumns; i++)
+				for (i = 0; i < nkeycolumns; i++)
 				{
 					int16		opt = indexRelation->rd_indoption[i];
 
@@ -287,11 +276,11 @@ get_relation_info(PlannerInfo *root, Oid relationObjectId, bool inhparent,
 				 * of current or foreseeable amcanorder index types, it's not
 				 * worth expending more effort on now.
 				 */
-				info->sortopfamily = (Oid *) palloc(sizeof(Oid) * ncolumns);
-				info->reverse_sort = (bool *) palloc(sizeof(bool) * ncolumns);
-				info->nulls_first = (bool *) palloc(sizeof(bool) * ncolumns);
+				info->sortopfamily = (Oid *) palloc(sizeof(Oid) * nkeycolumns);
+				info->reverse_sort = (bool *) palloc(sizeof(bool) * nkeycolumns);
+				info->nulls_first = (bool *) palloc(sizeof(bool) * nkeycolumns);
 
-				for (i = 0; i < ncolumns; i++)
+				for (i = 0; i < nkeycolumns; i++)
 				{
 					int16		opt = indexRelation->rd_indoption[i];
 					Oid			ltopr;

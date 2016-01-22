@@ -765,10 +765,10 @@ amrestrpos (IndexScanDesc scan);
   <para>
    <productname>&productname;</productname> enforces SQL uniqueness constraints
    using <firstterm>unique indexes</>, which are indexes that disallow
-   multiple entries with identical keys. An access method that supports this
+   multiple entries with identical keys.  An access method that supports this
    feature sets <structname>pg_am</>.<structfield>amcanunique</> true.
-   Columns included with clause INCLUDING  aren't used to enforce uniqueness.
-   (At present, only b-tree supports them.)
+   (At present, only b-tree supports it.) Columns which are present in the
+   <literal>INCLUDING</> clause are not used to enforce uniqueness.
   </para>
 
   <para>

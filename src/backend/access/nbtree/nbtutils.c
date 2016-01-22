@@ -64,14 +64,15 @@ _bt_mkscankey(Relation rel, IndexTuple itup)
 	ScanKey		skey;
 	TupleDesc	itupdesc;
 	int			nkeyatts;
-	int16	   *indoption = rel->rd_indoption;
+	int16	   *indoption;
 	int			i;
+
 	itupdesc = RelationGetDescr(rel);
+	nkeyatts = rel->rd_index->indnkeyatts;
+	indoption = rel->rd_indoption;
 
 	Assert(rel->rd_index->indnkeyatts != 0);
 	Assert(rel->rd_index->indnkeyatts <= rel->rd_index->indnatts);
-
-	nkeyatts = rel->rd_index->indnkeyatts;
 
 	/*
 	 * We'll execute search using ScanKey constructed on key columns.
@@ -121,16 +122,16 @@ ScanKey
 _bt_mkscankey_nodata(Relation rel)
 {
 	ScanKey		skey;
-	int			natts;
+	int			nkeyatts;
 	int16	   *indoption;
 	int			i;
 
-	natts = RelationGetNumberOfAttributes(rel);
+	nkeyatts = IndexRelationGetNumberOfKeyAttributes(rel);
 	indoption = rel->rd_indoption;
 
-	skey = (ScanKey) palloc(natts * sizeof(ScanKeyData));
+	skey = (ScanKey) palloc(nkeyatts * sizeof(ScanKeyData));
 
-	for (i = 0; i < natts; i++)
+	for (i = 0; i < nkeyatts; i++)
 	{
 		FmgrInfo   *procinfo;
 		int			flags;
