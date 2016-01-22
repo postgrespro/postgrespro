@@ -292,7 +292,7 @@ load_check_constraints(Oid parent_oid)
 		{
 			if (ranges[i].max > ranges[i+1].min)
 			{
-				elog(WARNING, "Partitions %u and %u overlap. Disabling pathman for relation %u..",
+				elog(WARNING, "Partitions %u and %u overlap. Disabling pathman for relation %u...",
 					 ranges[i].child_oid, ranges[i+1].child_oid, parent_oid);
 				hash_search(relations, (const void *) &parent_oid, HASH_REMOVE, &found);
 			}
