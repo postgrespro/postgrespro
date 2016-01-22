@@ -645,7 +645,7 @@
      </row>
 
       <row>
-      <entry><structfield>amcanincluding</structfield></entry>
+      <entry><structfield>amcaninclude</structfield></entry>
       <entry><type>bool</type></entry>
       <entry></entry>
       <entry>Does the access method support included columns?</entry>
