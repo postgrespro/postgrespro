@@ -55,4 +55,93 @@
   </tgroup>
  </table>
 
+ <sect2>
+  <title>Examples</title>
+
+  <para>
+   Text search objects will be created after installation of a dictionary module.
+   We can test created configuration:
+
+<programlisting>
+SELECT * FROM ts_debug('public.english', 'abilities');
+   alias   |   description   |   token   |          dictionaries           |    dictionary    |  lexemes  
+-----------+-----------------+-----------+---------------------------------+------------------+-----------
+ asciiword | Word, all ASCII | abilities | {english_hunspell,english_stem} | english_hunspell | {ability}
+(1 row)
+</programlisting>
+
+  </para>
+
+  <para>
+   Or you can create your own text search configuration. For example, with
+   the created dictionary and with the <literal>simple</> dictionary:
+
+<programlisting>
+CREATE TEXT SEARCH CONFIGURATION public.english (
+  COPY = pg_catalog.simple
+);
+
+ALTER TEXT SEARCH CONFIGURATION public.english
+  ALTER MAPPING FOR asciiword, asciihword, hword_asciipart,
+    word, hword, hword_part
+  WITH public.english_hunspell;
+</programlisting>
+
+  </para>
+
+  <para>
+   A text search configuration which is created with a dictionary module is ready
+   to use. For example, in this text you can search some words:
+
+<programlisting>
+SELECT to_tsvector('public.english', 'The blue whale is the largest animal');
+               to_tsvector               
+-----------------------------------------
+ 'animal':7 'blue':2 'large':6 'whale':3
+(1 row)
+</programlisting>
+
+  </para>
+
+  <para>
+   Search query might looks like this:
+
+<programlisting>
+SELECT to_tsvector('public.english', 'The blue whale is the largest animal')
+  @@ to_tsquery('public.english', 'large & whale');
+ ?column? 
+----------
+ t
+(1 row)
+</programlisting>
+
+  </para>
+
+  <para>
+   With this configurations you can search a text using GIN or GIST indexes.
+   For example, there is a table with GIN index:
+
+<programlisting>
+CREATE TABLE table1 (t varchar);
+INSERT INTO table1 VALUES ('The blue whale is the largest animal');
+CREATE INDEX t_idx ON table1 USING GIN (to_tsvector('public.english', "t"));
+</programlisting>
+
+  </para>
+
+  <para>
+   For this table you can execute the following query:
+
+<programlisting>
+SELECT * FROM table1 where to_tsvector('public.english', t)
+  @@ to_tsquery('public.english', 'blue & animal');
+                  t                   
+--------------------------------------
+ The blue whale is the largest animal
+(1 row)
+</programlisting>
+
+  </para>
+ </sect2>
+
 </sect1>

@@ -1,57 +1,57 @@
 CREATE EXTENSION hunspell_fr;
 CREATE TABLE table1(name varchar);
-INSERT INTO table1 VALUES ('beau'), ('antérieur'), ('fraternel'),
-						('plaît'), ('comprends'), ('désolée'),
-						('cents'), ('grammairiens'), ('résistèrent'),
-						('derniers'), ('rapprochent');
-SELECT ts_lexize('public.french_hunspell', name) FROM table1;
-    ts_lexize    
------------------
- {beau}
- {antérieure}
- {fraternelle}
- {plaire}
- {comprendre}
- {désoler}
- {cent}
- {grammairienne}
- {résister}
- {dernière}
- {rapprocher}
-(11 rows)
+INSERT INTO table1 VALUES ('batifoler'), ('batifolant'), ('batifole'), ('batifolait'),
+						('consentant'), ('consentir'), ('consentiriez');
+SELECT d.* FROM table1 AS t, LATERAL ts_debug('public.french', t.name) AS d;
+   alias   |   description   |    token     |         dictionaries          |   dictionary    |         lexemes         
+-----------+-----------------+--------------+-------------------------------+-----------------+-------------------------
+ asciiword | Word, all ASCII | batifoler    | {french_hunspell,french_stem} | french_hunspell | {batifoler}
+ asciiword | Word, all ASCII | batifolant   | {french_hunspell,french_stem} | french_hunspell | {batifolante,batifoler}
+ asciiword | Word, all ASCII | batifole     | {french_hunspell,french_stem} | french_hunspell | {batifoler}
+ asciiword | Word, all ASCII | batifolait   | {french_hunspell,french_stem} | french_hunspell | {batifoler}
+ asciiword | Word, all ASCII | consentant   | {french_hunspell,french_stem} | french_hunspell | {consentante,consentir}
+ asciiword | Word, all ASCII | consentir    | {french_hunspell,french_stem} | french_hunspell | {consentir}
+ asciiword | Word, all ASCII | consentiriez | {french_hunspell,french_stem} | french_hunspell | {consentir}
+(7 rows)
 
 CREATE INDEX name_idx ON table1 USING GIN (to_tsvector('public.french', "name"));
-SELECT d.* FROM table1 AS t, LATERAL ts_debug('public.french', t.name) AS d;
-   alias   |    description    |    token     |         dictionaries          |   dictionary    |     lexemes     
------------+-------------------+--------------+-------------------------------+-----------------+-----------------
- asciiword | Word, all ASCII   | beau         | {french_hunspell,french_stem} | french_hunspell | {beau}
- word      | Word, all letters | antérieur    | {french_hunspell,french_stem} | french_hunspell | {antérieure}
- asciiword | Word, all ASCII   | fraternel    | {french_hunspell,french_stem} | french_hunspell | {fraternelle}
- word      | Word, all letters | plaît        | {french_hunspell,french_stem} | french_hunspell | {plaire}
- asciiword | Word, all ASCII   | comprends    | {french_hunspell,french_stem} | french_hunspell | {comprendre}
- word      | Word, all letters | désolée      | {french_hunspell,french_stem} | french_hunspell | {désoler}
- asciiword | Word, all ASCII   | cents        | {french_hunspell,french_stem} | french_hunspell | {cent}
- asciiword | Word, all ASCII   | grammairiens | {french_hunspell,french_stem} | french_hunspell | {grammairienne}
- word      | Word, all letters | résistèrent  | {french_hunspell,french_stem} | french_hunspell | {résister}
- asciiword | Word, all ASCII   | derniers     | {french_hunspell,french_stem} | french_hunspell | {dernière}
- asciiword | Word, all ASCII   | rapprochent  | {french_hunspell,french_stem} | french_hunspell | {rapprocher}
-(11 rows)
+SELECT * FROM table1 WHERE to_tsvector('public.french', name)
+	@@ to_tsquery('public.french', 'batifolant');
+    name    
+------------
+ batifoler
+ batifolant
+ batifole
+ batifolait
+(4 rows)
+
+SELECT * FROM table1 WHERE to_tsvector('public.french', name)
+	@@ to_tsquery('public.french', 'consentiriez');
+     name     
+--------------
+ consentant
+ consentir
+ consentiriez
+(3 rows)
 
 DROP INDEX name_idx;
 CREATE INDEX name_idx ON table1 USING GIST (to_tsvector('public.french', "name"));
-SELECT d.* FROM table1 AS t, LATERAL ts_debug('public.french', t.name) AS d;
-   alias   |    description    |    token     |         dictionaries          |   dictionary    |     lexemes     
------------+-------------------+--------------+-------------------------------+-----------------+-----------------
- asciiword | Word, all ASCII   | beau         | {french_hunspell,french_stem} | french_hunspell | {beau}
- word      | Word, all letters | antérieur    | {french_hunspell,french_stem} | french_hunspell | {antérieure}
- asciiword | Word, all ASCII   | fraternel    | {french_hunspell,french_stem} | french_hunspell | {fraternelle}
- word      | Word, all letters | plaît        | {french_hunspell,french_stem} | french_hunspell | {plaire}
- asciiword | Word, all ASCII   | comprends    | {french_hunspell,french_stem} | french_hunspell | {comprendre}
- word      | Word, all letters | désolée      | {french_hunspell,french_stem} | french_hunspell | {désoler}
- asciiword | Word, all ASCII   | cents        | {french_hunspell,french_stem} | french_hunspell | {cent}
- asciiword | Word, all ASCII   | grammairiens | {french_hunspell,french_stem} | french_hunspell | {grammairienne}
- word      | Word, all letters | résistèrent  | {french_hunspell,french_stem} | french_hunspell | {résister}
- asciiword | Word, all ASCII   | derniers     | {french_hunspell,french_stem} | french_hunspell | {dernière}
- asciiword | Word, all ASCII   | rapprochent  | {french_hunspell,french_stem} | french_hunspell | {rapprocher}
-(11 rows)
+SELECT * FROM table1 WHERE to_tsvector('public.french', name)
+	@@ to_tsquery('public.french', 'batifolant');
+    name    
+------------
+ batifoler
+ batifolant
+ batifole
+ batifolait
+(4 rows)
+
+SELECT * FROM table1 WHERE to_tsvector('public.french', name)
+	@@ to_tsquery('public.french', 'consentiriez');
+     name     
+--------------
+ consentant
+ consentir
+ consentiriez
+(3 rows)
 
