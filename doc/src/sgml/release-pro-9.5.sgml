@@ -27,6 +27,9 @@
      </para>
     </listitem>
     <listitem>
+    Covering indexes.
+    </listitem>
+    <listitem>
     <para>
     Use portable implementation of the internationalization functions
     (libicu) instead of system specific.
@@ -34,17 +37,17 @@
     </listitem>
     <listitem>
      <para>
-       Contrib module pg_trgm supports substring searches (Arthur Zakirov).
+       Contrib module pg_trgm supports substring searches.
      </para>
      </listitem>
      <listitem>
      <para>
-        Save-restore execution plan extension (Yury Zhuravlev)
+        Save-restore execution plan extension.
      </para>
      </listitem>
      <listitem>
      <para>
-     Dump/restore database statistics (Dmitry Ivanov)
+     Dump/restore database statistics.
      </para>
     </listitem>
     <listitem>
@@ -100,7 +103,10 @@
 
       <listitem>
        <para>
-       <!-- to be filled -->
+       Covering indexes. Now CREATE INDEX supports optional INCLUDING
+       clause, which allows to include additional columns, which would
+       not affect sort order or uniqueness, but allow speed up some
+       queries using index only scans.
        </para>
 
       </listitem>
