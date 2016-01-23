@@ -49,7 +49,7 @@ get_extension_schema()
 	bool isnull;
 
 	ret = SPI_exec("SELECT extnamespace::regnamespace::text FROM pg_extension WHERE extname = 'pathman'", 0);
-	if (ret > 0 && SPI_tuptable != NULL)
+	if (ret > 0 && SPI_tuptable != NULL && SPI_processed > 0)
 	{
 		TupleDesc tupdesc = SPI_tuptable->tupdesc;
 		SPITupleTable *tuptable = SPI_tuptable;
