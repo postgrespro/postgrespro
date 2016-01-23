@@ -1,7 +1,7 @@
 \set VERBOSITY terse
 
 CREATE SCHEMA pathman;
-CREATE EXTENSION pathman SCHEMA pathman;
+CREATE EXTENSION pg_pathman SCHEMA pathman;
 CREATE SCHEMA test;
 
 CREATE TABLE test.hash_rel (
