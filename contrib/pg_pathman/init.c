@@ -78,10 +78,10 @@ load_relations_hashtable(bool reinitialize)
 	ListCell   *lc;
 	char	   *schema;
 	PartRelationInfo *prel;
-	char		sql[] = "SELECT pg_class.relfilenode, pg_attribute.attnum, pathman_config.parttype, pg_attribute.atttypid "
-						"FROM %s.pathman_config "
-						"JOIN pg_class ON pg_class.relfilenode = pathman_config.relname::regclass::oid "
-						"JOIN pg_attribute ON pg_attribute.attname = pathman_config.attname "
+	char		sql[] = "SELECT pg_class.relfilenode, pg_attribute.attnum, cfg.parttype, pg_attribute.atttypid "
+						"FROM %s.pathman_config as cfg "
+						"JOIN pg_class ON pg_class.relfilenode = cfg.relname::regclass::oid "
+						"JOIN pg_attribute ON pg_attribute.attname = cfg.attname "
 						"AND attrelid = pg_class.relfilenode";
 	char *query;
 
