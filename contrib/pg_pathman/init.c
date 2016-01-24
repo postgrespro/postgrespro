@@ -285,16 +285,16 @@ load_check_constraints(Oid parent_oid)
 			/* Copy oids to prel */
 			for(i=0; i < proc; i++)
 				children[i] = ranges[i].child_oid;
-		}
 
-		/* Check if some ranges overlap */
-		for(i=0; i < proc-1; i++)
-		{
-			if (ranges[i].max > ranges[i+1].min)
+			/* Check if some ranges overlap */
+			for(i=0; i < proc-1; i++)
 			{
-				elog(WARNING, "Partitions %u and %u overlap. Disabling pg_pathman for relation %u...",
-					 ranges[i].child_oid, ranges[i+1].child_oid, parent_oid);
-				hash_search(relations, (const void *) &parent_oid, HASH_REMOVE, &found);
+				if (ranges[i].max > ranges[i+1].min)
+				{
+					elog(WARNING, "Partitions %u and %u overlap. Disabling pathman for relation %u...",
+						 ranges[i].child_oid, ranges[i+1].child_oid, parent_oid);
+					hash_search(relations, (const void *) &parent_oid, HASH_REMOVE, &found);
+				}
 			}
 		}
 	}
