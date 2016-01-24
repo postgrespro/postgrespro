@@ -105,7 +105,7 @@ _PG_init(void)
 	{
 		elog(ERROR, "Pathman module must be initialized in postmaster. "
 					"Put the following line to configuration file: "
-					"shared_preload_library = 'pathman'");
+					"shared_preload_library = 'pg_pathman'");
 		initialization_needed = false;
 	}
 

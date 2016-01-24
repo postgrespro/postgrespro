@@ -1,4 +1,4 @@
-# contrib/pathman/Makefile
+# contrib/pg_pathman/Makefile
 
 MODULE_big = pg_pathman
 OBJS = init.o pg_pathman.o dsm_array.o rangeset.o pl_funcs.o $(WIN32RES)
