@@ -94,6 +94,9 @@ SELECT to_tsvector('hunspell_tst', 'Booking the skies after rebookings for footb
 SELECT to_tsquery('hunspell_tst', 'footballklubber');
 SELECT to_tsquery('hunspell_tst', 'footballyklubber:b & rebookings:A & sky');
 
+SELECT to_tsquery('hunspell_tst', 'footballyklubber:b ? sky');
+SELECT phraseto_tsquery('hunspell_tst', 'footballyklubber sky');
+
 -- Test synonym dictionary in configuration
 CREATE TEXT SEARCH CONFIGURATION synonym_tst (
 						COPY=english

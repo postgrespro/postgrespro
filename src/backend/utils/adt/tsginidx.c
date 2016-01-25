@@ -179,13 +179,16 @@ typedef struct
 } GinChkVal;
 
 static GinTernaryValue
-checkcondition_gin(void *checkval, QueryOperand *val)
+checkcondition_gin(void *checkval, QueryOperand *val, ExecPhraseData *data)
 {
 	GinChkVal  *gcv = (GinChkVal *) checkval;
 	int			j;
 
-	/* if any val requiring a weight is used, set recheck flag */
-	if (val->weight != 0)
+	/*
+	 * if any val requiring a weight is used or caller
+	 * needs position information then set recheck flag
+	 */
+	if (val->weight != 0 || data != NULL)
 		*(gcv->need_recheck) = true;
 
 	/* convert item's number to corresponding entry's (operand's) number */

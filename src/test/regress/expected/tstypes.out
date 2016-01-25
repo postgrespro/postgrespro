@@ -289,15 +289,15 @@ SELECT '(!1|2)&3'::tsquery;
 (1 row)
 
 SELECT '1|(2|(4|(5|6)))'::tsquery;
-                 tsquery                 
------------------------------------------
- '1' | ( '2' | ( '4' | ( '5' | '6' ) ) )
+           tsquery           
+-----------------------------
+ '1' | '2' | '4' | '5' | '6'
 (1 row)
 
 SELECT '1|2|4|5|6'::tsquery;
-                 tsquery                 
------------------------------------------
- ( ( ( '1' | '2' ) | '4' ) | '5' ) | '6'
+           tsquery           
+-----------------------------
+ '1' | '2' | '4' | '5' | '6'
 (1 row)
 
 SELECT '1&(2&(4&(5&6)))'::tsquery;
@@ -337,9 +337,9 @@ SELECT $$'\\as'$$::tsquery;
 (1 row)
 
 SELECT 'a:* & nbb:*ac | doo:a* | goo'::tsquery;
-                 tsquery                  
-------------------------------------------
- ( 'a':* & 'nbb':*AC | 'doo':*A ) | 'goo'
+               tsquery                
+--------------------------------------
+ 'a':* & 'nbb':*AC | 'doo':*A | 'goo'
 (1 row)
 
 SELECT 'a' < 'b & c'::tsquery as "true";
@@ -354,10 +354,10 @@ SELECT 'a' > 'b & c'::tsquery as "false";
  f
 (1 row)
 
-SELECT 'a | f' < 'b & c'::tsquery as "true";
- true 
-------
- t
+SELECT 'a | f' < 'b & c'::tsquery as "false";
+ false 
+-------
+ f
 (1 row)
 
 SELECT 'a | ff' < 'b & c'::tsquery as "false";
@@ -623,5 +623,59 @@ SELECT ts_rank_cd(' a:1 s:2 d g'::tsvector, 'a & s');
  ts_rank_cd 
 ------------
         0.1
+(1 row)
+
+SELECT 'a:1 b:2'::tsvector @@ 'a ? b'::tsquery AS "true"; 
+ true 
+------
+ t
+(1 row)
+
+SELECT 'a:1 b:2'::tsvector @@ 'a ?[0] b'::tsquery AS "false"; 
+ false 
+-------
+ f
+(1 row)
+
+SELECT 'a:1 b:2'::tsvector @@ 'a ?[1] b'::tsquery AS "true"; 
+ true 
+------
+ t
+(1 row)
+
+SELECT 'a:1 b:2'::tsvector @@ 'a ?[2] b'::tsquery AS "true"; 
+ true 
+------
+ t
+(1 row)
+
+SELECT 'a:1 b:3'::tsvector @@ 'a ? b'::tsquery AS "false"; 
+ false 
+-------
+ f
+(1 row)
+
+SELECT 'a:1 b:3'::tsvector @@ 'a ?[0] b'::tsquery AS "false"; 
+ false 
+-------
+ f
+(1 row)
+
+SELECT 'a:1 b:3'::tsvector @@ 'a ?[1] b'::tsquery AS "false"; 
+ false 
+-------
+ f
+(1 row)
+
+SELECT 'a:1 b:3'::tsvector @@ 'a ?[2] b'::tsquery AS "true"; 
+ true 
+------
+ t
+(1 row)
+
+SELECT 'a:1 b:3'::tsvector @@ 'a ?[3] b'::tsquery AS "true"; 
+ true 
+------
+ t
 (1 row)
 

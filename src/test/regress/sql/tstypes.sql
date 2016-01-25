@@ -62,7 +62,7 @@ SELECT 'a:* & nbb:*ac | doo:a* | goo'::tsquery;
 
 SELECT 'a' < 'b & c'::tsquery as "true";
 SELECT 'a' > 'b & c'::tsquery as "false";
-SELECT 'a | f' < 'b & c'::tsquery as "true";
+SELECT 'a | f' < 'b & c'::tsquery as "false";
 SELECT 'a | ff' < 'b & c'::tsquery as "false";
 SELECT 'a | f | g' < 'b & c'::tsquery as "false";
 
@@ -115,3 +115,14 @@ SELECT ts_rank_cd(' a:1 s:2 d g'::tsvector, 'a | s');
 SELECT ts_rank_cd(' a:1 s:2C d g'::tsvector, 'a & s');
 SELECT ts_rank_cd(' a:1 s:2B d g'::tsvector, 'a & s');
 SELECT ts_rank_cd(' a:1 s:2 d g'::tsvector, 'a & s');
+
+SELECT 'a:1 b:2'::tsvector @@ 'a ? b'::tsquery AS "true"; 
+SELECT 'a:1 b:2'::tsvector @@ 'a ?[0] b'::tsquery AS "false"; 
+SELECT 'a:1 b:2'::tsvector @@ 'a ?[1] b'::tsquery AS "true"; 
+SELECT 'a:1 b:2'::tsvector @@ 'a ?[2] b'::tsquery AS "true"; 
+SELECT 'a:1 b:3'::tsvector @@ 'a ? b'::tsquery AS "false"; 
+SELECT 'a:1 b:3'::tsvector @@ 'a ?[0] b'::tsquery AS "false"; 
+SELECT 'a:1 b:3'::tsvector @@ 'a ?[1] b'::tsquery AS "false"; 
+SELECT 'a:1 b:3'::tsvector @@ 'a ?[2] b'::tsquery AS "true"; 
+SELECT 'a:1 b:3'::tsvector @@ 'a ?[3] b'::tsquery AS "true"; 
+

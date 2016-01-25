@@ -860,9 +860,9 @@ SELECT COUNT(*) FROM test_tsquery WHERE keyword >  'new & york';
 
 RESET enable_seqscan;
 SELECT ts_rewrite('foo & bar & qq & new & york',  'new & york'::tsquery, 'big & apple | nyc | new & york & city');
-                                    ts_rewrite                                    
-----------------------------------------------------------------------------------
- 'foo' & 'bar' & 'qq' & ( 'city' & 'new' & 'york' | ( 'nyc' | 'big' & 'apple' ) )
+                                  ts_rewrite                                  
+------------------------------------------------------------------------------
+ 'foo' & 'bar' & 'qq' & ( 'nyc' | 'big' & 'apple' | 'city' & 'new' & 'york' )
 (1 row)
 
 SELECT ts_rewrite('moscow', 'SELECT keyword, sample FROM test_tsquery'::text );
@@ -878,9 +878,9 @@ SELECT ts_rewrite('moscow & hotel', 'SELECT keyword, sample FROM test_tsquery'::
 (1 row)
 
 SELECT ts_rewrite('bar & new & qq & foo & york', 'SELECT keyword, sample FROM test_tsquery'::text );
-                                     ts_rewrite                                      
--------------------------------------------------------------------------------------
- 'citi' & 'foo' & ( 'bar' | 'qq' ) & ( 'nyc' | ( 'big' & 'appl' | 'new' & 'york' ) )
+                                   ts_rewrite                                    
+---------------------------------------------------------------------------------
+ ( 'nyc' | 'big' & 'appl' | 'new' & 'york' ) & 'citi' & 'foo' & ( 'bar' | 'qq' )
 (1 row)
 
 SELECT ts_rewrite( 'moscow', 'SELECT keyword, sample FROM test_tsquery');
@@ -896,9 +896,9 @@ SELECT ts_rewrite( 'moscow & hotel', 'SELECT keyword, sample FROM test_tsquery')
 (1 row)
 
 SELECT ts_rewrite( 'bar & new & qq & foo & york', 'SELECT keyword, sample FROM test_tsquery');
-                                     ts_rewrite                                      
--------------------------------------------------------------------------------------
- 'citi' & 'foo' & ( 'bar' | 'qq' ) & ( 'nyc' | ( 'big' & 'appl' | 'new' & 'york' ) )
+                                   ts_rewrite                                    
+---------------------------------------------------------------------------------
+ ( 'nyc' | 'big' & 'appl' | 'new' & 'york' ) & 'citi' & 'foo' & ( 'bar' | 'qq' )
 (1 row)
 
 SELECT keyword FROM test_tsquery WHERE keyword @> 'new';
@@ -937,9 +937,9 @@ SELECT ts_rewrite( query, 'SELECT keyword, sample FROM test_tsquery' ) FROM to_t
 (1 row)
 
 SELECT ts_rewrite( query, 'SELECT keyword, sample FROM test_tsquery' ) FROM to_tsquery('english', 'bar &  new & qq & foo & york') AS query;
-                                     ts_rewrite                                      
--------------------------------------------------------------------------------------
- 'citi' & 'foo' & ( 'bar' | 'qq' ) & ( 'nyc' | ( 'big' & 'appl' | 'new' & 'york' ) )
+                                   ts_rewrite                                    
+---------------------------------------------------------------------------------
+ ( 'nyc' | 'big' & 'appl' | 'new' & 'york' ) & 'citi' & 'foo' & ( 'bar' | 'qq' )
 (1 row)
 
 SELECT ts_rewrite( query, 'SELECT keyword, sample FROM test_tsquery' ) FROM to_tsquery('english', 'moscow') AS query;
@@ -955,9 +955,9 @@ SELECT ts_rewrite( query, 'SELECT keyword, sample FROM test_tsquery' ) FROM to_t
 (1 row)
 
 SELECT ts_rewrite( query, 'SELECT keyword, sample FROM test_tsquery' ) FROM to_tsquery('english', 'bar & new & qq & foo & york') AS query;
-                                     ts_rewrite                                      
--------------------------------------------------------------------------------------
- 'citi' & 'foo' & ( 'bar' | 'qq' ) & ( 'nyc' | ( 'big' & 'appl' | 'new' & 'york' ) )
+                                   ts_rewrite                                    
+---------------------------------------------------------------------------------
+ ( 'nyc' | 'big' & 'appl' | 'new' & 'york' ) & 'citi' & 'foo' & ( 'bar' | 'qq' )
 (1 row)
 
 CREATE INDEX qq ON test_tsquery USING gist (keyword tsquery_ops);
@@ -998,9 +998,9 @@ SELECT ts_rewrite( query, 'SELECT keyword, sample FROM test_tsquery' ) FROM to_t
 (1 row)
 
 SELECT ts_rewrite( query, 'SELECT keyword, sample FROM test_tsquery' ) FROM to_tsquery('english', 'bar & new & qq & foo & york') AS query;
-                                     ts_rewrite                                      
--------------------------------------------------------------------------------------
- 'citi' & 'foo' & ( 'bar' | 'qq' ) & ( 'nyc' | ( 'big' & 'appl' | 'new' & 'york' ) )
+                                   ts_rewrite                                    
+---------------------------------------------------------------------------------
+ ( 'nyc' | 'big' & 'appl' | 'new' & 'york' ) & 'citi' & 'foo' & ( 'bar' | 'qq' )
 (1 row)
 
 SELECT ts_rewrite( query, 'SELECT keyword, sample FROM test_tsquery' ) FROM to_tsquery('english', 'moscow') AS query;
@@ -1016,9 +1016,9 @@ SELECT ts_rewrite( query, 'SELECT keyword, sample FROM test_tsquery' ) FROM to_t
 (1 row)
 
 SELECT ts_rewrite( query, 'SELECT keyword, sample FROM test_tsquery' ) FROM to_tsquery('english', 'bar &  new & qq & foo & york') AS query;
-                                     ts_rewrite                                      
--------------------------------------------------------------------------------------
- 'citi' & 'foo' & ( 'bar' | 'qq' ) & ( 'nyc' | ( 'big' & 'appl' | 'new' & 'york' ) )
+                                   ts_rewrite                                    
+---------------------------------------------------------------------------------
+ ( 'nyc' | 'big' & 'appl' | 'new' & 'york' ) & 'citi' & 'foo' & ( 'bar' | 'qq' )
 (1 row)
 
 RESET enable_seqscan;
