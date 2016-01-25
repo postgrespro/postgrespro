@@ -718,10 +718,8 @@ get_docrep(TSVector txt, QueryRepresentation *qr, int *doclen)
 	int			len = qr->query->size * 4,
 				cur = 0;
 	DocRepresentation *doc;
-	char	   *operand;
 
 	doc = (DocRepresentation *) palloc(sizeof(DocRepresentation) * len);
-	operand = GETOPERAND(qr->query);
 
 	/*
 	 * Iterate through query to make DocRepresentaion for words and it's entries 

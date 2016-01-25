@@ -388,7 +388,6 @@ tsquery_setweight(PG_FUNCTION_ARGS)
 	TSQuery    	in = PG_GETARG_TSQUERY(0);
 	char        cw = PG_GETARG_CHAR(1);
 	TSQuery 	out;
-	int         i;
 	QueryItem  *item;
 	int         w = 0;
 
