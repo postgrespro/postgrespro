@@ -256,7 +256,7 @@ to_tsvector(PG_FUNCTION_ARGS)
 typedef struct MorphOpaque
 {
 	Oid		cfg_id;
-	int		operator;
+	int		qoperator;	/* query operator */
 } MorphOpaque;
 
 /*
@@ -300,7 +300,7 @@ pushval_morph(Datum opaque, TSQueryParserState state, char *strval, int lenval, 
 					/* put placeholders for each stop word */
 					pushStop(state);
 					if (cntpos)
-						pushOperator(state, data->operator, 1);
+						pushOperator(state, data->qoperator, 1);
 					cntpos++;
 					pos++;
 				}
@@ -331,7 +331,7 @@ pushval_morph(Datum opaque, TSQueryParserState state, char *strval, int lenval, 
 			}
 
 			if (cntpos)
-				pushOperator(state, data->operator, 1);
+				pushOperator(state, data->qoperator, 1);
 			cntpos++;
 		}
 
@@ -349,7 +349,7 @@ to_tsquery_byid(PG_FUNCTION_ARGS)
 	MorphOpaque	data;
 
 	data.cfg_id = PG_GETARG_OID(0);
-	data.operator = OP_AND;
+	data.qoperator = OP_AND;
 
 	query = parse_tsquery(text_to_cstring(in), pushval_morph, PointerGetDatum(&data), false);
 
@@ -376,7 +376,7 @@ plainto_tsquery_byid(PG_FUNCTION_ARGS)
 	MorphOpaque	data;
 
 	data.cfg_id = PG_GETARG_OID(0);
-	data.operator = OP_AND;
+	data.qoperator = OP_AND;
 
 	query = parse_tsquery(text_to_cstring(in), pushval_morph, PointerGetDatum(&data), true);
 
@@ -404,7 +404,7 @@ phraseto_tsquery_byid(PG_FUNCTION_ARGS)
 	MorphOpaque data;
 
 	data.cfg_id = PG_GETARG_OID(0);
-	data.operator = OP_PHRASE;
+	data.qoperator = OP_PHRASE;
 
 	query = parse_tsquery(text_to_cstring(in), pushval_morph, PointerGetDatum(&data), true);
 
