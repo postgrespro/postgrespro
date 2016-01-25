@@ -364,8 +364,10 @@ calc_rank(const float *w, TSVector t, TSQuery q, int32 method)
 		return 0.0;
 
 	/* XXX: What about NOT? */
-	res = (item->type == QI_OPR && (item->qoperator.oper == OP_AND || item->qoperator.oper == OP_PHRASE)) ?
-		calc_rank_and(w, t, q) : calc_rank_or(w, t, q);
+	res = (item->type == QI_OPR && (item->qoperator.oper == OP_AND ||
+									item->qoperator.oper == OP_PHRASE)) ?
+			calc_rank_and(w, t, q) :
+			calc_rank_or(w, t, q);
 
 	if (res < 0)
 		res = 1e-20f;
@@ -532,13 +534,13 @@ compareDocR(const void *va, const void *vb)
 }
 
 #define MAXQROPOS	MAXENTRYPOS
-typedef struct 
+typedef struct
 {
 	bool			operandexist;
 	bool			reverseinsert; /* indicates order to insert,
 									  true means descending order */
 	uint32			npos;
-	WordEntryPos   	pos[ MAXQROPOS ];
+	WordEntryPos	pos[MAXQROPOS];
 } QueryRepresentationOperand;
 
 typedef struct
@@ -547,13 +549,14 @@ typedef struct
 	QueryRepresentationOperand *operandData;
 } QueryRepresentation;
 
-#define QR_GET_OPERAND_DATA(q, v)		( (q)->operandData + (((QueryItem*)(v)) - GETQUERY((q)->query)) )
+#define QR_GET_OPERAND_DATA(q, v) \
+	( (q)->operandData + (((QueryItem*)(v)) - GETQUERY((q)->query)) )
 
 static bool
 checkcondition_QueryOperand(void *checkval, QueryOperand *val, ExecPhraseData *data)
 {
-	QueryRepresentation *qr = (QueryRepresentation *) checkval;
-	QueryRepresentationOperand	*opData = QR_GET_OPERAND_DATA(qr, val);	
+	QueryRepresentation			*qr = (QueryRepresentation *) checkval;
+	QueryRepresentationOperand	*opData = QR_GET_OPERAND_DATA(qr, val);
 
 	if (!opData->operandexist)
 		return false;
@@ -562,7 +565,7 @@ checkcondition_QueryOperand(void *checkval, QueryOperand *val, ExecPhraseData *d
 	{
 		data->npos = opData->npos;
 		data->pos = opData->pos;
-		if ( opData->reverseinsert )
+		if (opData->reverseinsert)
 			data->pos += MAXQROPOS - opData->npos;
 	}
 
@@ -581,9 +584,9 @@ typedef struct
 static void
 resetQueryRepresentation(QueryRepresentation *qr, bool reverseinsert)
 {
-	int	i;
+	int i;
 
-	for(i=0; i<qr->query->size; i++)
+	for(i = 0; i < qr->query->size; i++)
 	{
 		qr->operandData[i].operandexist = false;
 		qr->operandData[i].reverseinsert = reverseinsert;
@@ -607,19 +610,25 @@ fillQueryRepresentationData(QueryRepresentation *qr, DocRepresentation *entry)
 
 		opData->operandexist = true;
 
-		if ( opData->npos == 0 )
+		if (opData->npos == 0)
 		{
 			lastPos = (opData->reverseinsert) ? (MAXQROPOS - 1) : 0;
-			opData->pos[ lastPos ] = entry->pos;
+			opData->pos[lastPos] = entry->pos;
 			opData->npos++;
 			continue;
 		}
-
-		lastPos = (opData->reverseinsert) ? (MAXQROPOS - opData->npos) : (opData->npos - 1);
-		if ( WEP_GETPOS(opData->pos[ lastPos ]) != WEP_GETPOS(entry->pos) )
+		
+		lastPos = opData->reverseinsert ?
+					(MAXQROPOS - opData->npos) :
+					(opData->npos - 1);
+		
+		if (WEP_GETPOS(opData->pos[lastPos]) != WEP_GETPOS(entry->pos))
 		{
-			lastPos = (opData->reverseinsert) ? (MAXQROPOS - 1 - opData->npos) : (opData->npos);
-			opData->pos[ lastPos ] = entry->pos;
+			lastPos = opData->reverseinsert ?
+						(MAXQROPOS - 1 - opData->npos) :
+						(opData->npos);
+						
+			opData->pos[lastPos] = entry->pos;
 			opData->npos++;
 		}
 	}
@@ -628,9 +637,9 @@ fillQueryRepresentationData(QueryRepresentation *qr, DocRepresentation *entry)
 static bool
 Cover(DocRepresentation *doc, int len, QueryRepresentation *qr, CoverExt *ext)
 {
-	DocRepresentation *ptr;
-	int			lastpos = ext->pos;
-	bool		found = false;
+	DocRepresentation	*ptr;
+	int					 lastpos = ext->pos;
+	bool				 found = false;
 
 	/*
 	 * since this function recurses, it could be driven to stack overflow.
@@ -777,7 +786,7 @@ get_docrep(TSVector txt, QueryRepresentation *qr, int *doclen)
 
 	if (cur > 0)
 	{
-		DocRepresentation  *rptr = doc+1,
+		DocRepresentation  *rptr = doc + 1,
 						   *wptr = doc,
 							storage;
 
@@ -790,15 +799,16 @@ get_docrep(TSVector txt, QueryRepresentation *qr, int *doclen)
 		 * Join QueryItem per WordEntry and it's position
 		 */
 		storage.pos = doc->pos;
-		storage.data.query.items = palloc(sizeof(QueryItem*) * qr->query->size);
+		storage.data.query.items = palloc(sizeof(QueryItem *) * qr->query->size);
 		storage.data.query.items[0] = doc->data.map.item;
 		storage.data.query.nitem = 1;
 
-		while( rptr - doc < cur )
+		while (rptr - doc < cur)
 		{
-			if ( rptr->pos == (rptr-1)->pos && rptr->data.map.entry == (rptr-1)->data.map.entry )
+			if (rptr->pos == (rptr-1)->pos &&
+				rptr->data.map.entry == (rptr-1)->data.map.entry)
 			{
-				storage.data.query.items[ storage.data.query.nitem ] = rptr->data.map.item;
+				storage.data.query.items[storage.data.query.nitem] = rptr->data.map.item;
 				storage.data.query.nitem++;
 			}
 			else
@@ -806,7 +816,7 @@ get_docrep(TSVector txt, QueryRepresentation *qr, int *doclen)
 				*wptr = storage;
 				wptr++;
 				storage.pos = rptr->pos;
-				storage.data.query.items = palloc(sizeof(QueryItem*) * qr->query->size);
+				storage.data.query.items = palloc(sizeof(QueryItem *) * qr->query->size);
 				storage.data.query.items[0] = rptr->data.map.item;
 				storage.data.query.nitem = 1;
 			}
@@ -853,7 +863,8 @@ calc_rank_cd(const float4 *arrdata, TSVector txt, TSQuery query, int method)
 	}
 
 	qr.query = query;
-	qr.operandData = (QueryRepresentationOperand *) palloc0(sizeof(QueryRepresentationOperand) * query->size);
+	qr.operandData = (QueryRepresentationOperand *)
+						palloc0(sizeof(QueryRepresentationOperand) * query->size);
 
 	doc = get_docrep(txt, &qr, &doclen);
 	if (!doc)
@@ -872,7 +883,7 @@ calc_rank_cd(const float4 *arrdata, TSVector txt, TSQuery query, int method)
 
 		while (ptr <= ext.end)
 		{
-			InvSum += invws[ WEP_GETWEIGHT(ptr->pos) ];
+			InvSum += invws[WEP_GETWEIGHT(ptr->pos)];
 			ptr++;
 		}
 

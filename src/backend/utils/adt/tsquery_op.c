@@ -116,7 +116,7 @@ tsquery_phrase_distance(PG_FUNCTION_ARGS)
 	TSQuery		query;
 	int32 		distance = PG_GETARG_INT32(2);
 
-	if (distance<0 || distance>MAXENTRYPOS)
+	if (distance < 0 || distance > MAXENTRYPOS)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("distance in phrase operator should be non-negative and less than %d",
@@ -132,7 +132,7 @@ tsquery_phrase_distance(PG_FUNCTION_ARGS)
 		PG_RETURN_POINTER(a);
 	}
 
-	res = join_tsqueries(a, b, OP_PHRASE, (uint16)distance );
+	res = join_tsqueries(a, b, OP_PHRASE, (uint16) distance);
 
 	query = QTN2QT(res);
 
@@ -420,7 +420,7 @@ tsquery_setweight(PG_FUNCTION_ARGS)
 
 	while(item - GETQUERY(out) < out->size)	
 	{
-		if ( item->type == QI_VAL )
+		if (item->type == QI_VAL)
 			item->qoperand.weight |= (1 << w);
 
 		item++;
