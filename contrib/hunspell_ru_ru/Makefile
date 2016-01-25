@@ -5,6 +5,8 @@ DATA_TSEARCH = dict/ru_ru.affix dict/ru_ru.dict
 
 REGRESS = hunspell_ru_ru
 
+EXTRA_REGRESS_OPTS=--encoding=UTF8
+
 ifdef USE_PGXS
 PG_CONFIG = pg_config
 PGXS := $(shell $(PG_CONFIG) --pgxs)
