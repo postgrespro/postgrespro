@@ -795,7 +795,7 @@ checkcondition_str(void *checkval, QueryOperand *val, ExecPhraseData *data)
  */
 static bool
 TS_phrase_execute(QueryItem *curitem, void *checkval, bool calcnot, ExecPhraseData *data,
-		 bool (*chkcond) (void *checkval, QueryOperand *val, ExecPhraseData *data))
+		 bool (*chkcond) (void *, QueryOperand *, ExecPhraseData *))
 {
 	/* since this function recurses, it could be driven to stack overflow */
 	check_stack_depth();
@@ -806,8 +806,8 @@ TS_phrase_execute(QueryItem *curitem, void *checkval, bool calcnot, ExecPhraseDa
 	}
 	else
 	{
-		ExecPhraseData  Ldata = {0, NULL, false},
-						Rdata = {0, NULL, false};
+		ExecPhraseData  Ldata = {0, false, NULL},
+						Rdata = {0, false, NULL};
 		WordEntryPos   	*Lpos,
 						*Rpos,
 						*pos = NULL;
@@ -933,7 +933,7 @@ TS_execute(QueryItem *curitem, void *checkval, bool calcnot,
 	check_stack_depth();
 
 	if (curitem->type == QI_VAL)
-		return chkcond(checkval, (QueryOperand *) curitem, 
+		return chkcond(checkval, (QueryOperand *) curitem,
 						NULL /* we don't need a position infos */);
 
 	switch (curitem->qoperator.oper)

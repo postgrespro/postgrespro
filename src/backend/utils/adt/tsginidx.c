@@ -207,7 +207,7 @@ checkcondition_gin(void *checkval, QueryOperand *val, ExecPhraseData *data)
  */
 static GinTernaryValue
 TS_execute_ternary(QueryItem *curitem, void *checkval,
-			  GinTernaryValue (*chkcond) (void *checkval, QueryOperand *val))
+			  GinTernaryValue (*chkcond) (void*, QueryOperand*, ExecPhraseData*))
 {
 	GinTernaryValue val1,
 				val2,
@@ -217,7 +217,8 @@ TS_execute_ternary(QueryItem *curitem, void *checkval,
 	check_stack_depth();
 
 	if (curitem->type == QI_VAL)
-		return chkcond(checkval, (QueryOperand *) curitem);
+		return chkcond(checkval, (QueryOperand *) curitem,
+					   NULL /* we don't need a position infos */);
 
 	switch (curitem->qoperator.oper)
 	{
@@ -226,6 +227,13 @@ TS_execute_ternary(QueryItem *curitem, void *checkval,
 			if (result == GIN_MAYBE)
 				return result;
 			return !result;
+
+		case OP_PHRASE:
+			/*
+			 * GIN doesn't contain any information about postions,
+			 * treat OP_PHRASE as OP_AND with recheck requirement
+			 */
+			*((GinChkVal*)checkval)->need_recheck = true;
 
 		case OP_AND:
 			val1 = TS_execute_ternary(curitem + curitem->qoperator.left,
