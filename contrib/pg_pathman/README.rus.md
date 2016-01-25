@@ -137,7 +137,7 @@ SELECT partition_data('hash_rel');
 CREATE TABLE range_rel (
     id SERIAL PRIMARY KEY,
     dt TIMESTAMP);
-INSERT INTO range_rel (dt) SELECT g FROM generate_series('2010-01-01'::date, '2015-12-31'::date, '1 day') as g;
+INSERT INTO range_rel (dt) SELECT g FROM generate_series('2010-01-01'::date, '2014-12-31'::date, '1 day') as g;
 ```
 Разобьем таблицу на 60 секций так, чтобы каждая секция содержала данные за один месяц:
 ```
