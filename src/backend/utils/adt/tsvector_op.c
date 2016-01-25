@@ -590,21 +590,22 @@ tsCompareString(char *a, int lena, char *b, int lenb, bool prefix)
  * check weight info or/and fill data by needed positions
  */
 static bool
-checkclass_str(CHKVAL *chkval, WordEntry *entry, QueryOperand *val, ExecPhraseData *data)
+checkclass_str(CHKVAL *chkval, WordEntry *entry, QueryOperand *val,
+			   ExecPhraseData *data)
 {
 	bool res = false;
 
-	if (entry->haspos && (val->weight || data) )
+	if (entry->haspos && (val->weight || data))
 	{
 		WordEntryPosVector	*posvec;
 
 		posvec = (WordEntryPosVector *)
 			(chkval->values + SHORTALIGN(entry->pos + entry->len));
 
-		if ( val->weight && data )
+		if (val->weight && data)
 		{
-			WordEntryPos		*ptr = posvec->pos;
-			WordEntryPos		*dptr;
+			WordEntryPos	*ptr = posvec->pos;
+			WordEntryPos	*dptr;
 
 			/*
 			 * Filter position information by weights
@@ -612,7 +613,7 @@ checkclass_str(CHKVAL *chkval, WordEntry *entry, QueryOperand *val, ExecPhraseDa
 			dptr = data->pos = palloc(sizeof(WordEntryPos) * posvec->npos);
 			data->allocated = true;
 
-			while( ptr - posvec->pos < posvec->npos )
+			while (ptr - posvec->pos < posvec->npos)
 			{
 				if (val->weight & (1 << WEP_GETWEIGHT(*ptr)))
 				{
@@ -625,14 +626,14 @@ checkclass_str(CHKVAL *chkval, WordEntry *entry, QueryOperand *val, ExecPhraseDa
 
 			data->npos = dptr - data->pos;
 
-			if ( data->npos > 0 )
+			if (data->npos > 0)
 				res = true;
 		}
-		else if ( val->weight )
+		else if (val->weight)
 		{
-			WordEntryPos		*ptr = posvec->pos;
+			WordEntryPos	*ptr = posvec->pos;
 
-			while( ptr - posvec->pos < posvec->npos )
+			while (ptr - posvec->pos < posvec->npos)
 			{
 				if (val->weight & (1 << WEP_GETWEIGHT(*ptr)))
 				{
@@ -739,7 +740,7 @@ checkcondition_str(void *checkval, QueryOperand *val, ExecPhraseData *data)
 
 		while ((res == false || data) && StopMiddle < chkval->arre &&
 			   tsCompareString(chkval->operand + val->distance, val->length,
-						   chkval->values + StopMiddle->pos, StopMiddle->len,
+							   chkval->values + StopMiddle->pos, StopMiddle->len,
 							   true) == 0)
 		{
 			if (data)
@@ -766,7 +767,7 @@ checkcondition_str(void *checkval, QueryOperand *val, ExecPhraseData *data)
 					}
 
 					memcpy(allpos+npos, data->pos, sizeof(WordEntryPos) * data->npos);
-					npos+=data->npos;
+					npos += data->npos;
 				}
 			}
 			else
@@ -817,17 +818,19 @@ TS_phrase_execute(QueryItem *curitem, void *checkval, bool calcnot, ExecPhraseDa
 		if (data)
 			data->npos = 0;
 
-		if (TS_phrase_execute(curitem + curitem->qoperator.left, checkval, calcnot, &Ldata, chkcond) == false)
+		if (TS_phrase_execute(curitem + curitem->qoperator.left,
+							  checkval, calcnot, &Ldata, chkcond) == false)
 			return false;
 
-		if (TS_phrase_execute(curitem + 1, checkval, calcnot, &Rdata, chkcond) == false)
+		if (TS_phrase_execute(curitem + 1,
+							  checkval, calcnot, &Rdata, chkcond) == false)
 			return false;
 
 		/*
 		 * if at least one of operand has not a position information then
 		 * fallback to AND operation.
 		 */
-		if ( Ldata.npos == 0 || Rdata.npos == 0 )
+		if (Ldata.npos == 0 || Rdata.npos == 0)
 			return true;
 
 		/*
@@ -841,7 +844,8 @@ TS_phrase_execute(QueryItem *curitem, void *checkval, bool calcnot, ExecPhraseDa
 				 * OP_PHRASE is a modificated OP_AND, so number of resulting
 				 * positions could not be greater than any of operands
 				 */
-				data->pos = palloc(sizeof(WordEntryPos) * Min(Ldata.npos, Rdata.npos));
+				data->pos = palloc(sizeof(WordEntryPos) *
+										Min(Ldata.npos, Rdata.npos));
 			else
 				data->pos = Rdata.pos;
 
@@ -858,9 +862,9 @@ TS_phrase_execute(QueryItem *curitem, void *checkval, bool calcnot, ExecPhraseDa
 		 * ExecPhraseData->data could point to the tsvector's WordEntryPosVector
 		 */
 
-		while(Rpos - Rdata.pos < Rdata.npos)
+		while (Rpos - Rdata.pos < Rdata.npos)
 		{
-			while(Lpos - Ldata.pos < Ldata.npos)
+			while (Lpos - Ldata.pos < Ldata.npos)
 			{
 				if (WEP_GETPOS(*Lpos) <= WEP_GETPOS(*Rpos))
 				{
@@ -927,7 +931,8 @@ TS_phrase_execute(QueryItem *curitem, void *checkval, bool calcnot, ExecPhraseDa
  */
 bool
 TS_execute(QueryItem *curitem, void *checkval, bool calcnot,
-		   bool (*chkcond) (void *checkval, QueryOperand *val, ExecPhraseData *data))
+		   bool (*chkcond) (void *checkval, QueryOperand *val,
+		   ExecPhraseData *data))
 {
 	/* since this function recurses, it could be driven to stack overflow */
 	check_stack_depth();

@@ -34,14 +34,14 @@ typedef struct
  */
 typedef struct
 {
-	uint32			selected:1,
-					in:1,
-					replace:1,
-					repeated:1,
-					skip:1,
-					unused:3,
-					type:8,
-					len:16;
+	uint32			selected: 	1,
+					in: 		1,
+					replace:	1,
+					repeated:	1,
+					skip:		1,
+					unused:		3,
+					type:		8,
+					len:		16;
 	WordEntryPos	pos;
 	char		   *word;
 	QueryOperand   *item;
