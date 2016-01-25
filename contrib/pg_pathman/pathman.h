@@ -10,7 +10,7 @@
 
 
 #define ALL NIL
-#define BLOCKS_COUNT 20480
+#define BLOCKS_COUNT 10240
 
 /*
  * Partitioning type
