@@ -2054,7 +2054,7 @@ checkcondition_HL(void *opaque, QueryOperand *val, ExecPhraseData *data)
 		}
 	}
 
-	if ( data && data->npos > 0 )
+	if (data && data->npos > 0)
 		return true;
 
 	return false;
