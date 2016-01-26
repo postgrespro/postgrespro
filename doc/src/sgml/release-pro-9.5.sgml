@@ -38,6 +38,11 @@
     </para>
     </listitem>
     <listitem>
+    <para>
+    Speedup of two-phase commit
+    </para>
+    </listitem>
+    <listitem>
      <para>
        Contrib module pg_trgm supports substring searches.
      </para>
@@ -157,7 +162,39 @@ commit [90e649a7afac8c76]   Thu Dec 31 09:52:30 2015 +0300
     when modifying state, shared between processes.
     </para>
     </listitem>
+    
      </itemizedlist>
+    </listitem>
+    <listitem>
+    <!-- Commit  b1a1741f3a7eecae by Stas Kelvich -->
+    <para>
+     Speedup two phase commit by skipping two phase state files in normal path
+      2PC state info is written only to WAL at PREPARE, then read back
+      from WAL at
+      COMMIT PREPARED/ABORT PREPARED. Prepared transactions that live
+      past one bufmgr
+      checkpoint cycle will be written to disk in the same form as
+      previously. Crash
+      recovery path is not altered. Measured performance gains of
+      50-100% for short
+      2PC transactions by completely avoiding writing files and
+      fsyncing. Other
+      optimizations still available, further patches in related areas
+      expected.
+     </para>
+     <para>
+      Stas Kelvich and heavily edited by Simon Riggs.
+     </para>
+     <para>
+      Based upon earlier ideas and patches by Michael Paquier and
+      Heikki Linnakangas,
+      a concrete example of how Postgres-XC has fed back ideas into
+      PostgreSQL.
+     </para>
+     <para>
+      Reviewed by Michael Paquier, Jeff Janes and Andres Freund
+      Performance testing by Jesper Pedersen
+    </para>
     </listitem>
      </itemizedlist>
 
