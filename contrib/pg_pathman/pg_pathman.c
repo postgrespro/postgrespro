@@ -646,8 +646,10 @@ handle_binary_opexpr(const PartRelationInfo *prel, WrapperNode *result,
 				RangeEntry *re;
 				bool		found = false,
 							lossy = false;
-				int			counter = 0,
-							startidx = 0,
+#ifdef USE_ASSERT_CHECKING
+				int			counter = 0;
+#endif
+				int			startidx = 0,
 							cmp_min,
 							cmp_max,
 							endidx = rangerel->ranges.length - 1;
