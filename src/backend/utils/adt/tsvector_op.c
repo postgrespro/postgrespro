@@ -1000,6 +1000,10 @@ tsquery_requires_match(QueryItem *curitem)
 			 */
 			return false;
 
+		case OP_PHRASE:
+			/*
+			 * Treat OP_PHRASE as OP_AND here
+			 */
 		case OP_AND:
 			/* If either side requires a match, we're good */
 			if (tsquery_requires_match(curitem + curitem->qoperator.left))
