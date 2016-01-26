@@ -3586,11 +3586,17 @@ static void
 TerminateBufferIO(volatile BufferDesc *buf, bool clear_dirty,
 				  int set_flag_bits)
 {
+#ifdef 	USE_ASSERT_CHECKING
 	uint32		state;
+#endif
 
 	Assert(buf == InProgressBuf);
 
-	state = LockBufHdr(buf);
+#ifdef USE_ASSERT_CHECKING
+	state = 
+#endif
+		LockBufHdr(buf);
+
 
 	Assert(state & BM_IO_IN_PROGRESS);
 

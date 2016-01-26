@@ -1511,7 +1511,10 @@ str_tolower(const char *buff, size_t nbytes, Oid collid)
 		UChar       sourcebuf[STACKBUFLEN], destbuf[STACKBUFLEN];
 		UChar      *source, *dest;
 		int			buflen;
-		size_t		result_size, usize;
+		size_t		result_size;
+#ifdef USE_ASSERT_CHECKING		
+		size_t		usize;
+#endif
 		UErrorCode  status = U_ZERO_ERROR;
 
 		if (conv == NULL)
@@ -1558,8 +1561,10 @@ str_tolower(const char *buff, size_t nbytes, Oid collid)
 		// and convert modified utf-16 string back to text
 		result_size = UCNV_GET_MAX_BYTES_FOR_STRING(buflen, ucnv_getMaxCharSize(conv));
 		result = palloc(result_size);
-
-		usize = ucnv_fromUChars(conv, result, result_size,
+#ifdef USE_ASSERT_CHECKING
+		usize = 
+#endif		
+		     ucnv_fromUChars(conv, result, result_size,
 								 dest, buflen, &status);
 
 		if (U_FAILURE(status))
@@ -1708,7 +1713,10 @@ str_toupper(const char *buff, size_t nbytes, Oid collid)
 		UChar       sourcebuf[STACKBUFLEN], destbuf[STACKBUFLEN];
 		UChar      *source, *dest;
 		int			buflen;
-		size_t		result_size, usize;
+		size_t		result_size;
+#ifdef USE_ASSERT_CHECKING		
+		size_t		 usize;
+#endif		
 		UErrorCode  status = U_ZERO_ERROR;
 
 		if (conv == NULL)
@@ -1755,8 +1763,10 @@ str_toupper(const char *buff, size_t nbytes, Oid collid)
 		// and convert modified utf-16 string back to text
 		result_size = UCNV_GET_MAX_BYTES_FOR_STRING(buflen, ucnv_getMaxCharSize(conv));
 		result = palloc(result_size);
-
-		usize = ucnv_fromUChars(conv, result, result_size,
+#ifdef USE_ASSERT_CHECKING
+		usize = 
+#endif		
+			ucnv_fromUChars(conv, result, result_size,
 								 dest, buflen, &status);
 
 		if (U_FAILURE(status))
@@ -1906,7 +1916,10 @@ str_initcap(const char *buff, size_t nbytes, Oid collid)
 		UChar       sourcebuf[STACKBUFLEN], destbuf[STACKBUFLEN];
 		UChar      *source, *dest;
 		int			buflen;
-		size_t		result_size, usize;
+		size_t		result_size;
+#ifdef USE_ASSERT_CHECKING		
+		size_t usize;
+#endif		
 		UErrorCode  status = U_ZERO_ERROR;
 
 		if (conv == NULL)
@@ -1953,8 +1966,10 @@ str_initcap(const char *buff, size_t nbytes, Oid collid)
 		// and convert modified utf-16 string back to text
 		result_size = UCNV_GET_MAX_BYTES_FOR_STRING(buflen, ucnv_getMaxCharSize(conv));
 		result = palloc(result_size);
-
-		usize = ucnv_fromUChars(conv, result, result_size,
+#ifdef USE_ASSERT_CHECKING
+		usize = 
+#endif		
+		ucnv_fromUChars(conv, result, result_size,
 								 dest, buflen, &status);
 
 		if (U_FAILURE(status))

@@ -1204,8 +1204,7 @@ get_hash_entry(HTAB *hashp, int partition_idx)
 {
 	HASHHDR    *hctl = hashp->hctl;
 	HASHBUCKET	newElement;
-	int			i,
-				borrow_from_idx;
+	int			borrow_from_idx;
 
 	for (;;)
 	{
