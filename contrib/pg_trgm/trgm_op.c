@@ -479,6 +479,11 @@ iterate_substring_similarity(int *trg2indexes,
 					lower = tmp_lower;
 					count = tmp_count;
 				}
+				/*
+				 * if we only check that substring similarity is greater than
+				 * pg_trgm.substring_limit we do not need to calculate a
+				 * maximum similarity
+				 */
 				if (check_only && smlr_cur >= trgm_substring_limit)
 					break;
 
@@ -492,6 +497,11 @@ iterate_substring_similarity(int *trg2indexes,
 			}
 
 			smlr_max = Max(smlr_max, smlr_cur);
+			/*
+			 * if we only check that substring similarity is greater than
+			 * pg_trgm.substring_limit we do not need to calculate a
+			 * maximum similarity
+			 */
 			if (check_only && smlr_max >= trgm_substring_limit)
 				break;
 
