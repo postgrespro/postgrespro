@@ -1193,14 +1193,14 @@ generateClonedIndexStmt(CreateStmtContext *cxt, Relation source_idx,
 
 	/* Build the list of IndexElem */
 	index->indexParams = NIL;
+	index->indexIncludingParams = NIL;
 
 	indexpr_item = list_head(indexprs);
-	for (keyno = 0; keyno < idxrec->indnatts; keyno++)
+	for (keyno = 0; keyno < idxrec->indnkeyatts; keyno++)
 	{
 		IndexElem  *iparam;
 		AttrNumber	attnum = idxrec->indkey.values[keyno];
 		int16		opt = source_idx->rd_indoption[keyno];
-
 		iparam = makeNode(IndexElem);
 
 		if (AttributeNumberIsValid(attnum))
@@ -1282,6 +1282,36 @@ generateClonedIndexStmt(CreateStmtContext *cxt, Relation source_idx,
 		index->indexParams = lappend(index->indexParams, iparam);
 	}
 
+	/* Handle included columns separately */
+	for (keyno = idxrec->indnkeyatts; keyno < idxrec->indnatts; keyno++)
+	{
+		IndexElem  *iparam;
+		AttrNumber	attnum = idxrec->indkey.values[keyno];
+
+		iparam = makeNode(IndexElem);
+
+		if (AttributeNumberIsValid(attnum))
+		{
+			/* Simple index column */
+			char	   *attname;
+
+			attname = get_relid_attribute_name(indrelid, attnum);
+			keycoltype = get_atttype(indrelid, attnum);
+
+			iparam->name = attname;
+			iparam->expr = NULL;
+		}
+		else
+			elog(ERROR, "Expressions are not supported in included columns.");
+
+		/* Copy the original index column name */
+		iparam->indexcolname = pstrdup(NameStr(attrs[keyno]->attname));
+
+		/* Add the collation name, if non-default */
+		iparam->collation = get_collation(indcollation->values[keyno], keycoltype);
+
+		index->indexIncludingParams = lappend(index->indexIncludingParams, iparam);
+	}
 	/* Copy reloptions if any */
 	datum = SysCacheGetAttr(RELOID, ht_idxrel,
 							Anum_pg_class_reloptions, &isnull);
@@ -1544,6 +1574,7 @@ transformIndexConstraint(Constraint *constraint, CreateStmtContext *cxt)
 	index->tableSpace = constraint->indexspace;
 	index->whereClause = constraint->where_clause;
 	index->indexParams = NIL;
+	index->indexIncludingParams = NIL;
 	index->excludeOpNames = NIL;
 	index->idxcomment = NULL;
 	index->indexOid = InvalidOid;
@@ -1671,7 +1702,7 @@ transformIndexConstraint(Constraint *constraint, CreateStmtContext *cxt)
 		Assert(!isnull);
 		indclass = (oidvector *) DatumGetPointer(indclassDatum);
 
-		for (i = 0; i < index_form->indnatts; i++)
+		for (i = 0; i < index_form->indnkeyatts; i++)
 		{
 			int16		attnum = index_form->indkey.values[i];
 			Form_pg_attribute attform;
