@@ -564,7 +564,7 @@ UpdateIndexRelation(Oid indexoid,
 	for (i = 0; i < indexInfo->ii_NumIndexAttrs; i++)
 		indkey->values[i] = indexInfo->ii_KeyAttrNumbers[i];
 	indcollation = buildoidvector(collationOids, indexInfo->ii_NumIndexAttrs);
-	indclass = buildoidvector(classOids, indexInfo->ii_NumIndexAttrs);
+	indclass = buildoidvector(classOids, indexInfo->ii_NumIndexKeyAttrs);
 	indoption = buildint2vector(coloptions, indexInfo->ii_NumIndexAttrs);
 
 	/*

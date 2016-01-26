@@ -578,7 +578,7 @@ DefineIndex(Oid relationId,
 
 	typeObjectId = (Oid *) palloc(numberOfAttributes * sizeof(Oid));
 	collationObjectId = (Oid *) palloc(numberOfAttributes * sizeof(Oid));
-	classObjectId = (Oid *) palloc(numberOfAttributes * sizeof(Oid));
+	classObjectId = (Oid *) palloc(numberOfKeyAttributes * sizeof(Oid));
 	coloptions = (int16 *) palloc(numberOfAttributes * sizeof(int16));
 	ComputeIndexAttrs(indexInfo,
 					  typeObjectId, collationObjectId, classObjectId,
@@ -1127,6 +1127,16 @@ ComputeIndexAttrs(IndexInfo *indexInfo,
 		}
 
 		collationOidP[attn] = attcollation;
+
+		/*
+		 * Skip opclass and ordering options for included columns.
+		 */
+		if (attn >= nkeycols)
+		{
+			colOptionP[attn] = 0;
+			attn++;
+			continue;
+		}
 
 		/*
 		 * Identify the opclass to use.
