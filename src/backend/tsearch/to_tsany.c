@@ -279,7 +279,7 @@ pushval_morph(Datum opaque, TSQueryParserState state, char *strval, int lenval, 
 					cntvar = 0,
 					cntpos = 0,
 					cnt = 0;
-	MorphOpaque	   *data = (MorphOpaque*) DatumGetPointer(opaque);
+	MorphOpaque	   *data = (MorphOpaque *) DatumGetPointer(opaque);
 
 	prs.lenwords = 4;
 	prs.curwords = 0;

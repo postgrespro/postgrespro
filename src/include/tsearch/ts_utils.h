@@ -104,7 +104,7 @@ extern text *generateHeadline(HeadlineParsedText *prs);
 /*
  * Common check function for tsvector @@ tsquery
  */
-typedef struct ExecPhraseData 
+typedef struct ExecPhraseData
 {
 	int				npos;
 	bool			allocated;

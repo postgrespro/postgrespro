@@ -586,9 +586,9 @@ cleanup_fakeval_and_phrase(TSQuery in)
 	ptr = GETOPERAND(out);
 	for (i = 0; i < out->size; i++)
 	{
-		QueryOperand	*op = (QueryOperand*) (items + i);
+		QueryOperand	*op = (QueryOperand *) (items + i);
 
-		if (op->type != QI_VAL) 
+		if (op->type != QI_VAL)
 			continue;
 
 		memcpy(ptr, GETOPERAND(in) + op->distance, op->length);
@@ -599,4 +599,3 @@ cleanup_fakeval_and_phrase(TSQuery in)
 
 	return out;
 }
-

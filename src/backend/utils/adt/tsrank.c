@@ -527,7 +527,7 @@ compareDocR(const void *va, const void *vb)
 			return (a->data.map.entry > b->data.map.entry) ? 1 : -1;
 		}
 
-		return (WEP_GETWEIGHT(a->pos) > WEP_GETWEIGHT(b->pos)) ? 1 : -1;	
+		return (WEP_GETWEIGHT(a->pos) > WEP_GETWEIGHT(b->pos)) ? 1 : -1;
 	}
 
 	return (WEP_GETPOS(a->pos) > WEP_GETPOS(b->pos)) ? 1 : -1;
@@ -682,7 +682,7 @@ Cover(DocRepresentation *doc, int len, QueryRepresentation *qr, CoverExt *ext)
 	/* find lower bound of cover from found upper bound, move down */
 	while (ptr >= doc + ext->pos)
 	{
-		/* 
+		/*
 		 * we scan doc from right to left, so pos info in reverse order!
 		 */
 		fillQueryRepresentationData(qr, ptr);
@@ -731,7 +731,7 @@ get_docrep(TSVector txt, QueryRepresentation *qr, int *doclen)
 	doc = (DocRepresentation *) palloc(sizeof(DocRepresentation) * len);
 
 	/*
-	 * Iterate through query to make DocRepresentaion for words and it's entries 
+	 * Iterate through query to make DocRepresentaion for words and it's entries
 	 * satisfied by query
 	 */
 	for (i = 0; i < qr->query->size; i++)
