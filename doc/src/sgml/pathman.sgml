@@ -1,11 +1,11 @@
-<sect1 id="pathman">
-  <title>pathman</title>
+<sect1 id="pg-pathman">
+  <title>pg_pathman</title>
   <para>
-    The <literal>pathman</literal> module provides optimized
+    The <literal>pg_pathman</literal> module provides optimized
     partitioning mechanism and functions to manage partitions.
   </para>
-  <sect2 id="pathman-concepts">
-    <title>pathman Concepts</title>
+  <sect2 id="pg-pathman-concepts">
+    <title>pg_pathman Concepts</title>
     <para>
       Partitioning refers to splitting one large table into smaller
       pieces. Each row in such table assigns to a single partition based
@@ -36,8 +36,9 @@
       For example:
     </para>
     <programlisting>
-CHECK ( id &gt;= 100 AND id &lt; 200 )
-CHECK ( id &gt;= 200 AND id &lt; 300 )
+CREATE TABLE test (id SERIAL PRIMARY KEY, title TEXT);
+CREATE TABLE test_1 (CHECK ( id &gt;= 100 AND id &lt; 200 )) INHERITS (test);
+CREATE TABLE test_2 (CHECK ( id &gt;= 200 AND id &lt; 300 )) INHERITS (test);
 </programlisting>
     <para>
       Despite the flexibility of this approach it has weakness. If query
@@ -47,15 +48,15 @@ CHECK ( id &gt;= 200 AND id &lt; 300 )
       partitions is large the overhead may be significant.
     </para>
     <para>
-      The <literal>pathman</literal> module provides functions to manage
-      partitions and partitioning mechanism optimized based on knowledge
-      of the partitions structure. It stores partitioning configuration
-      in the <literal>pathman_config</literal> table, each row of which
-      contains single entry for partitioned table (relation name,
-      partitioning key and type). During initialization the
-      <literal>pathman</literal> module caches information about child
-      partitions in shared memory in form convenient to perform rapid
-      search. When user executes SELECT query pathman analyzes
+      The <literal>pg_pathman</literal> module provides functions to
+      manage partitions and partitioning mechanism optimized based on
+      knowledge of the partitions structure. It stores partitioning
+      configuration in the <literal>pathman_config</literal> table, each
+      row of which contains single entry for partitioned table (relation
+      name, partitioning key and type). During initialization the
+      <literal>pg_pathman</literal> module caches information about
+      child partitions in shared memory in form convenient to perform
+      rapid search. When user executes SELECT query pg_pathman analyzes
       conditions tree looking for conditions like:
     </para>
     <programlisting>
@@ -72,32 +73,34 @@ WHERE id = 150
 </programlisting>
     <para>
       Based on partitioning type and operator the
-      <literal>pathman</literal> searches corresponding partitions and
-      builds the plan.
+      <literal>pg_pathman</literal> searches corresponding partitions
+      and builds the plan.
     </para>
   </sect2>
-  <sect2 id="pathman-installation">
+  <sect2 id="pg-pathman-installation">
     <title>Installation</title>
     <para>
       To install pathman run:
     </para>
     <programlisting>
-CREATE EXTENSION pathman;
+CREATE SCHEMA pathman;
+CREATE EXTENSION pg_pathman SCHEMA pathman;
 </programlisting>
     <para>
-      in your database Then modify shared_preload_libraries parameter
-      in postgresql.conf as following:
+      Then modify <literal>shared_preload_libraries</>
+      parameter in postgresql.conf as 
+      following:
     </para>
     <programlisting>
-shared_preload_libraries = 'pathman'
+shared_preload_libraries = 'pg_pathman'
 </programlisting>
     <para>
-      Then restart the &productname; instance.
+      It will require to restart of the &productname; instance.
     </para>
   </sect2>
-  <sect2 id="pathman-functions">
+  <sect2 id="pg-pathman-functions">
     <title>FUNCTIONS</title>
-    <sect3 id="partitions-creation">
+    <sect3 id="pg-pathman-partitions-creation">
       <title>Partitions Creation</title>
       <programlisting>
 create_hash_partitions(
@@ -143,7 +146,7 @@ create_range_partitions(
         <literal>TIMESTAMP</literal> partitioning keys.
       </para>
     </sect3>
-    <sect3 id="data-migration">
+    <sect3 id="pg-pathman-data-migration">
       <title>Data migration</title>
       <programlisting>
 partition_data(parent text)
@@ -151,8 +154,22 @@ partition_data(parent text)
       <para>
         Copies data from parent table to its partitions.
       </para>
+      <programlisting>
+create_hash_update_trigger(parent TEXT)
+</programlisting>
+      <para>
+        Creates the trigger on UPDATE for HASH partitions. The UPDATE
+        trigger isn't created by default because of overhead. It is
+        useful in cases when key attribute could be changed.
+      </para>
+      <programlisting>
+create_hash_update_trigger(parent TEXT)
+</programlisting>
+      <para>
+        Same as above for RANGE sections.
+      </para>
     </sect3>
-    <sect3 id="partitions-management">
+    <sect3 id="pg-pathman-partitions-management">
       <title>Partitions management</title>
       <programlisting>
 split_range_partition(partition TEXT, value ANYELEMENT)
@@ -188,15 +205,15 @@ prepend_partition(p_relation TEXT)
 disable_partitioning(relation TEXT)
 </programlisting>
       <para>
-        Disables <literal>pathman</literal> partitioning mechanism for
-        the specified parent table and removes an insert trigger.
+        Disables <literal>pg_pathman</literal> partitioning mechanism
+        for the specified parent table and removes an insert trigger.
         Partitions itself remain unchanged.
       </para>
     </sect3>
   </sect2>
-  <sect2 id="examples">
+  <sect2 id="pg-pathman-examples">
     <title>Examples</title>
-    <sect3 id="hash">
+    <sect3 id="pg-pathman-example-hash">
       <title>HASH</title>
       <para>
         Consider an example of HASH partitioning. First create a table
@@ -223,8 +240,35 @@ SELECT create_hash_partitions('hash_rel', 'value', 100);
       <programlisting>
 SELECT partition_data('hash_rel');
 </programlisting>
+      <para>
+        Here is an example of the query with filtering by partitioning
+        key and its plan:
+      </para>
+      <programlisting>
+SELECT * FROM hash_rel WHERE value = 1234;
+  id  | value 
+------+-------
+ 1234 |  1234
+
+EXPLAIN SELECT * FROM hash_rel WHERE value = 1234;
+                           QUERY PLAN                            
+-----------------------------------------------------------------
+ Append  (cost=0.00..2.00 rows=0 width=0)
+   -&gt;  Seq Scan on hash_rel_34  (cost=0.00..2.00 rows=0 width=0)
+         Filter: (value = 1234)
+</programlisting>
+      <para>
+        Note that pg_pathman exludes parent table from the query plan.
+        To access parent table use ONLY modifier:
+      </para>
+      <programlisting>
+EXPLAIN SELECT * FROM ONLY hash_rel;
+                       QUERY PLAN                       
+--------------------------------------------------------
+ Seq Scan on hash_rel  (cost=0.00..0.00 rows=1 width=8)
+</programlisting>
     </sect3>
-    <sect3 id="range">
+    <sect3 id="pg-pathman-example-range">
       <title>RANGE</title>
       <para>
         Consider an example of RANGE partitioning. Create a table with
@@ -270,15 +314,93 @@ SELECT split_range_partition('range_rel_1', '2010-02-15'::date);
       </para>
       <programlisting>
 SELECT append_partition('range_rel');
-SELECT append_partition('range_rel');
+</programlisting>
+      <para>
+        Here is an example of the query with filtering by partitioning
+        key and its plan:
+      </para>
+      <programlisting>
+SELECT * FROM range_rel WHERE dt &gt;= '2012-04-30' AND dt &lt;= '2012-05-01';
+ id  |         dt          
+-----+---------------------
+ 851 | 2012-04-30 00:00:00
+ 852 | 2012-05-01 00:00:00
+
+EXPLAIN SELECT * FROM range_rel WHERE dt &gt;= '2012-04-30' AND dt &lt;= '2012-05-01';
+                                 QUERY PLAN                                 
+----------------------------------------------------------------------------
+ Append  (cost=0.00..60.80 rows=0 width=0)
+   -&gt;  Seq Scan on range_rel_28  (cost=0.00..30.40 rows=0 width=0)
+         Filter: (dt &gt;= '2012-04-30 00:00:00'::timestamp without time zone)
+   -&gt;  Seq Scan on range_rel_29  (cost=0.00..30.40 rows=0 width=0)
+         Filter: (dt &lt;= '2012-05-01 00:00:00'::timestamp without time zone)
+</programlisting>
+    </sect3>
+    <sect3 id="disable-pg-pathman">
+      <title>Disable pg_pathman</title>
+      <para>
+        To disable pg_pathman for some previously partitioned table use
+        disable_partitioning() function:
+      </para>
+      <programlisting>
+SELECT disable_partitioning('range_rel');
+</programlisting>
+      <para>
+        All sections and data will stay available and will be handled by
+        standard PostgreSQL partitioning mechanism. ### Manual
+        partitions management It is possible to manage partitions
+        manually. After creating or removing child tables it's necessary
+        to invoke function:
+      </para>
+      <programlisting>
+on_update_partitions(oid),
+</programlisting>
+      <para>
+        which updates internal structures in memory of
+        <literal>pg_pathman module</literal>. For example, let's create
+        new section for the <literal>range_rel</literal> from above:
+      </para>
+      <programlisting>
+CREATE TABLE range_rel_archive (CHECK (dt &gt;= '2000-01-01' AND dt &lt; '2010-01-01')) INHERITS (range_rel);
+SELECT on_update_partitions('range_rel'::regclass::oid);
+</programlisting>
+      <para>
+        CHECK CONSTRAINT must have the exact format: * (VARIABLE &gt;=
+        CONST AND VARIABLE &lt; CONST) for RANGE partitioned tables; *
+        (VARIABLE % CONST = CONST) for HASH partitioned tables.
+      </para>
+      <para>
+        It is possible to create partition from foreign table as well:
+      </para>
+      <programlisting>
+CREATE FOREIGN TABLE range_rel_archive (
+    id INTEGER NOT NULL,
+    dt TIMESTAMP)
+SERVER archive_server;
+ALTER TABLE range_rel_archive INHERIT range_rel;
+ALTER TABLE range_rel_archive ADD CHECK (dt &gt;= '2000-01-01' AND dt &lt; '2010-01-01');
+SELECT on_update_partitions('range_rel'::regclass::oid);
+</programlisting>
+      <para>
+        Foreign table structure must exactly match the parent table.
+      </para>
+      <para>
+        In case when parent table is being dropped by DROP TABLE, you
+        should invoke on_remove_partitions() function and delete
+        particular entry from <literal>pathman_config</literal> table:
+      </para>
+      <programlisting>
+SELECT on_remove_partitions('range_rel'::regclass::oid);
+DROP TABLE range_rel CASCADE;
+DELETE FROM pathman_config WHERE relname = 'public.range_rel';
 </programlisting>
     </sect3>
   </sect2>
-  <sect2 id="author">
+  <sect2 id="pg-pathman-author">
     <title>Author</title>
     <para>
       Ildar Musin <email>i.musin@postgrespro.ru</email> Postgres
-      Professional Ltd., Russia 
+      Professional Ltd., Russia
     </para>
   </sect2>
 </sect1>
