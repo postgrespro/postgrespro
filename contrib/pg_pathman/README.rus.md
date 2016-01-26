@@ -38,8 +38,7 @@ WHERE id = 150
 
 Для установки pg_pathman выполните в командной строке:
 ```
-CREATE SCHEMA pathman;
-CREATE EXTENSION pg_pathman SCHEMA pathman;
+CREATE EXTENSION pg_pathman;
 
 ```
 Затем модифицируйте параметр shared_preload_libraries в конфигурационном файле postgres.conf:
@@ -123,7 +122,7 @@ CREATE TABLE hash_rel (
     value   INTEGER);
 INSERT INTO hash_rel (value) SELECT g FROM generate_series(1, 10000) as g;
 ```
-Разобьем таблицу `hash_rel` на 100 секций по полю `value`:
+Если дочерние секции подразумевают наличие индексов, то стоит их создать в родительской таблице до разбиения. Тогда при разбиении pg_pathman автоматически создаст соответствующие индексы в дочерних.таблицах. Разобьем таблицу `hash_rel` на 100 секций по полю `value`:
 ```
 SELECT create_hash_partitions('hash_rel', 'value', 100);
 ```

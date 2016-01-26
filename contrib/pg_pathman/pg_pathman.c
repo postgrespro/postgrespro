@@ -644,9 +644,9 @@ handle_binary_opexpr(const PartRelationInfo *prel, WrapperNode *result,
 			if (rangerel != NULL)
 			{
 				RangeEntry *re;
-				bool		found = false,
-							lossy = false;
+				bool		lossy = false;
 #ifdef USE_ASSERT_CHECKING
+				bool		found = false;
 				int			counter = 0;
 #endif
 				int			startidx = 0,
@@ -718,7 +718,9 @@ handle_binary_opexpr(const PartRelationInfo *prel, WrapperNode *result,
 							lossy = false;
 						else
 							lossy = true;
+#ifdef USE_ASSERT_CHECKING
 						found = true;
+#endif
 						break;
 					}
 
@@ -808,8 +810,10 @@ range_binary_search(const RangeRelation *rangerel, FmgrInfo *cmp_func, Datum val
 				cmp_max,
 				i = 0,
 				startidx = 0,
-				endidx = rangerel->ranges.length-1,
-				counter = 0;
+				endidx = rangerel->ranges.length-1;
+#ifdef USE_ASSERT_CHECKING
+	int			counter = 0;
+#endif
 
 	*foundPtr = false;
 
