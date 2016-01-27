@@ -27,6 +27,18 @@ my @client_program_files = (
 	'pg_isready',    'pg_receivexlog', 'pg_restore', 'psql',
 	'reindexdb',     'vacuumdb',       @client_contribs);
 
+sub SubstituteMakefileVariables {
+	local $_ = shift; # Line to substitue
+	my $mf = shift; # Makefile text
+	while (/\$\((\w+)\)/) {
+			my $varname = $1;
+			if ($mf =~ /^$varname\s*=\s*(.*)$/mg) {
+			my $varvalue=$1;
+			s/\$\($varname\)/$varvalue/g;
+			}
+	}
+	return $_;
+}
 sub lcopy
 {
 	my $src    = shift;
@@ -494,8 +506,8 @@ sub CopySubdirFiles
 	}
 
 	$flist = '';
-	if ($mf =~ /^DATA_built\s*=\s*(.*)$/m) { $flist .= $1 }
-	if ($mf =~ /^DATA\s*=\s*(.*)$/m)       { $flist .= " $1" }
+	if ($mf =~ /^DATA_built\s*=\s*(.*)$/m) { $flist .= $1; }
+	if ($mf =~ /^DATA\s*=\s*(.*)$/m)       { $flist .= " $1"; }
 	$flist =~ s/^\s*//;    # Remove leading spaces if we had only DATA_built
 
 	if ($flist ne '')
@@ -516,7 +528,7 @@ sub CopySubdirFiles
 	if ($flist ne '')
 	{
 		$flist = ParseAndCleanRule($flist, $mf);
-
+		print STDERR "Installing TSEARCH data for module $module: $flist\n";
 		foreach my $f (split /\s+/, $flist)
 		{
 			lcopy("$subdir/$module/$f",
@@ -568,7 +580,7 @@ sub ParseAndCleanRule
 		    substr($flist, 0, index($flist, '$(addsuffix '))
 		  . substr($flist, $i + 1);
 	}
-	return $flist;
+	return SubstituteMakefileVariables($flist,$mf);
 }
 
 sub CopyIncludeFiles
