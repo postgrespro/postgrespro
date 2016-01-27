@@ -16,13 +16,13 @@ CREATE TABLE test.range_rel (
 CREATE INDEX ON test.range_rel (dt);
 INSERT INTO test.range_rel (dt, txt)
 SELECT g, md5(g::TEXT) FROM generate_series('2015-01-01', '2015-04-30', '1 day'::interval) as g;
-SELECT pathman.create_range_partitions('test.range_rel', 'dt', '2015-01-01'::DATE, '1 month'::INTERVAL, 3);
+SELECT pathman.create_range_partitions('test.range_rel', 'dt', '2015-01-01'::DATE, '1 month'::INTERVAL, 4);
 SELECT pathman.partition_data('test.range_rel');
 
 CREATE TABLE test.num_range_rel (
     id SERIAL PRIMARY KEY,
     txt TEXT);
-SELECT pathman.create_range_partitions('test.num_range_rel', 'id', 0, 1000, 3);
+SELECT pathman.create_range_partitions('test.num_range_rel', 'id', 0, 1000, 4);
 
 INSERT INTO test.num_range_rel
 SELECT g, md5(g::TEXT) FROM generate_series(1, 3000) as g;

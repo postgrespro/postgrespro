@@ -6,7 +6,7 @@ CREATE OR REPLACE FUNCTION @extschema@.create_range_partitions(
     , p_attribute TEXT
     , p_start_value ANYELEMENT
     , p_interval INTERVAL
-    , p_premake INTEGER)
+    , p_count INTEGER)
 RETURNS INTEGER AS
 $$
 DECLARE
@@ -14,6 +14,10 @@ DECLARE
     i INTEGER;
 BEGIN
     p_relation := @extschema@.validate_relname(p_relation);
+
+    IF p_count <= 0 THEN
+        RAISE EXCEPTION 'Partitions count must be greater than zero';
+    END IF;
 
     IF EXISTS (SELECT * FROM @extschema@.pathman_config WHERE relname = p_relation) THEN
         RAISE EXCEPTION 'Relation "%" has already been partitioned', p_relation;
@@ -26,7 +30,7 @@ BEGIN
     VALUES (p_relation, p_attribute, 2);
 
     /* create first partition */
-    FOR i IN 1..p_premake+1
+    FOR i IN 1..p_count
     LOOP
         EXECUTE format('SELECT @extschema@.create_single_range_partition($1, $2, $3::%s);', pg_typeof(p_start_value))
         USING p_relation, p_start_value, p_start_value + p_interval;
@@ -40,7 +44,7 @@ BEGIN
     /* Notify backend about changes */
     PERFORM @extschema@.on_create_partitions(p_relation::regclass::oid);
 
-    RETURN p_premake+1;
+    RETURN p_count;
 END
 $$ LANGUAGE plpgsql;
 
@@ -52,7 +56,7 @@ CREATE OR REPLACE FUNCTION @extschema@.create_range_partitions(
     , p_attribute TEXT
     , p_start_value ANYELEMENT
     , p_interval ANYELEMENT
-    , p_premake INTEGER)
+    , p_count INTEGER)
 RETURNS INTEGER AS
 $$
 DECLARE
@@ -60,6 +64,10 @@ DECLARE
     i INTEGER;
 BEGIN
     p_relation := @extschema@.validate_relname(p_relation);
+
+    IF p_count <= 0 THEN
+        RAISE EXCEPTION 'Partitions count must be greater than zero';
+    END IF;
 
     IF EXISTS (SELECT * FROM @extschema@.pathman_config WHERE relname = p_relation) THEN
         RAISE EXCEPTION 'Relation "%" has already been partitioned', p_relation;
@@ -72,7 +80,7 @@ BEGIN
     VALUES (p_relation, p_attribute, 2);
 
     /* create first partition */
-    FOR i IN 1..p_premake+1
+    FOR i IN 1..p_count
     LOOP
         PERFORM @extschema@.create_single_range_partition(p_relation
                                                           , p_start_value
@@ -86,10 +94,90 @@ BEGIN
     /* Notify backend about changes */
     PERFORM @extschema@.on_create_partitions(p_relation::regclass::oid);
 
-    RETURN p_premake+1;
+    RETURN p_count;
 END
 $$ LANGUAGE plpgsql;
 
+/*
+ * Creates RANGE partitions for specified range
+ */
+CREATE OR REPLACE FUNCTION @extschema@.create_partitions_from_range(
+    p_relation TEXT
+    , p_attribute TEXT
+    , p_start_value ANYELEMENT
+    , p_end_value ANYELEMENT
+    , p_count INTEGER)
+RETURNS INTEGER AS
+$$
+DECLARE
+    v_value     TEXT;
+    v_interval  DOUBLE PRECISION;
+    v_dt_interval INTERVAL;
+    v_type      REGTYPE;
+    v_is_date   BOOL;
+    i INTEGER;
+BEGIN
+    p_relation := @extschema@.validate_relname(p_relation);
+
+    IF p_count <= 0 THEN
+        RAISE EXCEPTION 'Partitions count must be greater than zero';
+    END IF;
+
+    IF EXISTS (SELECT * FROM @extschema@.pathman_config WHERE relname = p_relation) THEN
+        RAISE EXCEPTION 'Relation "%" has already been partitioned', p_relation;
+    END IF;
+
+    EXECUTE format('DROP SEQUENCE IF EXISTS %s_seq', p_relation);
+    EXECUTE format('CREATE SEQUENCE %s_seq START 1', p_relation);
+
+    INSERT INTO @extschema@.pathman_config (relname, attname, parttype)
+    VALUES (p_relation, p_attribute, 2);
+
+    v_type := pg_typeof(p_start_value);
+    v_interval := (p_end_value - p_start_value) / cast(p_count as DOUBLE PRECISION);
+
+    IF v_type IN ('date'::regtype, 'timestamp'::regtype, 'timestamptz'::regtype) THEN
+        v_is_date = TRUE;
+        IF v_interval BETWEEN 30 AND 31 THEN
+            v_dt_interval := '1 month';
+        ELSIF v_interval BETWEEN 365 AND 366 THEN
+            v_dt_interval := '1 year';
+        ELSE
+            v_dt_interval := format('%s day', ceil(v_interval));
+        END IF;
+    ELSIF v_type IN ('integer'::regtype, 'smallint'::regtype, 'bigint'::regtype) THEN
+        v_interval := ceil(v_interval);
+    END IF;
+
+    /* create first partition */
+    IF v_is_date THEN
+        FOR i IN 1..p_count
+        LOOP
+            p_end_value := p_start_value + v_dt_interval;
+            PERFORM @extschema@.create_single_range_partition(p_relation
+                                                         , p_start_value
+                                                         , p_end_value);
+            p_start_value := p_end_value;
+        END LOOP;
+    ELSE
+        FOR i IN 1..p_count
+        LOOP
+            PERFORM @extschema@.create_single_range_partition(p_relation
+                                                         , p_start_value
+                                                         , p_start_value + v_interval);
+            p_start_value := p_start_value + v_interval;
+        END LOOP;
+    END IF;
+
+    /* Create triggers */
+    PERFORM @extschema@.create_range_insert_trigger(p_relation, p_attribute);
+
+    /* Notify backend about changes */
+    PERFORM @extschema@.on_create_partitions(p_relation::regclass::oid);
+
+    RETURN p_count;
+END
+$$ LANGUAGE plpgsql;
 
 /*
  * Formats range condition. Utility function.

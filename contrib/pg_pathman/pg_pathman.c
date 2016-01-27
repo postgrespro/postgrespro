@@ -230,6 +230,9 @@ void
 pathman_set_rel_pathlist_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte)
 {
 	PartRelationInfo *prel = NULL;
+	RelOptInfo **new_rel_array;
+	RangeTblEntry **new_rte_array;
+	int len;
 
 	/* This works only for SELECT queries */
 	if (root->parse->commandType != CMD_SELECT || !inheritance_disabled)
@@ -267,35 +270,32 @@ pathman_set_rel_pathlist_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, Ran
 		/*
 		 * Expand simple_rte_array and simple_rel_array
 		 */
-		if (list_length(ranges) > 0)
-		{
-			RelOptInfo **new_rel_array;
-			RangeTblEntry **new_rte_array;
-			int len = irange_list_length(ranges);
 
-			/* Expand simple_rel_array and simple_rte_array */
-			new_rel_array = (RelOptInfo **)
-				palloc0((root->simple_rel_array_size + len) * sizeof(RelOptInfo *));
+		/* +1 for copy of parent rel */
+		len = irange_list_length(ranges) + 1;
 
-			/* simple_rte_array is an array equivalent of the rtable list */
-			new_rte_array = (RangeTblEntry **)
-				palloc0((root->simple_rel_array_size + len) * sizeof(RangeTblEntry *));
+		/* Expand simple_rel_array and simple_rte_array */
+		new_rel_array = (RelOptInfo **)
+			palloc0((root->simple_rel_array_size + len) * sizeof(RelOptInfo *));
 
-			/* Copy relations to the new arrays */
-            for (i = 0; i < root->simple_rel_array_size; i++)
-            {
-                    new_rel_array[i] = root->simple_rel_array[i];
-                    new_rte_array[i] = root->simple_rte_array[i];
-            }
+		/* simple_rte_array is an array equivalent of the rtable list */
+		new_rte_array = (RangeTblEntry **)
+			palloc0((root->simple_rel_array_size + len) * sizeof(RangeTblEntry *));
 
-			/* Free old arrays */
-			pfree(root->simple_rel_array);
-			pfree(root->simple_rte_array);
+		/* Copy relations to the new arrays */
+        for (i = 0; i < root->simple_rel_array_size; i++)
+        {
+                new_rel_array[i] = root->simple_rel_array[i];
+                new_rte_array[i] = root->simple_rte_array[i];
+        }
 
-			root->simple_rel_array_size += len;
-			root->simple_rel_array = new_rel_array;
-			root->simple_rte_array = new_rte_array;
-		}
+		/* Free old arrays */
+		pfree(root->simple_rel_array);
+		pfree(root->simple_rte_array);
+
+		root->simple_rel_array_size += len;
+		root->simple_rel_array = new_rel_array;
+		root->simple_rte_array = new_rte_array;
 
 		/*
 		 * Iterate all indexes in rangeset and append corresponding child
@@ -312,6 +312,7 @@ pathman_set_rel_pathlist_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, Ran
 				append_child_relation(root, rel, rti, rte, i, childOid, wrappers);
 			}
 		}
+		append_child_relation(root, rel, rti, rte, i, rte->relid, NIL);
 
 		/* Clear old path list */
 		list_free(rel->pathlist);
@@ -369,34 +370,53 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti,
 	}
 
 	/* Copy restrictions */
-	childrel->baserestrictinfo = NIL;
-	forboth(lc, wrappers, lc2, rel->baserestrictinfo)
+	if (wrappers != NIL)
 	{
-		bool alwaysTrue;
-		WrapperNode *wrap = (WrapperNode *) lfirst(lc);
-		Node *new_clause = wrapper_make_expression(wrap, index, &alwaysTrue);
-		RestrictInfo *old_rinfo = (RestrictInfo *) lfirst(lc2),
-					 *new_rinfo;
-
-		if (alwaysTrue)
+		childrel->baserestrictinfo = NIL;
+		forboth(lc, wrappers, lc2, rel->baserestrictinfo)
 		{
-			continue;
+			bool alwaysTrue;
+			WrapperNode *wrap = (WrapperNode *) lfirst(lc);
+			Node *new_clause = wrapper_make_expression(wrap, index, &alwaysTrue);
+			RestrictInfo *old_rinfo = (RestrictInfo *) lfirst(lc2),
+						 *new_rinfo;
+
+			if (alwaysTrue)
+			{
+				continue;
+			}
+			Assert(new_clause);
+
+			new_rinfo = make_restrictinfo((Expr *) new_clause,
+										  old_rinfo->is_pushed_down,
+										  old_rinfo->outerjoin_delayed,
+										  old_rinfo->pseudoconstant,
+										  old_rinfo->required_relids,
+										  old_rinfo->outer_relids,
+										  old_rinfo->nullable_relids);
+
+			/* Replace old relids with new ones */
+			change_varnos((Node *)new_rinfo, rel->relid, childrel->relid);
+
+			childrel->baserestrictinfo = lappend(childrel->baserestrictinfo,
+												 (void *) new_rinfo);
 		}
-		Assert(new_clause);
+	}
+	else
+	{
+		childrel->baserestrictinfo = NIL;
+		foreach(lc, rel->baserestrictinfo)
+		{
+			RestrictInfo *rinfo = (RestrictInfo *) lfirst(lc);
+			RestrictInfo *new_rinfo;
+			new_rinfo = copyObject(rinfo);
 
-		new_rinfo = make_restrictinfo((Expr *) new_clause,
-									  old_rinfo->is_pushed_down,
-									  old_rinfo->outerjoin_delayed,
-									  old_rinfo->pseudoconstant,
-									  old_rinfo->required_relids,
-									  old_rinfo->outer_relids,
-									  old_rinfo->nullable_relids);
+			/* Replace old relids with new ones */
+			change_varnos((Node *)new_rinfo, rel->relid, childrel->relid);
 
-		/* Replace old relids with new ones */
-		change_varnos((Node *)new_rinfo, rel->relid, childrel->relid);
-
-		childrel->baserestrictinfo = lappend(childrel->baserestrictinfo,
-											 (void *) new_rinfo);
+			childrel->baserestrictinfo = lappend(childrel->baserestrictinfo,
+												 (void *) new_rinfo);
+		}
 	}
 
 	/* Build an AppendRelInfo for this parent and child */
