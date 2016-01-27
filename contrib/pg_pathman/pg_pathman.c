@@ -137,7 +137,9 @@ pathman_planner_hook(Query *parse, int cursorOptions, ParamListInfo boundParams)
 	PlannedStmt	  *result;
 
 	if (initialization_needed)
+	{
 		load_config();
+	}
 
 	inheritance_disabled = false;
 	disable_inheritance(parse);

@@ -48,21 +48,20 @@ DECLARE
     rec RECORD;
 BEGIN
     p_parent := @extschema@.validate_relname(p_parent);
-    FOR rec IN  (SELECT child.relname, pg_constraint.consrc
+    FOR rec IN  (SELECT inhrelid as child_id, pg_constraint.consrc
                  FROM @extschema@.pathman_config as cfg
                  JOIN pg_class AS parent ON parent.relfilenode = cfg.relname::regclass::oid
                  JOIN pg_inherits ON inhparent = parent.relfilenode
                  JOIN pg_constraint ON conrelid = inhrelid AND contype='c'
-                 JOIN pg_class AS child ON child.relfilenode = inhrelid
                  WHERE cfg.relname = p_parent)
     LOOP
-        RAISE NOTICE 'Copying data to % (condition: %)', rec.relname, rec.consrc;
+        RAISE NOTICE 'Copying data to % (condition: %)', rec.child_id::regclass::text, rec.consrc;
         EXECUTE format('WITH part_data AS (
                             DELETE FROM ONLY %s WHERE %s RETURNING *)
                         INSERT INTO %s SELECT * FROM part_data'
                         , p_parent
                         , rec.consrc
-                        , rec.relname);
+                        , rec.child_id::regclass::text);
     END LOOP;
     RETURN 0;
 END

@@ -31,7 +31,7 @@ load_config(void)
 	bool new_segment_created;
 
 	initialization_needed = false;
-	new_segment_created = init_dsm_segment(32);
+	new_segment_created = init_dsm_segment(INITIAL_BLOCKS_COUNT, 32);
 
 	LWLockAcquire(load_config_lock, LW_EXCLUSIVE);
 	load_relations_hashtable(new_segment_created);
@@ -208,7 +208,7 @@ load_check_constraints(Oid parent_oid)
 	{
 		SPITupleTable *tuptable = SPI_tuptable;
 		Oid *children;
-		RangeEntry *ranges = NULL;
+		RangeEntry *ranges;
 		Datum min;
 		Datum max;
 		int hash;
