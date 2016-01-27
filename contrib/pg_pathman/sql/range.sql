@@ -262,7 +262,6 @@ BEGIN
 END
 $$ LANGUAGE plpgsql;
 
-
 /*
  * Split RANGE partition
  */
@@ -596,7 +595,7 @@ $$ LANGUAGE plpgsql;
  */
 CREATE OR REPLACE FUNCTION @extschema@.create_range_update_trigger(
     IN relation TEXT)
-RETURNS VOID AS
+RETURNS TEXT AS
 $$
 DECLARE
     func TEXT := '
@@ -630,6 +629,7 @@ DECLARE
     num         INTEGER := 0;
     attr        TEXT;
 BEGIN
+    relation := @extschema@.validate_relname(relation);
     relid := relation::regclass::oid;
     SELECT string_agg(attname, ', '),
            string_agg('OLD.' || attname, ', '),
@@ -656,6 +656,8 @@ BEGIN
                        , relation);
         num := num + 1;
     END LOOP;
+
+    RETURN format('%s_update_trigger_func()', relation);
 END
 $$ LANGUAGE plpgsql;
 

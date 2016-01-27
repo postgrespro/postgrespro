@@ -41,13 +41,16 @@ RETURNS ANYARRAY AS 'pg_pathman', 'get_range_by_idx' LANGUAGE C STRICT;
 /*
  * Copy rows to partitions
  */
-CREATE OR REPLACE FUNCTION @extschema@.partition_data(p_parent text)
-RETURNS bigint AS
+CREATE OR REPLACE FUNCTION @extschema@.partition_data(p_parent text, OUT p_total BIGINT)
+AS
 $$
 DECLARE
     rec RECORD;
+    cnt BIGINT := 0;
 BEGIN
     p_parent := @extschema@.validate_relname(p_parent);
+
+    p_total := 0;
     FOR rec IN  (SELECT inhrelid as child_id, pg_constraint.consrc
                  FROM @extschema@.pathman_config as cfg
                  JOIN pg_class AS parent ON parent.relfilenode = cfg.relname::regclass::oid
@@ -62,8 +65,9 @@ BEGIN
                         , p_parent
                         , rec.consrc
                         , rec.child_id::regclass::text);
+        GET DIAGNOSTICS cnt = ROW_COUNT;
+        p_total := p_total + cnt;
     END LOOP;
-    RETURN 0;
 END
 $$
 LANGUAGE plpgsql;

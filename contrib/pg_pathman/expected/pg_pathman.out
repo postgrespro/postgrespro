@@ -34,7 +34,7 @@ NOTICE:  Copying data to test.range_rel_2 (condition: ((dt >= 'Sun Feb 01 00:00:
 NOTICE:  Copying data to test.range_rel_1 (condition: ((dt >= 'Thu Jan 01 00:00:00 2015'::timestamp without time zone) AND (dt < 'Sun Feb 01 00:00:00 2015'::timestamp without time zone)))
  partition_data 
 ----------------
-              0
+            120
 (1 row)
 
 CREATE TABLE test.num_range_rel (
@@ -81,9 +81,9 @@ SELECT * FROM test.hash_rel WHERE value = 7;
 (1 row)
 
 SELECT pathman.create_range_update_trigger('test.num_range_rel');
- create_range_update_trigger 
------------------------------
- 
+       create_range_update_trigger        
+------------------------------------------
+ test.num_range_rel_update_trigger_func()
 (1 row)
 
 UPDATE test.num_range_rel SET id = 3001 WHERE id = 1;
@@ -518,7 +518,7 @@ NOTICE:  Copying data to hash_rel_1 (condition: ((value % 3) = 1))
 NOTICE:  Copying data to hash_rel_2 (condition: ((value % 3) = 2))
  partition_data 
 ----------------
-              0
+          10000
 (1 row)
 
 EXPLAIN (COSTS OFF) SELECT * FROM hash_rel WHERE id = 1234;
@@ -562,7 +562,7 @@ NOTICE:  Copying data to range_rel_11 (condition: ((dt >= 'Mon Nov 01 00:00:00 2
 NOTICE:  Copying data to range_rel_12 (condition: ((dt >= 'Wed Dec 01 00:00:00 2010'::timestamp without time zone) AND (dt < 'Sat Jan 01 00:00:00 2011'::timestamp without time zone)))
  partition_data 
 ----------------
-              0
+            365
 (1 row)
 
 SELECT merge_range_partitions('range_rel_1', 'range_rel_2');
