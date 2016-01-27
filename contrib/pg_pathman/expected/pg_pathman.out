@@ -18,11 +18,23 @@ CREATE TABLE test.range_rel (
     dt TIMESTAMP,
     txt TEXT);
 CREATE INDEX ON test.range_rel (dt);
+INSERT INTO test.range_rel (dt, txt)
+SELECT g, md5(g::TEXT) FROM generate_series('2015-01-01', '2015-04-30', '1 day'::interval) as g;
 SELECT pathman.create_range_partitions('test.range_rel', 'dt', '2015-01-01'::DATE, '1 month'::INTERVAL, 3);
 NOTICE:  sequence "range_rel_seq" does not exist, skipping
  create_range_partitions 
 -------------------------
                        4
+(1 row)
+
+SELECT pathman.partition_data('test.range_rel');
+NOTICE:  Copying data to test.range_rel_4 (condition: ((dt >= 'Wed Apr 01 00:00:00 2015'::timestamp without time zone) AND (dt < 'Fri May 01 00:00:00 2015'::timestamp without time zone)))
+NOTICE:  Copying data to test.range_rel_3 (condition: ((dt >= 'Sun Mar 01 00:00:00 2015'::timestamp without time zone) AND (dt < 'Wed Apr 01 00:00:00 2015'::timestamp without time zone)))
+NOTICE:  Copying data to test.range_rel_2 (condition: ((dt >= 'Sun Feb 01 00:00:00 2015'::timestamp without time zone) AND (dt < 'Sun Mar 01 00:00:00 2015'::timestamp without time zone)))
+NOTICE:  Copying data to test.range_rel_1 (condition: ((dt >= 'Thu Jan 01 00:00:00 2015'::timestamp without time zone) AND (dt < 'Sun Feb 01 00:00:00 2015'::timestamp without time zone)))
+ partition_data 
+----------------
+              0
 (1 row)
 
 CREATE TABLE test.num_range_rel (
@@ -37,8 +49,6 @@ NOTICE:  sequence "num_range_rel_seq" does not exist, skipping
 
 INSERT INTO test.num_range_rel
 SELECT g, md5(g::TEXT) FROM generate_series(1, 3000) as g;
-INSERT INTO test.range_rel (dt, txt)
-SELECT g, md5(g::TEXT) FROM generate_series('2015-01-01', '2015-04-30', '1 day'::interval) as g;
 INSERT INTO test.hash_rel VALUES (1, 1);
 INSERT INTO test.hash_rel VALUES (2, 2);
 INSERT INTO test.hash_rel VALUES (3, 3);
