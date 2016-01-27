@@ -1455,7 +1455,7 @@ SELECT to_tsquery('fat') ?? to_tsquery('cat | rat');
       <primary>tsquery_phrase</primary>
      </indexterm>
 
-      <literal><type>tsquery_phrase(<replaceable class="PARAMETER">query1</replaceable> <type>tsquery</>, <replaceable class="PARAMETER">query2</replaceable> <type>tsquery</> [, <replaceable class="PARAMETER">distance</replaceable> <type>integer</> ]) returns <type>tsquery</></literal>
+      <literal>tsquery_phrase(<replaceable class="PARAMETER">query1</replaceable> <type>tsquery</>, <replaceable class="PARAMETER">query2</replaceable> <type>tsquery</> [, <replaceable class="PARAMETER">distance</replaceable> <type>integer</> ]) returns <type>tsquery</></literal>
      </term>
 
      <listitem>
