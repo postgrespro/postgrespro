@@ -885,7 +885,6 @@ sub GenerateContribSqlFiles
 				for my $in (@prereq) {
 					my $data = Project::read_file("contrib/$n/$in");  
 					print $o $data;
-					close $i;
 				}
 				close $o;
 
