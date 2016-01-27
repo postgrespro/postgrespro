@@ -1451,3 +1451,15 @@ select * from pendtest where 'ipi:*'::tsquery @@ ts;
 ----
 (0 rows)
 
+--check OP_PHRASE on index
+create temp table phrase_index_test(fts tsvector);
+insert into phrase_index_test values('A fat cat has just eaten a rat.');
+create index phrase_index_test_idx on phrase_index_test using gin(fts);
+set enable_seqscan = off;
+select * from phrase_index_test where fts @@ phraseto_tsquery('fat cat');
+                       fts                       
+-------------------------------------------------
+ 'A' 'a' 'cat' 'eaten' 'fat' 'has' 'just' 'rat.'
+(1 row)
+
+set enable_seqscan = on;
