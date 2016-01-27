@@ -793,6 +793,10 @@ sub AddContrib
 		my $proj = $solution->AddProject($1, 'exe', 'contrib', "$subdir/$n");
 		AdjustContribProj($proj);
 	}
+	elsif ($mf =~ /^DATA_TSEARCH\s*=\s*(.*)$/mg) 
+	{
+		# This is ispell dictionary project
+	}
 	else
 	{
 		croak "Could not determine contrib module type for $n\n";
@@ -802,50 +806,92 @@ sub AddContrib
 	GenerateContribSqlFiles($n, $mf);
 }
 
+sub SubstituteMakefileVariables {
+	local $_ = shift; # Line to substitue
+	my $mf = shift; # Makefile text
+	while (/\$\((\w+)\)/) {
+			my $varname = $1;
+			if ($mf =~ /^$varname\s*=\s*(.*)$/mg) {
+			my $varvalue=$1;
+			s/\$\($varname\)/$varvalue/g;
+			}
+	}
+	return $_;
+}
+
 sub GenerateContribSqlFiles
 {
-	my $n  = shift;
-	my $mf = shift;
-	$mf =~ s{\\\r?\n}{}g;
-	if ($mf =~ /^DATA_built\s*=\s*(.*)$/mg)
-	{
-		my $l = $1;
-
-		# Strip out $(addsuffix) rules
-		if (index($l, '$(addsuffix ') >= 0)
-		{
-			my $pcount = 0;
-			my $i;
-			for ($i = index($l, '$(addsuffix ') + 12; $i < length($l); $i++)
-			{
-				$pcount++ if (substr($l, $i, 1) eq '(');
-				$pcount-- if (substr($l, $i, 1) eq ')');
-				last      if ($pcount < 0);
-			}
-			$l =
-			  substr($l, 0, index($l, '$(addsuffix ')) . substr($l, $i + 1);
-		}
-
-		foreach my $d (split /\s+/, $l)
-		{
-			my $in  = "$d.in";
-			my $out = "$d";
-
-			if (Solution::IsNewer("contrib/$n/$out", "contrib/$n/$in"))
-			{
-				print "Building $out from $in (contrib/$n)...\n";
-				my $cont = Project::read_file("contrib/$n/$in");
-				my $dn   = $out;
-				$dn   =~ s/\.sql$//;
-				$cont =~ s/MODULE_PATHNAME/\$libdir\/$dn/g;
+    my $n  = shift;
+    my $mf = shift;
+    $mf =~ s{\\\r?\n}{}g;
+    if ($mf =~ /^DATA_built\s*=\s*(.*)$/mg)
+    {
+        my $l = $1;
+        # Strip out $(addsuffix) rules
+        if (index($l, '$(addsuffix ') >= 0)
+        {
+            my $pcount = 0;
+            my $i;
+            for ($i = index($l, '$(addsuffix ') + 12; $i < length($l); $i++)
+            {
+                $pcount++ if (substr($l, $i, 1) eq '(');
+                $pcount-- if (substr($l, $i, 1) eq ')');
+                last      if ($pcount < 0);
+            }
+            $l =
+              substr($l, 0, index($l, '$(addsuffix ')) . substr($l, $i + 1);
+        }
+        # perform variable substitutions in the makefile
+		$l = SubstituteMakefileVariables($l,$mf);
+        foreach my $d (split /\s+/, $l)
+        {
+			print STDERR "Generating file $d\n";
+            if ( -f "$d.in" ) {
+				my $in  = "$d.in";
+				my $out = "$d";
+                if (Solution::IsNewer("contrib/$n/$out", "contrib/$n/$in"))
+                {
+                    print "Building $out from $in (contrib/$n)...\n";
+                    my $cont = Project::read_file("contrib/$n/$in");
+                    my $dn   = $out;
+                    $dn   =~ s/\.sql$//;
+                    $cont =~ s/MODULE_PATHNAME/\$libdir\/$dn/g;
+                    my $o;
+                    open($o, ">contrib/$n/$out")
+                    || croak "Could not write to contrib/$n/$d";
+                    print $o $cont;
+                    close($o);
+                }
+            } else {
+				# Search for makefile rule.
+				# For now we do not process rule command and assume
+				# that we should just concatenate all prerequisites
+				#
+				my @prereq = ();
+				my $target;
+				my @rules = $mf =~ /^(\S+)\s*:\s*([^=].*)$/mg;
+				RULE:
+				while (@rules) {
+					$target = SubstituteMakefileVariables(shift @rules,$mf);
+					 @prereq = split(/\s+/,SubstituteMakefileVariables(shift @rules,$mf));
+					last RULE if ($target eq $d);
+					@prereq = ();
+				}
+				croak "Don't know how to build contrib/$n/$d" unless @prereq;
+				print STDERR "building $d from @prereq\n";
 				my $o;
-				open($o, ">contrib/$n/$out")
-				  || croak "Could not write to contrib/$n/$d";
-				print $o $cont;
-				close($o);
+				open $o, ">contrib/$n/$d"
+					or croak("Couldn't write to contrib/$n/$d:$!");
+				for my $in (@prereq) {
+					my $data = Project::read_file("contrib/$n/$in");  
+					print $o $data;
+					close $i;
+				}
+				close $o;
+
 			}
-		}
-	}
+        }
+    }
 }
 
 sub AdjustContribProj
