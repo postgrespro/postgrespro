@@ -4617,7 +4617,7 @@ DESCR("less-equal-greater");
 DATA(insert OID = 3669 (  tsquery_and		PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 3615 "3615 3615" _null_ _null_ _null_ _null_ _null_ tsquery_and _null_ _null_ _null_ ));
 DATA(insert OID = 3670 (  tsquery_or		PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 3615 "3615 3615" _null_ _null_ _null_ _null_ _null_ tsquery_or _null_ _null_ _null_ ));
 DATA(insert OID = 5003 (  tsquery_phrase	PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 3615 "3615 3615" _null_ _null_ _null_ _null_ _null_ tsquery_phrase _null_ _null_ _null_ ));
-DATA(insert OID = 5004 (  tsquery_phrase	PGNSP PGUID 12 1 0 0 0 f f f f t f i 3 0 3615 "3615 3615 25" _null_ _null_ _null_ _null_ _null_ tsquery_phrase_distance _null_ _null_ _null_ ));
+DATA(insert OID = 5004 (  tsquery_phrase	PGNSP PGUID 12 1 0 0 0 f f f f t f i 3 0 3615 "3615 3615 23" _null_ _null_ _null_ _null_ _null_ tsquery_phrase_distance _null_ _null_ _null_ ));
 DESCR("phrase-concatenate with distance");
 DATA(insert OID = 3671 (  tsquery_not		PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 3615 "3615" _null_ _null_ _null_ _null_ _null_ tsquery_not _null_ _null_ _null_ ));
 DATA(insert OID = 5002 (  setweight			PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 3615 "3615 18" _null_ _null_ _null_ _null_ _null_ tsquery_setweight _null_ _null_ _null_ ));
