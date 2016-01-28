@@ -519,12 +519,122 @@ NIAddAffix(IspellDict *Conf, int flag, char flagflags, const char *mask, const c
 }
 
 #define PAE_WAIT_MASK	0
-#define PAE_INMASK	1
+#define PAE_INMASK		1
 #define PAE_WAIT_FIND	2
-#define PAE_INFIND	3
+#define PAE_INFIND		3
 #define PAE_WAIT_REPL	4
-#define PAE_INREPL	5
+#define PAE_INREPL		5
+#define PAE_WAIT_TYPE	6
+#define PAE_WAIT_FLAG	7
 
+/*
+ * Used in parse_ooaffentry() to parse an .affix file entry.
+ */
+static bool
+get_nextentry(char **str, char *next)
+{
+	int			state = PAE_WAIT_MASK;
+	char	   *pnext = next;
+
+	*next = '\0';
+
+	while (**str)
+	{
+		if (state == PAE_WAIT_MASK)
+		{
+			if (t_iseq(*str, '#'))
+				return false;
+			else if (!t_isspace(*str))
+			{
+				COPYCHAR(pnext, *str);
+				pnext += pg_mblen(*str);
+				state = PAE_INMASK;
+			}
+		}
+		else if (state == PAE_INMASK)
+		{
+			if (t_isspace(*str))
+			{
+				*pnext = '\0';
+				return true;
+			}
+			else
+			{
+				COPYCHAR(pnext, *str);
+				pnext += pg_mblen(*str);
+			}
+		}
+		*str += pg_mblen(*str);
+	}
+
+	*pnext ='\0';
+
+	return *next;
+}
+
+/*
+ * Parses entry of an .affix file of MySpell or Hunspell format.
+ *
+ * An .affix file entry has the following format:
+ * - header
+ *   <type>  <flag>  <cross_flag>  <flag_count>
+ * - fields after header:
+ *   <type>  <flag>  <find>  <replace>  <mask>
+ */
+static int
+parse_ooaffentry(char *str, char *type, char *flag, char *find,
+				char *repl, char *mask)
+{
+	int			state = PAE_WAIT_TYPE,
+				next_state = PAE_WAIT_FLAG;
+	int			parse_read = 0;
+	bool		valid = true;
+
+	*type = *flag = *find = *repl = *mask = '\0';
+
+	while (*str && valid)
+	{
+		switch (state)
+		{
+			case PAE_WAIT_TYPE:
+				valid = get_nextentry(&str, type);
+				break;
+			case PAE_WAIT_FLAG:
+				valid = get_nextentry(&str, flag);
+				next_state = PAE_WAIT_FIND;
+				break;
+			case PAE_WAIT_FIND:
+				valid = get_nextentry(&str, find);
+				next_state = PAE_WAIT_REPL;
+				break;
+			case PAE_WAIT_REPL:
+				valid = get_nextentry(&str, repl);
+				next_state = PAE_WAIT_MASK;
+				break;
+			case PAE_WAIT_MASK:
+				get_nextentry(&str, mask);
+				/* break loop */
+				valid = false;
+				break;
+			default:
+				elog(ERROR, "unrecognized state in parse_ooaffentry: %d", state);
+		}
+		state = next_state;
+		if (*str)
+			str += pg_mblen(str);
+
+		parse_read++;
+	}
+
+	return parse_read;
+}
+
+/*
+ * Parses entry of an .affix file of Ispell format
+ *
+ * An .affix file entry has the following format:
+ * <mask>  >  [-<find>,]<replace>
+ */
 static bool
 parse_affentry(char *str, char *mask, char *find, char *repl)
 {
@@ -731,8 +841,7 @@ NIImportOOAffixes(IspellDict *Conf, const char *filename)
 				sflaglen = 0;
 	char		flagflags = 0;
 	tsearch_readline_state trst;
-	int			scanread = 0;
-	char		scanbuf[BUFSIZ];
+	int			parseread = 0;
 	char	   *recoded;
 
 	/* read file to find any flag */
@@ -804,8 +913,6 @@ NIImportOOAffixes(IspellDict *Conf, const char *filename)
 	}
 	tsearch_readline_end(&trst);
 
-	sprintf(scanbuf, "%%6s %%%ds %%%ds %%%ds %%%ds", BUFSIZ / 5, BUFSIZ / 5, BUFSIZ / 5, BUFSIZ / 5);
-
 	if (!tsearch_readline_begin(&trst, filename))
 		ereport(ERROR,
 				(errcode(ERRCODE_CONFIG_FILE_ERROR),
@@ -817,8 +924,7 @@ NIImportOOAffixes(IspellDict *Conf, const char *filename)
 		if (*recoded == '\0' || t_isspace(recoded) || t_iseq(recoded, '#'))
 			goto nextline;
 
-		*find = *repl = *mask = '\0';
-		scanread = sscanf(recoded, scanbuf, type, sflag, find, repl, mask);
+		parseread = parse_ooaffentry(recoded, type, sflag, find, repl, mask);
 
 		if (ptype)
 			pfree(ptype);
@@ -859,7 +965,7 @@ NIImportOOAffixes(IspellDict *Conf, const char *filename)
 			goto nextline;
 		}
 		/* Else try to parse prefixes and suffixes */
-		if (scanread < 4 || (STRNCMP(ptype, "sfx") && STRNCMP(ptype, "pfx")))
+		if (parseread < 4 || (STRNCMP(ptype, "sfx") && STRNCMP(ptype, "pfx")))
 			goto nextline;
 
 		sflaglen = strlen(sflag);
@@ -888,9 +994,13 @@ NIImportOOAffixes(IspellDict *Conf, const char *filename)
 			if (flag == 0)
 				goto nextline;
 			prepl = lowerstr_ctx(Conf, repl);
-			/* affix flag */
+			/* Find position of '/' in lowercased string "prepl" */
 			if ((ptr = strchr(prepl, '/')) != NULL)
 			{
+				/*
+				 * Here we use non-lowercased string "repl". We need position of
+				 * '/' in "repl".
+				 */
 				*ptr = '\0';
 				ptr = repl + (ptr - prepl) + 1;
 				aflg |= getFlagValues(Conf, getFlags(Conf, ptr));
@@ -964,11 +1074,12 @@ NIImportAffixes(IspellDict *Conf, const char *filename)
 
 		if (STRNCMP(pstr, "compoundwords") == 0)
 		{
+			/* Find position in lowercased string "pstr" */
 			s = findchar(pstr, 'l');
 			if (s)
 			{
-				s = recoded + (s - pstr);		/* we need non-lowercased
-												 * string */
+				/* Here we use non-lowercased string "recoded" */
+				s = recoded + (s - pstr);
 				while (*s && !t_isspace(s))
 					s += pg_mblen(s);
 				while (*s && t_isspace(s))
