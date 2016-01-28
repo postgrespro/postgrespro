@@ -1,6 +1,8 @@
 #include "pathman.h"
+#include "utils/lsyscache.h"
 #include "utils/typcache.h"
 #include "utils/array.h"
+#include "access/nbtree.h"
 
 
 /* declarations */
@@ -79,12 +81,22 @@ find_range_partition(PG_FUNCTION_ARGS)
 	RangeRelation	*rangerel;
 	RangeEntry		*ranges;
 	TypeCacheEntry	*tce;
-	FmgrInfo		*cmp_func;
+	PartRelationInfo *prel;
+	Oid				 cmp_proc_oid;
+	FmgrInfo		 cmp_func;
 
 	tce = lookup_type_cache(value_type,
 		TYPECACHE_EQ_OPR | TYPECACHE_LT_OPR | TYPECACHE_GT_OPR |
 		TYPECACHE_CMP_PROC | TYPECACHE_CMP_PROC_FINFO);
-	cmp_func = &tce->cmp_proc_finfo;
+
+	prel = (PartRelationInfo *)
+		hash_search(relations, (const void *) &relid, HASH_FIND, NULL);
+
+	cmp_proc_oid = get_opfamily_proc(tce->btree_opf,
+									 value_type,
+									 prel->atttype,
+									 BTORDER_PROC);
+	fmgr_info(cmp_proc_oid, &cmp_func);
 
 	rangerel = (RangeRelation *)
 		hash_search(range_restrictions, (const void *) &relid, HASH_FIND, NULL);
@@ -93,7 +105,7 @@ find_range_partition(PG_FUNCTION_ARGS)
 		PG_RETURN_NULL();
 
 	ranges = dsm_array_get_pointer(&rangerel->ranges);
-	pos = range_binary_search(rangerel, cmp_func, value, &found);
+	pos = range_binary_search(rangerel, &cmp_func, value, &found);
 
 	if (found)
 		PG_RETURN_OID(ranges[pos].child_oid);

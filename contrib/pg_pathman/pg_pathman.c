@@ -20,6 +20,7 @@
 #include "utils/typcache.h"
 #include "utils/lsyscache.h"
 #include "access/heapam.h"
+#include "access/nbtree.h"
 #include "storage/ipc.h"
 #include "catalog/pg_operator.h"
 #include "catalog/pg_type.h"
@@ -271,31 +272,33 @@ pathman_set_rel_pathlist_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, Ran
 		 * Expand simple_rte_array and simple_rel_array
 		 */
 
-		/* +1 for copy of parent rel */
-		len = irange_list_length(ranges) + 1;
+		 if (ranges)
+		 {
+			len = irange_list_length(ranges);
 
-		/* Expand simple_rel_array and simple_rte_array */
-		new_rel_array = (RelOptInfo **)
-			palloc0((root->simple_rel_array_size + len) * sizeof(RelOptInfo *));
+			/* Expand simple_rel_array and simple_rte_array */
+			new_rel_array = (RelOptInfo **)
+				palloc0((root->simple_rel_array_size + len) * sizeof(RelOptInfo *));
 
-		/* simple_rte_array is an array equivalent of the rtable list */
-		new_rte_array = (RangeTblEntry **)
-			palloc0((root->simple_rel_array_size + len) * sizeof(RangeTblEntry *));
+			/* simple_rte_array is an array equivalent of the rtable list */
+			new_rte_array = (RangeTblEntry **)
+				palloc0((root->simple_rel_array_size + len) * sizeof(RangeTblEntry *));
 
-		/* Copy relations to the new arrays */
-        for (i = 0; i < root->simple_rel_array_size; i++)
-        {
-                new_rel_array[i] = root->simple_rel_array[i];
-                new_rte_array[i] = root->simple_rte_array[i];
-        }
+			/* Copy relations to the new arrays */
+	        for (i = 0; i < root->simple_rel_array_size; i++)
+	        {
+	                new_rel_array[i] = root->simple_rel_array[i];
+	                new_rte_array[i] = root->simple_rte_array[i];
+	        }
 
-		/* Free old arrays */
-		pfree(root->simple_rel_array);
-		pfree(root->simple_rte_array);
+			/* Free old arrays */
+			pfree(root->simple_rel_array);
+			pfree(root->simple_rte_array);
 
-		root->simple_rel_array_size += len;
-		root->simple_rel_array = new_rel_array;
-		root->simple_rte_array = new_rte_array;
+			root->simple_rel_array_size += len;
+			root->simple_rel_array = new_rel_array;
+			root->simple_rte_array = new_rte_array;
+		}
 
 		/*
 		 * Iterate all indexes in rangeset and append corresponding child
@@ -312,7 +315,6 @@ pathman_set_rel_pathlist_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, Ran
 				append_child_relation(root, rel, rti, rte, i, childOid, wrappers);
 			}
 		}
-		append_child_relation(root, rel, rti, rte, i, rte->relid, NIL);
 
 		/* Clear old path list */
 		list_free(rel->pathlist);
@@ -370,53 +372,34 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti,
 	}
 
 	/* Copy restrictions */
-	if (wrappers != NIL)
+	childrel->baserestrictinfo = NIL;
+	forboth(lc, wrappers, lc2, rel->baserestrictinfo)
 	{
-		childrel->baserestrictinfo = NIL;
-		forboth(lc, wrappers, lc2, rel->baserestrictinfo)
+		bool alwaysTrue;
+		WrapperNode *wrap = (WrapperNode *) lfirst(lc);
+		Node *new_clause = wrapper_make_expression(wrap, index, &alwaysTrue);
+		RestrictInfo *old_rinfo = (RestrictInfo *) lfirst(lc2),
+					 *new_rinfo;
+
+		if (alwaysTrue)
 		{
-			bool alwaysTrue;
-			WrapperNode *wrap = (WrapperNode *) lfirst(lc);
-			Node *new_clause = wrapper_make_expression(wrap, index, &alwaysTrue);
-			RestrictInfo *old_rinfo = (RestrictInfo *) lfirst(lc2),
-						 *new_rinfo;
-
-			if (alwaysTrue)
-			{
-				continue;
-			}
-			Assert(new_clause);
-
-			new_rinfo = make_restrictinfo((Expr *) new_clause,
-										  old_rinfo->is_pushed_down,
-										  old_rinfo->outerjoin_delayed,
-										  old_rinfo->pseudoconstant,
-										  old_rinfo->required_relids,
-										  old_rinfo->outer_relids,
-										  old_rinfo->nullable_relids);
-
-			/* Replace old relids with new ones */
-			change_varnos((Node *)new_rinfo, rel->relid, childrel->relid);
-
-			childrel->baserestrictinfo = lappend(childrel->baserestrictinfo,
-												 (void *) new_rinfo);
+			continue;
 		}
-	}
-	else
-	{
-		childrel->baserestrictinfo = NIL;
-		foreach(lc, rel->baserestrictinfo)
-		{
-			RestrictInfo *rinfo = (RestrictInfo *) lfirst(lc);
-			RestrictInfo *new_rinfo;
-			new_rinfo = copyObject(rinfo);
+		Assert(new_clause);
 
-			/* Replace old relids with new ones */
-			change_varnos((Node *)new_rinfo, rel->relid, childrel->relid);
+		new_rinfo = make_restrictinfo((Expr *) new_clause,
+									  old_rinfo->is_pushed_down,
+									  old_rinfo->outerjoin_delayed,
+									  old_rinfo->pseudoconstant,
+									  old_rinfo->required_relids,
+									  old_rinfo->outer_relids,
+									  old_rinfo->nullable_relids);
 
-			childrel->baserestrictinfo = lappend(childrel->baserestrictinfo,
-												 (void *) new_rinfo);
-		}
+		/* Replace old relids with new ones */
+		change_varnos((Node *)new_rinfo, rel->relid, childrel->relid);
+
+		childrel->baserestrictinfo = lappend(childrel->baserestrictinfo,
+											 (void *) new_rinfo);
 	}
 
 	/* Build an AppendRelInfo for this parent and child */
@@ -639,7 +622,8 @@ handle_binary_opexpr(const PartRelationInfo *prel, WrapperNode *result,
 						strategy;
 	bool				is_less,
 						is_greater;
-	FmgrInfo		   *cmp_func;
+	FmgrInfo		    cmp_func;
+	Oid					cmp_proc_oid;
 	const OpExpr	   *expr = (const OpExpr *)result->orig;
 	TypeCacheEntry	   *tce;
 
@@ -647,7 +631,11 @@ handle_binary_opexpr(const PartRelationInfo *prel, WrapperNode *result,
 	tce = lookup_type_cache(v->vartype,
 		TYPECACHE_EQ_OPR | TYPECACHE_LT_OPR | TYPECACHE_GT_OPR | TYPECACHE_CMP_PROC | TYPECACHE_CMP_PROC_FINFO);
 	strategy = get_op_opfamily_strategy(expr->opno, tce->btree_opf);
-	cmp_func = &tce->cmp_proc_finfo;
+	cmp_proc_oid = get_opfamily_proc(tce->btree_opf,
+									 c->consttype,
+									 prel->atttype,
+									 BTORDER_PROC);
+	fmgr_info(cmp_proc_oid, &cmp_func);
 
 	switch (prel->parttype)
 	{
@@ -686,8 +674,8 @@ handle_binary_opexpr(const PartRelationInfo *prel, WrapperNode *result,
 				else
 				{
 					/* Corner cases */
-					cmp_min = FunctionCall2(cmp_func, value, ranges[0].min),
-					cmp_max = FunctionCall2(cmp_func, value, ranges[rangerel->ranges.length - 1].max);
+					cmp_min = FunctionCall2(&cmp_func, value, ranges[0].min),
+					cmp_max = FunctionCall2(&cmp_func, value, ranges[rangerel->ranges.length - 1].max);
 
 					if ((cmp_min < 0 &&
 						 (strategy == BTLessEqualStrategyNumber ||
@@ -727,8 +715,8 @@ handle_binary_opexpr(const PartRelationInfo *prel, WrapperNode *result,
 					i = startidx + (endidx - startidx) / 2;
 					Assert(i >= 0 && i < rangerel->ranges.length);
 					re = &ranges[i];
-					cmp_min = FunctionCall2(cmp_func, value, re->min);
-					cmp_max = FunctionCall2(cmp_func, value, re->max);
+					cmp_min = FunctionCall2(&cmp_func, value, re->min);
+					cmp_max = FunctionCall2(&cmp_func, value, re->max);
 					is_less = (cmp_min < 0 || (cmp_min == 0 && strategy == BTLessStrategyNumber));
 					is_greater = (cmp_max > 0 || (cmp_max >= 0 && strategy != BTLessStrategyNumber));
 
@@ -842,6 +830,8 @@ range_binary_search(const RangeRelation *rangerel, FmgrInfo *cmp_func, Datum val
 	/* Check boundaries */
 	cmp_min = FunctionCall2(cmp_func, value, ranges[0].min),
 	cmp_max = FunctionCall2(cmp_func, value, ranges[rangerel->ranges.length - 1].max);
+	// cmp_min = OidFunctionCall2(cmp_proc, value, ranges[0].min);
+	// cmp_max = OidFunctionCall2(cmp_proc, value, ranges[rangerel->ranges.length - 1].max);
 	if (cmp_min < 0 || cmp_max >0)
 	{
 		return i;
@@ -854,6 +844,8 @@ range_binary_search(const RangeRelation *rangerel, FmgrInfo *cmp_func, Datum val
 		re = &ranges[i];
 		cmp_min = FunctionCall2(cmp_func, value, re->min);
 		cmp_max = FunctionCall2(cmp_func, value, re->max);
+		// cmp_min = OidFunctionCall2(cmp_proc, value, re->min);
+		// cmp_max = OidFunctionCall2(cmp_proc, value, re->max);
 
 		if (cmp_min >= 0 && cmp_max < 0)
 		{
