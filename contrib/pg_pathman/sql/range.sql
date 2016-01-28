@@ -703,3 +703,29 @@ BEGIN
                    , relation);
 END
 $$ LANGUAGE plpgsql;
+
+
+/*
+ *
+ */
+CREATE OR REPLACE FUNCTION create_new_partitions(
+    p_relid OID
+    , p_min ANYELEMENT
+    , p_max ANYELEMENT
+    , p_new_value ANYELEMENT)
+RETURNS INTEGER AS
+$$
+DECLARE
+    v_cnt INTEGER;
+    i INTEGER;
+BEGIN
+    v_cnt := (p_new_value - p_max) / (p_max - p_min) + 1;
+    FOR i IN 0..v_cnt-1
+    LOOP
+        PERFORM @extschema@.create_single_range_partition(p_relation
+                                                          , p_max + (i * (p_max - p_min))
+                                                          , p_max + ((i+1) * (p_max - p_min)));
+    END LOOP;
+    RETURN v_cnt;
+END
+$$ LANGUAGE plpgsql;
