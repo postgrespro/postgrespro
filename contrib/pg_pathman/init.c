@@ -16,6 +16,7 @@ HTAB   *relations = NULL;
 HTAB   *range_restrictions = NULL;
 bool	initialization_needed = true;
 
+static FmgrInfo *qsort_type_cmp_func;
 
 static bool validate_range_constraint(Expr *, PartRelationInfo *, Datum *, Datum *);
 static bool validate_hash_constraint(Expr *expr, PartRelationInfo *prel, int *hash);
@@ -279,7 +280,12 @@ load_check_constraints(Oid parent_oid)
 
 		if (prel->parttype == PT_RANGE)
 		{
+			TypeCacheEntry	   *tce;
+
 			/* Sort ascending */
+			tce = lookup_type_cache(prel->atttype,
+				TYPECACHE_CMP_PROC | TYPECACHE_CMP_PROC_FINFO);
+			qsort_type_cmp_func = &tce->cmp_proc_finfo;
 			qsort(ranges, proc, sizeof(RangeEntry), cmp_range_entries);
 
 			/* Copy oids to prel */
@@ -308,11 +314,7 @@ cmp_range_entries(const void *p1, const void *p2)
 	const RangeEntry	*v1 = (const RangeEntry *) p1;
 	const RangeEntry	*v2 = (const RangeEntry *) p2;
 
-	if (v1->min < v2->min)
-		return -1;
-	if (v1->min > v2->min)
-		return 1;
-	return 0;
+	return FunctionCall2(qsort_type_cmp_func, v1->min, v2->min);
 }
 
 /*
