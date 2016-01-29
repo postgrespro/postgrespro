@@ -38,8 +38,7 @@ on_partitions_updated(PG_FUNCTION_ARGS)
 
 	/* Parent relation oid */
 	relid = DatumGetInt32(PG_GETARG_DATUM(0));
-	prel = (PartRelationInfo *)
-		hash_search(relations, (const void *) &relid, HASH_FIND, 0);
+	prel = get_pathman_relation_info(relid, NULL);
 	if (prel != NULL)
 	{
 		LWLockAcquire(load_config_lock, LW_EXCLUSIVE);
@@ -89,17 +88,14 @@ find_range_partition(PG_FUNCTION_ARGS)
 		TYPECACHE_EQ_OPR | TYPECACHE_LT_OPR | TYPECACHE_GT_OPR |
 		TYPECACHE_CMP_PROC | TYPECACHE_CMP_PROC_FINFO);
 
-	prel = (PartRelationInfo *)
-		hash_search(relations, (const void *) &relid, HASH_FIND, NULL);
-
+	prel = get_pathman_relation_info(relid, NULL);
 	cmp_proc_oid = get_opfamily_proc(tce->btree_opf,
 									 value_type,
 									 prel->atttype,
 									 BTORDER_PROC);
 	fmgr_info(cmp_proc_oid, &cmp_func);
 
-	rangerel = (RangeRelation *)
-		hash_search(range_restrictions, (const void *) &relid, HASH_FIND, NULL);
+	rangerel = get_pathman_range_relation(relid, NULL);
 
 	if (!rangerel)
 		PG_RETURN_NULL();
@@ -135,11 +131,9 @@ get_partition_range(PG_FUNCTION_ARGS)
 	TypeCacheEntry	   *tce;
 	ArrayType		   *arr;
 
-	prel = (PartRelationInfo *)
-		hash_search(relations, (const void *) &parent_oid, HASH_FIND, NULL);
+	prel = get_pathman_relation_info(parent_oid, NULL);
 	
-	rangerel = (RangeRelation *)
-		hash_search(range_restrictions, (const void *) &parent_oid, HASH_FIND, NULL);
+	rangerel = get_pathman_range_relation(parent_oid, NULL);
 
 	if (!prel || !rangerel)
 		PG_RETURN_NULL();
@@ -189,11 +183,9 @@ get_range_by_idx(PG_FUNCTION_ARGS)
 	Datum			*elems;
 	TypeCacheEntry	*tce;
 
-	prel = (PartRelationInfo *)
-		hash_search(relations, (const void *) &parent_oid, HASH_FIND, NULL);
+	prel = get_pathman_relation_info(parent_oid, NULL);
 
-	rangerel = (RangeRelation *)
-		hash_search(range_restrictions, (const void *) &parent_oid, HASH_FIND, NULL);
+	rangerel = get_pathman_range_relation(parent_oid, NULL);
 
 	if (!prel || !rangerel || idx >= (int)rangerel->ranges.length)
 		PG_RETURN_NULL();

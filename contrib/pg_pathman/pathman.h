@@ -32,6 +32,15 @@ typedef struct DsmArray
 } DsmArray;
 
 /*
+ * Hashtable key for relations
+ */
+typedef struct RelationKey
+{
+	Oid		dbid;
+	Oid		relid;
+} RelationKey;
+
+/*
  * PartRelationInfo
  *		Per-relation partitioning information
  *
@@ -42,8 +51,8 @@ typedef struct DsmArray
  */
 typedef struct PartRelationInfo
 {
-	Oid			oid;
-	DsmArray    children;
+	RelationKey	key;
+	DsmArray	children;
 	int			children_count;
 	PartType	parttype;
 	Index		attnum;
@@ -78,7 +87,7 @@ typedef struct RangeEntry
 
 typedef struct RangeRelation
 {
-	Oid			parent_oid;
+	RelationKey	key;
 	DsmArray    ranges;
 } RangeRelation;
 
@@ -143,6 +152,8 @@ void load_check_constraints(Oid parent_oid);
 void remove_relation_info(Oid relid);
 
 /* utility functions */
+PartRelationInfo *get_pathman_relation_info(Oid relid, bool *found);
+RangeRelation *get_pathman_range_relation(Oid relid, bool *found);
 int range_binary_search(const RangeRelation *rangerel, FmgrInfo *cmp_func, Datum value, bool *fountPtr);
 
 #endif   /* PATHMAN_H */

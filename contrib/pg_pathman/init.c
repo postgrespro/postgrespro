@@ -1,4 +1,5 @@
 #include "pathman.h"
+#include "miscadmin.h"
 #include "executor/spi.h"
 #include "catalog/pg_type.h"
 #include "catalog/pg_class.h"
@@ -108,12 +109,15 @@ load_relations_hashtable(bool reinitialize)
 
 		for (i=0; i<proc; i++)
 		{
+			RelationKey key;
 			HeapTuple tuple = tuptable->vals[i];
 			int oid = DatumGetObjectId(SPI_getbinval(tuple, tupdesc, 1, &isnull));
 
+			key.dbid = MyDatabaseId;
+			key.relid = oid;
 			prel = (PartRelationInfo*)
-				hash_search(relations, (const void *)&oid, HASH_ENTER, NULL);
-			prel->oid = oid;
+				hash_search(relations, (const void *) &key, HASH_ENTER, NULL);
+
 			prel->attnum = DatumGetInt32(SPI_getbinval(tuple, tupdesc, 2, &isnull));
 			prel->parttype = DatumGetInt32(SPI_getbinval(tuple, tupdesc, 3, &isnull));
 			prel->atttype = DatumGetObjectId(SPI_getbinval(tuple, tupdesc, 4, &isnull));
@@ -128,16 +132,13 @@ load_relations_hashtable(bool reinitialize)
 	{
 		Oid oid = (int) lfirst_int(lc);
 
-		prel = (PartRelationInfo*)
-			hash_search(relations, (const void *)&oid, HASH_FIND, NULL);	
-
+		prel = get_pathman_relation_info(oid, NULL);
 		switch(prel->parttype)
 		{
 			case PT_RANGE:
 				if (reinitialize && prel->children.length > 0)
 				{
-					RangeRelation *rangerel = (RangeRelation *)
-						hash_search(range_restrictions, (void *) &oid, HASH_FIND, NULL);
+					RangeRelation *rangerel = get_pathman_range_relation(oid, NULL);
 					free_dsm_array(&prel->children);
 					free_dsm_array(&rangerel->ranges);
 					prel->children_count = 0;
@@ -163,14 +164,14 @@ create_relations_hashtable()
 	HASHCTL		ctl;
 
 	memset(&ctl, 0, sizeof(ctl));
-	ctl.keysize = sizeof(int);
+	ctl.keysize = sizeof(RelationKey);
 	ctl.entrysize = sizeof(PartRelationInfo);
 
 	/* Already exists, recreate */
 	if (relations != NULL)
 		hash_destroy(relations);
 
-	relations = ShmemInitHash("Partitioning relation info", 1024, &ctl, HASH_ELEM);
+	relations = ShmemInitHash("Partitioning relation info", 1024, &ctl, HASH_ELEM | HASH_BLOBS);
 }
 
 /*
@@ -191,8 +192,7 @@ load_check_constraints(Oid parent_oid)
 	bool nulls[1] = {false};
 	vals[0] = Int32GetDatum(parent_oid);
 
-	prel = (PartRelationInfo*)
-		hash_search(relations, (const void *) &parent_oid, HASH_FIND, &found);
+	prel = get_pathman_relation_info(parent_oid, NULL);
 
 	/* Skip if already loaded */
 	if (prel->children.length > 0)
@@ -219,8 +219,12 @@ load_check_constraints(Oid parent_oid)
 
 		if (prel->parttype == PT_RANGE)
 		{
+			RelationKey key;
+			key.dbid = MyDatabaseId;
+			key.relid = parent_oid;
+
 			rangerel = (RangeRelation *)
-				hash_search(range_restrictions, (void *) &parent_oid, HASH_ENTER, &found);
+				hash_search(range_restrictions, (void *) &key, HASH_ENTER, &found);
 
 			alloc_dsm_array(&rangerel->ranges, sizeof(RangeEntry), proc);
 			ranges = (RangeEntry *) dsm_array_get_pointer(&rangerel->ranges);
@@ -297,9 +301,13 @@ load_check_constraints(Oid parent_oid)
 			{
 				if (ranges[i].max > ranges[i+1].min)
 				{
+					RelationKey key;
+					key.dbid = MyDatabaseId;
+					key.relid = parent_oid;
+
 					elog(WARNING, "Partitions %u and %u overlap. Disabling pathman for relation %u...",
 						 ranges[i].child_oid, ranges[i+1].child_oid, parent_oid);
-					hash_search(relations, (const void *) &parent_oid, HASH_REMOVE, &found);
+					hash_search(relations, (const void *) &key, HASH_REMOVE, &found);
 				}
 			}
 		}
@@ -433,7 +441,7 @@ create_range_restrictions_hashtable()
 	HASHCTL		ctl;
 
 	memset(&ctl, 0, sizeof(ctl));
-	ctl.keysize = sizeof(int);
+	ctl.keysize = sizeof(RelationKey);
 	ctl.entrysize = sizeof(RangeRelation);
 	range_restrictions = ShmemInitHash("pg_pathman range restrictions",
 									   1024, &ctl, HASH_ELEM | HASH_BLOBS);
@@ -447,9 +455,12 @@ remove_relation_info(Oid relid)
 {
 	PartRelationInfo   *prel;
 	RangeRelation	   *rangerel;
+	RelationKey key;
 
-	prel = (PartRelationInfo *)
-		hash_search(relations, (const void *) &relid, HASH_FIND, 0);
+	key.dbid = MyDatabaseId;
+	key.relid = relid;
+
+	prel = get_pathman_relation_info(relid, NULL);
 
 	/* If there is nothing to remove then just return */
 	if (!prel)
@@ -462,11 +473,10 @@ remove_relation_info(Oid relid)
 			free_dsm_array(&prel->children);
 			break;
 		case PT_RANGE:
-			rangerel = (RangeRelation *)
-				hash_search(range_restrictions, (const void *) &relid, HASH_FIND, 0);
+			rangerel = get_pathman_range_relation(relid, NULL);
 			free_dsm_array(&rangerel->ranges);
 			free_dsm_array(&prel->children);
-			hash_search(range_restrictions, (const void *) &relid, HASH_REMOVE, 0);
+			hash_search(range_restrictions, (const void *) &key, HASH_REMOVE, 0);
 			break;
 	}
 	prel->children_count = 0;
