@@ -127,6 +127,26 @@ _PG_fini(void)
 	planner_hook = planner_hook_original;
 }
 
+PartRelationInfo *
+get_pathman_relation_info(Oid relid, bool *found)
+{
+	RelationKey key;
+
+	key.dbid = MyDatabaseId;
+	key.relid = relid;
+	return hash_search(relations, (const void *) &key, HASH_FIND, found);
+}
+
+RangeRelation *
+get_pathman_range_relation(Oid relid, bool *found)
+{
+	RelationKey key;
+
+	key.dbid = MyDatabaseId;
+	key.relid = relid;
+	return hash_search(range_restrictions, (const void *) &key, HASH_FIND, found);
+}
+
 /*
  * Planner hook. It disables inheritance for tables that have been partitioned
  * by pathman to prevent standart PostgreSQL partitioning mechanism from
@@ -174,8 +194,7 @@ disable_inheritance(Query *parse)
 				if (rte->inh)
 				{
 					/* Look up this relation in pathman relations */
-					prel = (PartRelationInfo *)
-						hash_search(relations, (const void *) &rte->relid, HASH_FIND, 0);
+					prel = get_pathman_relation_info(rte->relid, NULL);
 					if (prel != NULL)
 					{
 						rte->inh = false;
@@ -240,8 +259,7 @@ pathman_set_rel_pathlist_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, Ran
 		return;
 
 	/* Lookup partitioning information for parent relation */
-	prel = (PartRelationInfo *)
-		hash_search(relations, (const void *) &rte->relid, HASH_FIND, 0);
+	prel = get_pathman_relation_info(rte->relid, NULL);
 
 	if (prel != NULL)
 	{
@@ -649,8 +667,7 @@ handle_binary_opexpr(const PartRelationInfo *prel, WrapperNode *result,
 			}
 		case PT_RANGE:
 			value = c->constvalue;
-			rangerel = (RangeRelation *)
-				hash_search(range_restrictions, (const void *)&prel->oid, HASH_FIND, NULL);
+			rangerel = get_pathman_range_relation(prel->key.relid, NULL);
 			if (rangerel != NULL)
 			{
 				RangeEntry *re;
@@ -830,8 +847,6 @@ range_binary_search(const RangeRelation *rangerel, FmgrInfo *cmp_func, Datum val
 	/* Check boundaries */
 	cmp_min = FunctionCall2(cmp_func, value, ranges[0].min),
 	cmp_max = FunctionCall2(cmp_func, value, ranges[rangerel->ranges.length - 1].max);
-	// cmp_min = OidFunctionCall2(cmp_proc, value, ranges[0].min);
-	// cmp_max = OidFunctionCall2(cmp_proc, value, ranges[rangerel->ranges.length - 1].max);
 	if (cmp_min < 0 || cmp_max >0)
 	{
 		return i;
@@ -844,8 +859,6 @@ range_binary_search(const RangeRelation *rangerel, FmgrInfo *cmp_func, Datum val
 		re = &ranges[i];
 		cmp_min = FunctionCall2(cmp_func, value, re->min);
 		cmp_max = FunctionCall2(cmp_func, value, re->max);
-		// cmp_min = OidFunctionCall2(cmp_proc, value, re->min);
-		// cmp_max = OidFunctionCall2(cmp_proc, value, re->max);
 
 		if (cmp_min >= 0 && cmp_max < 0)
 		{
