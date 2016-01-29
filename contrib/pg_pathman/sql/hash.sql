@@ -11,7 +11,7 @@ BEGIN
     relation := @extschema@.validate_relname(relation);
 
     IF EXISTS (SELECT * FROM @extschema@.pathman_config WHERE relname = relation) THEN
-        RAISE EXCEPTION 'Relation "%s" has already been partitioned', relation;
+        RAISE EXCEPTION 'Relation "%" has already been partitioned', relation;
     END IF;
 
     /* Create partitions and update pg_pathman configuration */

@@ -134,3 +134,28 @@ BEGIN
 END
 $$
 LANGUAGE plpgsql;
+
+/*
+ * DDL trigger that deletes entry from pathman_config
+ */
+CREATE OR REPLACE FUNCTION @extschema@.pathman_ddl_trigger_func()
+RETURNS event_trigger AS
+$$
+DECLARE
+    obj record;
+BEGIN
+    FOR obj IN SELECT * FROM pg_event_trigger_dropped_objects() as events
+               JOIN @extschema@.pathman_config as cfg ON cfg.relname = events.object_identity
+    LOOP
+        IF obj.object_type = 'table' THEN
+            EXECUTE 'DELETE FROM @extschema@.pathman_config WHERE relname = $1'
+            USING obj.object_identity;
+        END IF;
+    END LOOP;
+END
+$$
+LANGUAGE plpgsql;
+
+CREATE EVENT TRIGGER pathman_ddl_trigger
+ON sql_drop
+EXECUTE PROCEDURE @extschema@.pathman_ddl_trigger_func();

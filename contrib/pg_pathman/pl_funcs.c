@@ -3,6 +3,9 @@
 #include "utils/typcache.h"
 #include "utils/array.h"
 #include "access/nbtree.h"
+#include "access/xact.h"
+#include "catalog/pg_type.h"
+#include "executor/spi.h"
 
 
 /* declarations */
@@ -10,6 +13,7 @@ PG_FUNCTION_INFO_V1( on_partitions_created );
 PG_FUNCTION_INFO_V1( on_partitions_updated );
 PG_FUNCTION_INFO_V1( on_partitions_removed );
 PG_FUNCTION_INFO_V1( find_range_partition );
+PG_FUNCTION_INFO_V1( find_or_create_range_partition);
 PG_FUNCTION_INFO_V1( get_range_by_idx );
 PG_FUNCTION_INFO_V1( get_partition_range );
 
@@ -70,8 +74,52 @@ on_partitions_removed(PG_FUNCTION_ARGS)
 /*
  * Returns partition oid for specified parent relid and value
  */
+// Datum
+// find_range_partition(PG_FUNCTION_ARGS)
+// {
+// 	int		relid = DatumGetInt32(PG_GETARG_DATUM(0));
+// 	Datum	value = PG_GETARG_DATUM(1);
+// 	Oid		value_type = get_fn_expr_argtype(fcinfo->flinfo, 1);
+// 	int		pos;
+// 	bool	found;
+// 	RangeRelation	*rangerel;
+// 	RangeEntry		*ranges;
+// 	TypeCacheEntry	*tce;
+// 	PartRelationInfo *prel;
+// 	Oid				 cmp_proc_oid;
+// 	FmgrInfo		 cmp_func;
+
+// 	tce = lookup_type_cache(value_type,
+// 		TYPECACHE_EQ_OPR | TYPECACHE_LT_OPR | TYPECACHE_GT_OPR |
+// 		TYPECACHE_CMP_PROC | TYPECACHE_CMP_PROC_FINFO);
+
+// 	prel = (PartRelationInfo *)
+// 		hash_search(relations, (const void *) &relid, HASH_FIND, NULL);
+
+// 	cmp_proc_oid = get_opfamily_proc(tce->btree_opf,
+// 									 value_type,
+// 									 prel->atttype,
+// 									 BTORDER_PROC);
+// 	fmgr_info(cmp_proc_oid, &cmp_func);
+
+// 	rangerel = (RangeRelation *)
+// 		hash_search(range_restrictions, (const void *) &relid, HASH_FIND, NULL);
+
+// 	if (!rangerel)
+// 		PG_RETURN_NULL();
+
+// 	ranges = dsm_array_get_pointer(&rangerel->ranges);
+// 	pos = range_binary_search(rangerel, &cmp_func, value, &found);
+
+// 	if (found)
+// 		PG_RETURN_OID(ranges[pos].child_oid);
+
+// 	PG_RETURN_NULL();
+// }
+
 Datum
 find_range_partition(PG_FUNCTION_ARGS)
+// find_or_create_range_partition(PG_FUNCTION_ARGS)
 {
 	int		relid = DatumGetInt32(PG_GETARG_DATUM(0));
 	Datum	value = PG_GETARG_DATUM(1);
@@ -101,14 +149,67 @@ find_range_partition(PG_FUNCTION_ARGS)
 	rangerel = (RangeRelation *)
 		hash_search(range_restrictions, (const void *) &relid, HASH_FIND, NULL);
 
-	if (!rangerel)
+	if (!rangerel || rangerel->ranges.length == 0)
 		PG_RETURN_NULL();
 
 	ranges = dsm_array_get_pointer(&rangerel->ranges);
 	pos = range_binary_search(rangerel, &cmp_func, value, &found);
 
+	/*
+	 * If found then just return oid. Else create new partitions
+	 */
 	if (found)
 		PG_RETURN_OID(ranges[pos].child_oid);
+	else
+	{
+		int ret;
+		Datum	vals[4];
+		Oid		oids[] = {OIDOID, value_type, value_type, value_type};
+		bool	nulls[] = {false, false, false, false};
+		RangeEntry *re = &ranges[rangerel->ranges.length-1];
+		int cmp_upper = FunctionCall2(&cmp_func, value, ranges[rangerel->ranges.length-1].max);
+		int cmp_lower = FunctionCall2(&cmp_func, value, ranges[0].min);
+
+		if (cmp_upper > 0)
+			re = &ranges[rangerel->ranges.length-1];
+		else if (cmp_lower < 0)
+			re = &ranges[0];
+
+		vals[0] = ObjectIdGetDatum(relid);
+		vals[1] = re->min;
+		vals[2] = re->max;
+		vals[3] = value;
+
+		LWLockAcquire(load_config_lock, LW_EXCLUSIVE);
+
+		/* create new partitions */
+		SPI_connect();
+		ret = SPI_execute_with_args("select append_partitions_on_demand_internal($1, $2, $3, $4)",
+									4, oids, vals, nulls, false, 0);
+		if (ret > 0)
+		{
+			free_dsm_array(&rangerel->ranges);
+			free_dsm_array(&prel->children);
+			load_check_constraints(relid);
+		}
+		else
+		{
+			elog(WARNING, "Attempt to create new partitions failed");
+		}
+
+		/* update relation info */
+		SPI_finish();
+
+		LWLockRelease(load_config_lock);
+
+		/* repeat binary search */
+		ranges = dsm_array_get_pointer(&rangerel->ranges);
+		pos = range_binary_search(rangerel, &cmp_func, value, &found);
+		if (found)
+		{
+			PG_RETURN_OID(ranges[pos].child_oid);
+		}
+	}
 
 	PG_RETURN_NULL();
 }

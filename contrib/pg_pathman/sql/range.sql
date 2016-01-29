@@ -1,3 +1,5 @@
+/* TODO: function that subdivide specified period with specivied interval */
+
 /*
  * Creates RANGE partitions for specified relation based on datetime attribute
  */
@@ -258,6 +260,7 @@ BEGIN
                     , v_cond);
 
     EXECUTE v_sql;
+    -- RAISE NOTICE 'partition % created', v_child_relname;
     RETURN v_child_relname;
 END
 $$ LANGUAGE plpgsql;
@@ -708,7 +711,7 @@ $$ LANGUAGE plpgsql;
 /*
  *
  */
-CREATE OR REPLACE FUNCTION create_new_partitions(
+CREATE OR REPLACE FUNCTION append_partitions_on_demand_internal(
     p_relid OID
     , p_min ANYELEMENT
     , p_max ANYELEMENT
@@ -716,16 +719,31 @@ CREATE OR REPLACE FUNCTION create_new_partitions(
 RETURNS INTEGER AS
 $$
 DECLARE
-    v_cnt INTEGER;
+    v_cnt INTEGER := 0;
     i INTEGER;
+    v_part TEXT;
 BEGIN
-    v_cnt := (p_new_value - p_max) / (p_max - p_min) + 1;
-    FOR i IN 0..v_cnt-1
-    LOOP
-        PERFORM @extschema@.create_single_range_partition(p_relation
-                                                          , p_max + (i * (p_max - p_min))
-                                                          , p_max + ((i+1) * (p_max - p_min)));
-    END LOOP;
+    IF p_new_value >= p_max THEN
+        v_cnt := (p_new_value - p_max) / (p_max - p_min) + 1;
+        FOR i IN 0..v_cnt-1
+        LOOP
+            v_part := create_single_range_partition(get_schema_qualified_name(p_relid::regclass, '.')
+                                                  , p_max + (i * (p_max - p_min))
+                                                  , p_max + ((i+1) * (p_max - p_min)));
+            RAISE NOTICE 'partition % created', v_part;
+        END LOOP;
+    ELSIF p_new_value <= p_min THEN
+        v_cnt := (p_min - p_new_value) / (p_max - p_min) + 1;
+        FOR i IN 0..v_cnt-1
+        LOOP
+            v_part := create_single_range_partition(get_schema_qualified_name(p_relid::regclass, '.')
+                                                  , p_min - ((i+1) * (p_max - p_min))
+                                                  , p_min - (i * (p_max - p_min)));
+            RAISE NOTICE 'partition % created', v_part;
+        END LOOP;
+    ELSE
+        RAISE NOTICE 'Not implemented yet';
+    END IF;
     RETURN v_cnt;
 END
 $$ LANGUAGE plpgsql;

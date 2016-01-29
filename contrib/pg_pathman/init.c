@@ -11,6 +11,7 @@
 #include "utils/lsyscache.h"
 #include "utils/bytea.h"
 
+#include "utils/snapmgr.h"
 
 HTAB   *relations = NULL;
 HTAB   *range_restrictions = NULL;
@@ -190,6 +191,13 @@ load_check_constraints(Oid parent_oid)
 	Oid oids[1] = {INT4OID};
 	bool nulls[1] = {false};
 	vals[0] = Int32GetDatum(parent_oid);
+	SPIPlanPtr plan;
+
+	// char		sql[] = "select pg_constraint.* "
+	// 					"from pg_constraint "
+	// 					"join pg_inherits on inhrelid = conrelid "
+	// 					"where inhparent = %d and contype='c'";
+	// char *query;
 
 	prel = (PartRelationInfo*)
 		hash_search(relations, (const void *) &parent_oid, HASH_FIND, &found);
@@ -198,11 +206,20 @@ load_check_constraints(Oid parent_oid)
 	if (prel->children.length > 0)
 		return;
 
-	ret = SPI_execute_with_args("select pg_constraint.* "
-								"from pg_constraint "
-								"join pg_inherits on inhrelid = conrelid "
-								"where inhparent = $1 and contype='c';",
-								1, oids, vals, nulls, true, 0);
+	// ret = SPI_execute_with_args("select pg_constraint.* "
+	// 							"from pg_constraint "
+	// 							"join pg_inherits on inhrelid = conrelid "
+	// 							"where inhparent = $1 and contype='c';",
+	// 							1, oids, vals, nulls, true, 0);
+
+	plan = SPI_prepare("select pg_constraint.* "
+					   "from pg_constraint "
+					   "join pg_inherits on inhrelid = conrelid "
+					   "where inhparent = $1 and contype='c';",
+					   1, oids);
+	ret = SPI_execute_snapshot(plan, vals, nulls,
+		GetCatalogSnapshot(parent_oid), InvalidSnapshot, true, false, 0);
+
 	proc = SPI_processed;
 
 	if (ret > 0 && SPI_tuptable != NULL)
