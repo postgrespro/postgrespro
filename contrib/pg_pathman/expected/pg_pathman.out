@@ -436,6 +436,65 @@ SELECT pathman.drop_range_partitions('test.num_range_rel');
 DROP TABLE test.num_range_rel CASCADE;
 DROP TABLE test.range_rel CASCADE;
 NOTICE:  drop cascades to 6 other objects
+/* Test automatic partition creation */
+CREATE TABLE test.range_rel (
+    id SERIAL PRIMARY KEY,
+    dt TIMESTAMP);
+SELECT pathman.create_range_partitions('test.range_rel', 'dt', '2015-01-01'::DATE, '10 days'::INTERVAL, 1);
+ create_range_partitions 
+-------------------------
+                       1
+(1 row)
+
+INSERT INTO test.range_rel (dt)
+SELECT generate_series('2015-01-01', '2015-04-30', '1 day'::interval);
+NOTICE:  partition test.range_rel_2 created
+NOTICE:  partition test.range_rel_3 created
+NOTICE:  partition test.range_rel_4 created
+NOTICE:  partition test.range_rel_5 created
+NOTICE:  partition test.range_rel_6 created
+NOTICE:  partition test.range_rel_7 created
+NOTICE:  partition test.range_rel_8 created
+NOTICE:  partition test.range_rel_9 created
+NOTICE:  partition test.range_rel_10 created
+NOTICE:  partition test.range_rel_11 created
+NOTICE:  partition test.range_rel_12 created
+INSERT INTO test.range_rel (dt)
+SELECT generate_series('2014-12-31', '2014-12-01', '-1 day'::interval);
+NOTICE:  partition test.range_rel_13 created
+NOTICE:  partition test.range_rel_14 created
+NOTICE:  partition test.range_rel_15 created
+NOTICE:  partition test.range_rel_16 created
+EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt = '2014-12-15';
+                                   QUERY PLAN                                   
+--------------------------------------------------------------------------------
+ Append
+   ->  Seq Scan on range_rel_14
+         Filter: (dt = 'Mon Dec 15 00:00:00 2014'::timestamp without time zone)
+(3 rows)
+
+SELECT * FROM test.range_rel WHERE dt = '2014-12-15';
+ id  |            dt            
+-----+--------------------------
+ 137 | Mon Dec 15 00:00:00 2014
+(1 row)
+
+EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt = '2015-03-15';
+                                   QUERY PLAN                                   
+--------------------------------------------------------------------------------
+ Append
+   ->  Seq Scan on range_rel_8
+         Filter: (dt = 'Sun Mar 15 00:00:00 2015'::timestamp without time zone)
+(3 rows)
+
+SELECT * FROM test.range_rel WHERE dt = '2015-03-15';
+ id |            dt            
+----+--------------------------
+ 74 | Sun Mar 15 00:00:00 2015
+(1 row)
+
+DROP TABLE test.range_rel CASCADE;
+NOTICE:  drop cascades to 16 other objects
 SELECT * FROM pathman.pathman_config;
  id | relname | attname | parttype 
 ----+---------+---------+----------

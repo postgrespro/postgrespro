@@ -114,6 +114,23 @@ DROP TABLE test.num_range_rel CASCADE;
 
 DROP TABLE test.range_rel CASCADE;
 
+/* Test automatic partition creation */
+CREATE TABLE test.range_rel (
+    id SERIAL PRIMARY KEY,
+    dt TIMESTAMP);
+SELECT pathman.create_range_partitions('test.range_rel', 'dt', '2015-01-01'::DATE, '10 days'::INTERVAL, 1);
+INSERT INTO test.range_rel (dt)
+SELECT generate_series('2015-01-01', '2015-04-30', '1 day'::interval);
+
+INSERT INTO test.range_rel (dt)
+SELECT generate_series('2014-12-31', '2014-12-01', '-1 day'::interval);
+
+EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt = '2014-12-15';
+SELECT * FROM test.range_rel WHERE dt = '2014-12-15';
+EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt = '2015-03-15';
+SELECT * FROM test.range_rel WHERE dt = '2015-03-15';
+
+DROP TABLE test.range_rel CASCADE;
 SELECT * FROM pathman.pathman_config;
 
 DROP EXTENSION pg_pathman;

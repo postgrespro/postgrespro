@@ -18,8 +18,8 @@ RETURNS VOID AS 'pg_pathman', 'on_partitions_updated' LANGUAGE C STRICT;
 CREATE OR REPLACE FUNCTION @extschema@.on_remove_partitions(relid OID)
 RETURNS VOID AS 'pg_pathman', 'on_partitions_removed' LANGUAGE C STRICT;
 
-CREATE OR REPLACE FUNCTION @extschema@.find_range_partition(relid OID, value ANYELEMENT)
-RETURNS OID AS 'pg_pathman', 'find_range_partition' LANGUAGE C STRICT;
+CREATE OR REPLACE FUNCTION @extschema@.find_or_create_range_partition(relid OID, value ANYELEMENT)
+RETURNS OID AS 'pg_pathman', 'find_or_create_range_partition' LANGUAGE C STRICT;
 
 
 /*

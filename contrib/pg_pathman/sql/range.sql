@@ -567,7 +567,7 @@ DECLARE
             v_part_relid OID;
         BEGIN
             IF TG_OP = ''INSERT'' THEN
-                v_part_relid := @extschema@.find_range_partition(TG_RELID, NEW.%s);
+                v_part_relid := @extschema@.find_or_create_range_partition(TG_RELID, NEW.%s);
                 IF NOT v_part_relid IS NULL THEN
                     EXECUTE format(''INSERT INTO %%s SELECT $1.*'', v_part_relid::regclass)
                     USING NEW;
@@ -611,7 +611,7 @@ DECLARE
             q TEXT;
         BEGIN
             old_oid := TG_RELID;
-            new_oid := @extschema@.find_range_partition(''%1$s''::regclass::oid, NEW.%2$s);
+            new_oid := @extschema@.find_or_create_range_partition(''%1$s''::regclass::oid, NEW.%2$s);
             IF old_oid = new_oid THEN RETURN NEW; END IF;
             q := format(''DELETE FROM %%s WHERE %4$s'', old_oid::regclass::text);
             EXECUTE q USING %5$s;
@@ -709,41 +709,49 @@ $$ LANGUAGE plpgsql;
 
 
 /*
- *
+ * Internal function used to create new partitions on insert or update trigger.
+ * Invoked from C-function find_or_create_range_partition().
  */
-CREATE OR REPLACE FUNCTION append_partitions_on_demand_internal(
+CREATE OR REPLACE FUNCTION @extschema@.append_partitions_on_demand_internal(
     p_relid OID
     , p_min ANYELEMENT
     , p_max ANYELEMENT
     , p_new_value ANYELEMENT)
-RETURNS INTEGER AS
+RETURNS OID AS
 $$
 DECLARE
     v_cnt INTEGER := 0;
-    i INTEGER;
+    i INTEGER := 0;
     v_part TEXT;
 BEGIN
     IF p_new_value >= p_max THEN
-        v_cnt := (p_new_value - p_max) / (p_max - p_min) + 1;
-        FOR i IN 0..v_cnt-1
+        WHILE (p_max + i * (p_max - p_min)) <= p_new_value OR i > 1000
         LOOP
-            v_part := create_single_range_partition(get_schema_qualified_name(p_relid::regclass, '.')
-                                                  , p_max + (i * (p_max - p_min))
-                                                  , p_max + ((i+1) * (p_max - p_min)));
+            v_part := @extschema@.create_single_range_partition(
+                            @extschema@.get_schema_qualified_name(p_relid::regclass, '.')
+                            , p_max + (i * (p_max - p_min))
+                            , p_max + ((i+1) * (p_max - p_min)));
+            i := i + 1;
             RAISE NOTICE 'partition % created', v_part;
         END LOOP;
     ELSIF p_new_value <= p_min THEN
-        v_cnt := (p_min - p_new_value) / (p_max - p_min) + 1;
-        FOR i IN 0..v_cnt-1
+
+        WHILE (p_min - i * (p_max - p_min)) >= p_new_value OR i > 1000
         LOOP
-            v_part := create_single_range_partition(get_schema_qualified_name(p_relid::regclass, '.')
-                                                  , p_min - ((i+1) * (p_max - p_min))
-                                                  , p_min - (i * (p_max - p_min)));
+            v_part := @extschema@.create_single_range_partition(
+                            @extschema@.get_schema_qualified_name(p_relid::regclass, '.')
+                            , p_min - ((i+1) * (p_max - p_min))
+                            , p_min - (i * (p_max - p_min)));
+            i := i + 1;
             RAISE NOTICE 'partition % created', v_part;
         END LOOP;
     ELSE
         RAISE NOTICE 'Not implemented yet';
     END IF;
-    RETURN v_cnt;
+
+    IF i > 0 THEN
+        RETURN v_part::regclass::oid;
+    END IF;
+    RETURN NULL;
 END
 $$ LANGUAGE plpgsql;

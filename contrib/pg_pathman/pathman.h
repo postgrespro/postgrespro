@@ -4,6 +4,7 @@
 #include "postgres.h"
 #include "utils/date.h"
 #include "utils/hsearch.h"
+#include "utils/snapshot.h"
 #include "nodes/pg_list.h"
 #include "storage/dsm.h"
 #include "storage/lwlock.h"
@@ -148,12 +149,13 @@ void create_relations_hashtable(void);
 void create_hash_restrictions_hashtable(void);
 void create_range_restrictions_hashtable(void);
 void load_relations_hashtable(bool reinitialize);
-void load_check_constraints(Oid parent_oid);
+void load_check_constraints(Oid parent_oid, Snapshot snapshot);
 void remove_relation_info(Oid relid);
 
 /* utility functions */
 PartRelationInfo *get_pathman_relation_info(Oid relid, bool *found);
 RangeRelation *get_pathman_range_relation(Oid relid, bool *found);
 int range_binary_search(const RangeRelation *rangerel, FmgrInfo *cmp_func, Datum value, bool *fountPtr);
+char *get_extension_schema(void);
 
 #endif   /* PATHMAN_H */

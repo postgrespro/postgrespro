@@ -12,8 +12,6 @@
 #include "utils/lsyscache.h"
 #include "utils/bytea.h"
 
-#include "utils/snapmgr.h"
-
 HTAB   *relations = NULL;
 HTAB   *range_restrictions = NULL;
 bool	initialization_needed = true;
@@ -23,7 +21,6 @@ static FmgrInfo *qsort_type_cmp_func;
 static bool validate_range_constraint(Expr *, PartRelationInfo *, Datum *, Datum *);
 static bool validate_hash_constraint(Expr *expr, PartRelationInfo *prel, int *hash);
 static int cmp_range_entries(const void *p1, const void *p2);
-static char *get_extension_schema();
 
 /*
  * Initialize hashtables
@@ -45,7 +42,7 @@ load_config(void)
  * Returns extension schema name or NULL. Caller is responsible for freeing
  * the memory.
  */
-static char *
+char *
 get_extension_schema()
 {
 	int ret;
@@ -144,7 +141,7 @@ load_relations_hashtable(bool reinitialize)
 					free_dsm_array(&rangerel->ranges);
 					prel->children_count = 0;
 				}
-				load_check_constraints(oid);
+				load_check_constraints(oid, InvalidSnapshot);
 				break;
 			case PT_HASH:
 				if (reinitialize && prel->children.length > 0)
@@ -152,7 +149,7 @@ load_relations_hashtable(bool reinitialize)
 					free_dsm_array(&prel->children);
 					prel->children_count = 0;
 				}
-				load_check_constraints(oid);
+				load_check_constraints(oid, InvalidSnapshot);
 				break;
 		}
 	}
@@ -176,41 +173,28 @@ create_relations_hashtable()
 }
 
 /*
- * Load and validate constraints
+ * Load and validate CHECK constraints
  */
 void
-load_check_constraints(Oid parent_oid)
+load_check_constraints(Oid parent_oid, Snapshot snapshot)
 {
-	bool		found;
 	PartRelationInfo *prel;
 	RangeRelation *rangerel;
-	int ret;
-	int i;
-	int proc;
-
-	Datum vals[1];
-	Oid oids[1] = {INT4OID};
-	bool nulls[1] = {false};
-	vals[0] = Int32GetDatum(parent_oid);
 	SPIPlanPtr plan;
-
-	// char		sql[] = "select pg_constraint.* "
-	// 					"from pg_constraint "
-	// 					"join pg_inherits on inhrelid = conrelid "
-	// 					"where inhparent = %d and contype='c'";
-	// char *query;
-
+	bool	found;
+	int		ret,
+			i,
+			proc;
+	Datum	vals[1];
+	Oid		oids[1] = {INT4OID};
+	bool	nulls[1] = {false};
+	
+	vals[0] = Int32GetDatum(parent_oid);
 	prel = get_pathman_relation_info(parent_oid, NULL);
 
 	/* Skip if already loaded */
 	if (prel->children.length > 0)
 		return;
-
-	// ret = SPI_execute_with_args("select pg_constraint.* "
-	// 							"from pg_constraint "
-	// 							"join pg_inherits on inhrelid = conrelid "
-	// 							"where inhparent = $1 and contype='c';",
-	// 							1, oids, vals, nulls, true, 0);
 
 	plan = SPI_prepare("select pg_constraint.* "
 					   "from pg_constraint "
@@ -218,7 +202,7 @@ load_check_constraints(Oid parent_oid)
 					   "where inhparent = $1 and contype='c';",
 					   1, oids);
 	ret = SPI_execute_snapshot(plan, vals, nulls,
-		GetCatalogSnapshot(parent_oid), InvalidSnapshot, true, false, 0);
+							   snapshot, InvalidSnapshot, true, false, 0);
 
 	proc = SPI_processed;
 
