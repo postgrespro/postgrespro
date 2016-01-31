@@ -7,11 +7,18 @@ CREATE OR REPLACE FUNCTION @extschema@.create_hash_partitions(
     , partitions_count INTEGER
 ) RETURNS INTEGER AS
 $$
+DECLARE
+    v_type TEXT;
 BEGIN
     relation := @extschema@.validate_relname(relation);
+    v_type := @extschema@.get_attribute_type_name(relation, attribute);
 
     IF EXISTS (SELECT * FROM @extschema@.pathman_config WHERE relname = relation) THEN
         RAISE EXCEPTION 'Relation "%" has already been partitioned', relation;
+    END IF;
+
+    IF v_type::regtype != 'integer'::regtype THEN
+        RAISE EXCEPTION 'Attribute type must be INTEGER';
     END IF;
 
     /* Create partitions and update pg_pathman configuration */

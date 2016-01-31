@@ -386,17 +386,17 @@ NOTICE:  Done!
 SELECT pathman.append_partition('test.num_range_rel');
 NOTICE:  Appending new partition...
 NOTICE:  Done!
- append_partition 
-------------------
- 
+   append_partition   
+----------------------
+ test.num_range_rel_6
 (1 row)
 
 SELECT pathman.prepend_partition('test.num_range_rel');
 NOTICE:  Prepending new partition...
 NOTICE:  Done!
- prepend_partition 
--------------------
- 
+  prepend_partition   
+----------------------
+ test.num_range_rel_7
 (1 row)
 
 SELECT pathman.append_partition('test.range_rel');
@@ -404,7 +404,7 @@ NOTICE:  Appending new partition...
 NOTICE:  Done!
  append_partition 
 ------------------
- 
+ test.range_rel_6
 (1 row)
 
 SELECT pathman.prepend_partition('test.range_rel');
@@ -412,7 +412,7 @@ NOTICE:  Prepending new partition...
 NOTICE:  Done!
  prepend_partition 
 -------------------
- 
+ test.range_rel_7
 (1 row)
 
 /*
@@ -590,17 +590,17 @@ NOTICE:  Done!
 SELECT append_partition('range_rel');
 NOTICE:  Appending new partition...
 NOTICE:  Done!
- append_partition 
-------------------
- 
+  append_partition   
+---------------------
+ public.range_rel_14
 (1 row)
 
 SELECT prepend_partition('range_rel');
 NOTICE:  Prepending new partition...
 NOTICE:  Done!
- prepend_partition 
--------------------
- 
+  prepend_partition  
+---------------------
+ public.range_rel_15
 (1 row)
 
 EXPLAIN (COSTS OFF) SELECT * FROM range_rel WHERE dt < '2010-03-01';

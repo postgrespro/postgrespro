@@ -469,19 +469,25 @@ $$ LANGUAGE plpgsql;
 /*
  * Append new partition
  */
-CREATE OR REPLACE FUNCTION @extschema@.append_partition(p_relation TEXT)
-RETURNS VOID AS
+CREATE OR REPLACE FUNCTION @extschema@.append_partition(
+    p_relation TEXT)
+RETURNS TEXT AS
 $$
 DECLARE
     v_attname TEXT;
     v_atttype TEXT;
+    v_part_name TEXT;
 BEGIN
     p_relation := @extschema@.validate_relname(p_relation);
 
     v_attname := attname FROM @extschema@.pathman_config WHERE relname = p_relation;
     v_atttype := @extschema@.get_attribute_type_name(p_relation, v_attname);
-    EXECUTE format('SELECT @extschema@.append_partition_internal($1, NULL::%s)', v_atttype)
+    EXECUTE format('SELECT @extschema@.append_partition_internal($1, ARRAY[]::%s[])'
+                   , v_atttype)
+    INTO v_part_name
     USING p_relation;
+
+    RETURN v_part_name;
 END
 $$
 LANGUAGE plpgsql;
@@ -489,20 +495,22 @@ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION @extschema@.append_partition_internal(
     p_relation TEXT
-    , dummy ANYELEMENT
-    , OUT p_range ANYARRAY)
-RETURNS ANYARRAY AS
+    , p_range ANYARRAY DEFAULT NULL)
+RETURNS TEXT AS
 $$
+DECLARE
+    v_part_name TEXT;
 BEGIN
     p_range := @extschema@.get_range_by_idx(p_relation::regclass::oid, -1, 0);
     RAISE NOTICE 'Appending new partition...';
-    PERFORM @extschema@.create_single_range_partition(p_relation
-                                                      , p_range[2]
-                                                      , p_range[2] + (p_range[2] - p_range[1]));
+    v_part_name := @extschema@.create_single_range_partition(p_relation
+                                                             , p_range[2]
+                                                             , p_range[2] + (p_range[2] - p_range[1]));
 
     /* Tell backend to reload configuration */
     PERFORM @extschema@.on_create_partitions(p_relation::regclass::oid);
     RAISE NOTICE 'Done!';
+    RETURN v_part_name;
 END
 $$
 LANGUAGE plpgsql;
@@ -512,18 +520,23 @@ LANGUAGE plpgsql;
  * Append new partition
  */
 CREATE OR REPLACE FUNCTION @extschema@.prepend_partition(p_relation TEXT)
-RETURNS VOID AS
+RETURNS TEXT AS
 $$
 DECLARE
     v_attname TEXT;
     v_atttype TEXT;
+    v_part_name TEXT;
 BEGIN
     p_relation := @extschema@.validate_relname(p_relation);
 
     v_attname := attname FROM @extschema@.pathman_config WHERE relname = p_relation;
     v_atttype := @extschema@.get_attribute_type_name(p_relation, v_attname);
-    EXECUTE format('SELECT @extschema@.prepend_partition_internal($1, NULL::%s)', v_atttype)
+    EXECUTE format('SELECT @extschema@.prepend_partition_internal($1, ARRAY[]::%s[])'
+                   , v_atttype)
+    INTO v_part_name
     USING p_relation;
+
+    RETURN v_part_name;
 END
 $$
 LANGUAGE plpgsql;
@@ -531,20 +544,23 @@ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION @extschema@.prepend_partition_internal(
     p_relation TEXT
-    , dummy ANYELEMENT
-    , OUT p_range ANYARRAY)
-RETURNS ANYARRAY AS
+    , p_range ANYARRAY DEFAULT NULL)
+RETURNS TEXT AS
 $$
+DECLARE
+    v_part_name TEXT;
 BEGIN
     p_range := @extschema@.get_range_by_idx(p_relation::regclass::oid, 0, 0);
     RAISE NOTICE 'Prepending new partition...';
-    PERFORM @extschema@.create_single_range_partition(p_relation
-                                                      , p_range[1] - (p_range[2] - p_range[1])
-                                                      , p_range[1]);
+    v_part_name := @extschema@.create_single_range_partition(p_relation
+                                                             , p_range[1] - (p_range[2] - p_range[1])
+                                                             , p_range[1]);
 
     /* Tell backend to reload configuration */
     PERFORM @extschema@.on_create_partitions(p_relation::regclass::oid);
     RAISE NOTICE 'Done!';
+
+    RETURN v_part_name;
 END
 $$
 LANGUAGE plpgsql;
