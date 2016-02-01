@@ -50,6 +50,9 @@ BEGIN
     /* Notify backend about changes */
     PERFORM @extschema@.on_create_partitions(relation::regclass::oid);
 
+    /* Copy data */
+    PERFORM @extschema@.partition_data(relation);
+
     RETURN partitions_count;
 END
 $$ LANGUAGE plpgsql;
