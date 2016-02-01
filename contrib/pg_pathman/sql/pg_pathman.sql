@@ -8,6 +8,8 @@ CREATE TABLE test.hash_rel (
     id      SERIAL PRIMARY KEY,
     value   INTEGER);
 SELECT pathman.create_hash_partitions('test.hash_rel', 'value', 3);
+SELECT COUNT(*) FROM test.hash_rel;
+SELECT COUNT(*) FROM ONLY test.hash_rel;
 
 CREATE TABLE test.range_rel (
     id SERIAL PRIMARY KEY,
@@ -17,15 +19,19 @@ CREATE INDEX ON test.range_rel (dt);
 INSERT INTO test.range_rel (dt, txt)
 SELECT g, md5(g::TEXT) FROM generate_series('2015-01-01', '2015-04-30', '1 day'::interval) as g;
 SELECT pathman.create_range_partitions('test.range_rel', 'dt', '2015-01-01'::DATE, '1 month'::INTERVAL, 4);
-SELECT pathman.partition_data('test.range_rel');
+SELECT COUNT(*) FROM test.range_rel;
+SELECT COUNT(*) FROM ONLY test.range_rel;
 
 CREATE TABLE test.num_range_rel (
     id SERIAL PRIMARY KEY,
     txt TEXT);
 SELECT pathman.create_range_partitions('test.num_range_rel', 'id', 0, 1000, 4);
-
+SELECT COUNT(*) FROM test.num_range_rel;
+SELECT COUNT(*) FROM ONLY test.num_range_rel;
 INSERT INTO test.num_range_rel
-SELECT g, md5(g::TEXT) FROM generate_series(1, 3000) as g;
+    SELECT g, md5(g::TEXT) FROM generate_series(1, 3000) as g;
+SELECT COUNT(*) FROM test.num_range_rel;
+SELECT COUNT(*) FROM ONLY test.num_range_rel;
 
 INSERT INTO test.hash_rel VALUES (1, 1);
 INSERT INTO test.hash_rel VALUES (2, 2);
@@ -144,7 +150,6 @@ CREATE TABLE hash_rel (
     value   INTEGER);
 INSERT INTO hash_rel (value) SELECT g FROM generate_series(1, 10000) as g;
 SELECT create_hash_partitions('hash_rel', 'value', 3);
-SELECT partition_data('hash_rel');
 EXPLAIN (COSTS OFF) SELECT * FROM hash_rel WHERE id = 1234;
 
 /* Range */
@@ -153,7 +158,6 @@ CREATE TABLE range_rel (
     dt TIMESTAMP);
 INSERT INTO range_rel (dt) SELECT g FROM generate_series('2010-01-01'::date, '2010-12-31'::date, '1 day') as g;
 SELECT create_range_partitions('range_rel', 'dt', '2010-01-01'::date, '1 month'::interval, 12);
-SELECT partition_data('range_rel');
 SELECT merge_range_partitions('range_rel_1', 'range_rel_2');
 SELECT split_range_partition('range_rel_1', '2010-02-15'::date);
 SELECT append_partition('range_rel');
@@ -172,5 +176,13 @@ SELECT create_partitions_from_range('range_rel', 'id', 1, 1000, 100);
 SELECT drop_range_partitions('range_rel');
 SELECT create_partitions_from_range('range_rel', 'dt', '2015-01-01'::date, '2015-12-01'::date, '1 month'::interval);
 EXPLAIN (COSTS OFF) SELECT * FROM range_rel WHERE dt = '2015-12-15';
+
+/* Test exception handling on partitioning */
+CREATE TABLE messages(id SERIAL PRIMARY KEY, msg TEXT);
+CREATE TABLE replies(id SERIAL PRIMARY KEY, message_id INTEGER REFERENCES messages(id),  msg TEXT);
+INSERT INTO messages SELECT g, md5(g::text) FROM generate_series(1, 10) as g;
+INSERT INTO replies SELECT g, g, md5(g::text) FROM generate_series(1, 10) as g;
+SELECT create_range_partitions('messages', 'id', 1, 100, 2);
+EXPLAIN (COSTS OFF) SELECT * FROM messages;
 
 DROP EXTENSION pg_pathman;

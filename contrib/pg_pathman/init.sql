@@ -41,7 +41,10 @@ RETURNS ANYARRAY AS 'pg_pathman', 'get_range_by_idx' LANGUAGE C STRICT;
 /*
  * Copy rows to partitions
  */
-CREATE OR REPLACE FUNCTION @extschema@.partition_data(p_parent text, OUT p_total BIGINT)
+CREATE OR REPLACE FUNCTION @extschema@.partition_data(
+    p_parent text
+    , p_invalidate_cache_on_error BOOLEAN DEFAULT FALSE
+    , OUT p_total BIGINT)
 AS
 $$
 DECLARE
@@ -51,23 +54,22 @@ BEGIN
     p_parent := @extschema@.validate_relname(p_parent);
 
     p_total := 0;
-    FOR rec IN  (SELECT inhrelid as child_id, pg_constraint.consrc
-                 FROM @extschema@.pathman_config as cfg
-                 JOIN pg_class AS parent ON parent.relfilenode = cfg.relname::regclass::oid
-                 JOIN pg_inherits ON inhparent = parent.relfilenode
-                 JOIN pg_constraint ON conrelid = inhrelid AND contype='c'
-                 WHERE cfg.relname = p_parent)
-    LOOP
-        RAISE NOTICE 'Copying data to % (condition: %)', rec.child_id::regclass::text, rec.consrc;
-        EXECUTE format('WITH part_data AS (
-                            DELETE FROM ONLY %s WHERE %s RETURNING *)
-                        INSERT INTO %s SELECT * FROM part_data'
-                        , p_parent
-                        , rec.consrc
-                        , rec.child_id::regclass::text);
-        GET DIAGNOSTICS cnt = ROW_COUNT;
-        p_total := p_total + cnt;
-    END LOOP;
+
+    /* Create partitions and copy rest of the data */
+    RAISE NOTICE 'Copying data to partitions...';
+    EXECUTE format('
+                WITH part_data AS (
+                    DELETE FROM ONLY %s RETURNING *)
+                INSERT INTO %s SELECT * FROM part_data'
+                , p_parent
+                , p_parent);
+    GET DIAGNOSTICS p_total = ROW_COUNT;
+    RAISE NOTICE '% rows have been copied', p_total;
+    RETURN;
+
+EXCEPTION WHEN others THEN
+    PERFORM on_remove_partitions(p_parent::regclass::integer);
+    RAISE EXCEPTION '% %', SQLERRM, SQLSTATE;
 END
 $$
 LANGUAGE plpgsql;

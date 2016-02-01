@@ -46,6 +46,9 @@ BEGIN
     /* Notify backend about changes */
     PERFORM @extschema@.on_create_partitions(p_relation::regclass::oid);
 
+    /* Copy data */
+    PERFORM @extschema@.partition_data(p_relation);
+
     RETURN p_count;
 END
 $$ LANGUAGE plpgsql;
@@ -95,6 +98,9 @@ BEGIN
     -- PERFORM create_hash_update_trigger(relation, attribute, partitions_count);
     /* Notify backend about changes */
     PERFORM @extschema@.on_create_partitions(p_relation::regclass::oid);
+
+    /* Copy data */
+    PERFORM @extschema@.partition_data(p_relation);
 
     RETURN p_count;
 END
@@ -150,6 +156,9 @@ BEGIN
     /* Notify backend about changes */
     PERFORM @extschema@.on_create_partitions(p_relation::regclass::oid);
 
+    /* Copy data */
+    PERFORM @extschema@.partition_data(p_relation);
+
     RETURN i;
 END
 $$ LANGUAGE plpgsql;
@@ -198,6 +207,9 @@ BEGIN
 
     /* Notify backend about changes */
     PERFORM @extschema@.on_create_partitions(p_relation::regclass::oid);
+
+    /* Copy data */
+    PERFORM @extschema@.partition_data(p_relation);
 
     RETURN i;
 END
