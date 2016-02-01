@@ -31,7 +31,7 @@
       </listitem>
     </itemizedlist>
     <para>
-      &productname; supports partitioning via table inheritance. Each
+      PostgreSQL supports partitioning via table inheritance. Each
       partition must be created as child table with CHECK CONSTRAINT.
       For example:
     </para>
@@ -80,27 +80,25 @@ WHERE id = 150
   <sect2 id="pg-pathman-installation">
     <title>Installation</title>
     <para>
-      To install pathman run:
+      To install pg_pathman run in psql:
     </para>
     <programlisting>
-CREATE SCHEMA pathman;
-CREATE EXTENSION pg_pathman SCHEMA pathman;
+CREATE EXTENSION pg_pathman;
 </programlisting>
     <para>
-      Then modify <literal>shared_preload_libraries</>
-      parameter in postgresql.conf as 
+      Then modify shared_preload_libraries parameter in postgres.conf as
       following:
     </para>
     <programlisting>
 shared_preload_libraries = 'pg_pathman'
 </programlisting>
     <para>
-      It will require to restart of the &productname; instance.
+      It will require to restart the PostgreSQL instance.
     </para>
   </sect2>
   <sect2 id="pg-pathman-functions">
-    <title>FUNCTIONS</title>
-    <sect3 id="pg-pathman-partitions-creation">
+    <title>pg_pathman Functions</title>
+    <sect3 id="partitions-creation">
       <title>Partitions Creation</title>
       <programlisting>
 create_hash_partitions(
@@ -112,9 +110,8 @@ create_hash_partitions(
         Performs HASH partitioning for <literal>relation</literal> by
         integer key <literal>attribute</literal>. Creates
         <literal>partitions_count</literal> partitions and trigger on
-        INSERT. Data doesn't automatically copied from parent table to
-        partitions. Use <literal>partition_data()</literal> function
-        (see below) to migrate data.
+        INSERT. All the data will be automatically copied from the
+        parent to partitions.
       </para>
       <programlisting>
 create_range_partitions(
@@ -123,17 +120,7 @@ create_range_partitions(
     start_value ANYELEMENT,
     interval ANYELEMENT,
     premake INTEGER)
-</programlisting>
-      <para>
-        Performs RANGE partitioning for <literal>relation</literal> by
-        partitioning key <literal>attribute</literal>.
-        <literal>start_value</literal> argument specifies initial value,
-        <literal>interval</literal> sets the range of values in a single
-        partition, <literal>premake</literal> is the number of premade
-        partitions (the only one partition will be created if
-        <literal>premake</literal> is 0).
-      </para>
-      <programlisting>
+
 create_range_partitions(
     relation TEXT,
     attribute TEXT,
@@ -142,18 +129,38 @@ create_range_partitions(
     premake INTEGER)
 </programlisting>
       <para>
-        Same as above but suitable for <literal>DATE</literal> and
-        <literal>TIMESTAMP</literal> partitioning keys.
+        Performs RANGE partitioning for <literal>relation</literal> by
+        partitioning key <literal>attribute</literal>.
+        <literal>start_value</literal> argument specifies initial value,
+        <literal>interval</literal> sets the range of values in a single
+        partition, <literal>premake</literal> is the number of premade
+        partitions. All the data will be automatically copied from the
+        parent to partitions.
       </para>
-    </sect3>
-    <sect3 id="pg-pathman-data-migration">
-      <title>Data migration</title>
       <programlisting>
-partition_data(parent text)
+create_partitions_from_range(
+    relation TEXT,
+    attribute TEXT,
+    start_value ANYELEMENT,
+    end_value ANYELEMENT,
+    interval ANYELEMENT)
+
+create_partitions_from_range(
+    relation TEXT,
+    attribute TEXT,
+    start_value ANYELEMENT,
+    end_value ANYELEMENT,
+    interval INTERVAL)
 </programlisting>
       <para>
-        Copies data from parent table to its partitions.
+        Performs RANGE-partitioning from specified range for
+        <literal>relation</literal> by partitioning key
+        <literal>attribute</literal>. Data will be copied to partitions
+        as well.
       </para>
+    </sect3>
+    <sect3 id="utilities">
+      <title>Utilities</title>
       <programlisting>
 create_hash_update_trigger(parent TEXT)
 </programlisting>
@@ -163,13 +170,13 @@ create_hash_update_trigger(parent TEXT)
         useful in cases when key attribute could be changed.
       </para>
       <programlisting>
-create_hash_update_trigger(parent TEXT)
+create_range_update_trigger(parent TEXT)
 </programlisting>
       <para>
         Same as above for RANGE sections.
       </para>
     </sect3>
-    <sect3 id="pg-pathman-partitions-management">
+    <sect3 id="partitions-management">
       <title>Partitions management</title>
       <programlisting>
 split_range_partition(partition TEXT, value ANYELEMENT)
@@ -211,9 +218,9 @@ disable_partitioning(relation TEXT)
       </para>
     </sect3>
   </sect2>
-  <sect2 id="pg-pathman-examples">
+  <sect2 id="examples">
     <title>Examples</title>
-    <sect3 id="pg-pathman-example-hash">
+    <sect3 id="hash">
       <title>HASH</title>
       <para>
         Consider an example of HASH partitioning. First create a table
@@ -226,23 +233,19 @@ CREATE TABLE hash_rel (
 INSERT INTO hash_rel (value) SELECT g FROM generate_series(1, 10000) as g;
 </programlisting>
       <para>
-        Then run create_hash_partitions() function with appropriate
+        If partitions are supposed to have indexes, then they should be
+        created for parent table before partitioning. In this case
+        pg_pathman will automaticaly create indexes for partitions. Then
+        run create_hash_partitions() function with appropriate
         arguments:
       </para>
       <programlisting>
 SELECT create_hash_partitions('hash_rel', 'value', 100);
 </programlisting>
       <para>
-        This will create new partitions but data will still be in the
-        parent table. To move data to the corresponding partitions use
-        partition_data() function:
-      </para>
-      <programlisting>
-SELECT partition_data('hash_rel');
-</programlisting>
-      <para>
-        Here is an example of the query with filtering by partitioning
-        key and its plan:
+        This will create new partitions and move the data from parent to
+        partitions. Here is an example of the query with filtering by
+        partitioning key and its plan:
       </para>
       <programlisting>
 SELECT * FROM hash_rel WHERE value = 1234;
@@ -268,7 +271,7 @@ EXPLAIN SELECT * FROM ONLY hash_rel;
  Seq Scan on hash_rel  (cost=0.00..0.00 rows=1 width=8)
 </programlisting>
     </sect3>
-    <sect3 id="pg-pathman-example-range">
+    <sect3 id="range">
       <title>RANGE</title>
       <para>
         Consider an example of RANGE partitioning. Create a table with
@@ -278,26 +281,19 @@ EXPLAIN SELECT * FROM ONLY hash_rel;
 CREATE TABLE range_rel (
     id SERIAL PRIMARY KEY,
     dt TIMESTAMP);
-INSERT INTO range_rel (dt) SELECT g FROM generate_series('2010-01-01'::date, '2015-12-31'::date, '1 day') as g;
+INSERT INTO range_rel (dt) SELECT g FROM generate_series('2010-01-01'::date, '2014-12-31'::date, '1 day') as g;
 </programlisting>
       <para>
         Run create_range_partitions() function to create partitions so
         that each partition would contain data for one month:
       </para>
       <programlisting>
-SELECT create_range_partitions('range_rel', 'dt', '2010-01-01'::date, '1 month'::interval, 59);
+SELECT create_range_partitions('range_rel', 'dt', '2010-01-01'::date, '1 month'::interval, 60);
 </programlisting>
       <para>
-        It will create 60 partitions (one partition is created
-        regardless of <literal>premake</literal> parameter). Now move
-        data from the parent to partitions.
-      </para>
-      <programlisting>
-SELECT partition_data('range_rel');
-</programlisting>
-      <para>
-        To merge to adjacent partitions run merge_range_partitions()
-        function:
+        It will create 60 partitions and move the data from parent to
+        partitions. To merge to adjacent partitions run
+        merge_range_partitions() function:
       </para>
       <programlisting>
 SELECT merge_range_partitions('range_rel_1', 'range_rel_2');
@@ -396,11 +392,14 @@ DELETE FROM pathman_config WHERE relname = 'public.range_rel';
 </programlisting>
     </sect3>
   </sect2>
-  <sect2 id="pg-pathman-author">
+  <sect2 id="author">
     <title>Author</title>
     <para>
       Ildar Musin <email>i.musin@postgrespro.ru</email> Postgres
       Professional Ltd., Russia
+    </para>
+    <para>
+      This module is sponsored by Postgres Professional Ltd., Russia
     </para>
   </sect2>
 </sect1>
