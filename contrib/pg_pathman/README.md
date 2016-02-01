@@ -92,15 +92,11 @@ Performs RANGE-partitioning from specified range for `relation` by partitioning 
 
 ### Utilities
 ```
-partition_data(parent text)
-```
-Copies data from parent table to its partitions.
-```
 create_hash_update_trigger(parent TEXT)
 ```
 Creates the trigger on UPDATE for HASH partitions. The UPDATE trigger isn't created by default because of overhead. It is useful in cases when key attribute could be changed.
 ```
-create_hash_update_trigger(parent TEXT)
+create_range_update_trigger(parent TEXT)
 ```
 Same as above for RANGE sections.
 
@@ -139,10 +135,7 @@ If partitions are supposed to have indexes, then they should be created for pare
 ```
 SELECT create_hash_partitions('hash_rel', 'value', 100);
 ```
-This will create new partitions but data will still be in the parent table. To move data to the corresponding partitions use partition_data() function:
-```
-SELECT partition_data('hash_rel');
-```
+This will create new partitions and move the data from parent to partitions.
 Here is an example of the query with filtering by partitioning key and its plan:
 ```
 SELECT * FROM hash_rel WHERE value = 1234;
@@ -176,10 +169,7 @@ Run create_range_partitions() function to create partitions so that each partiti
 ```
 SELECT create_range_partitions('range_rel', 'dt', '2010-01-01'::date, '1 month'::interval, 60);
 ```
-It will create 60 partitions. Now let's move data from the parent to partitions.
-```
-SELECT partition_data('range_rel');
-```
+It will create 60 partitions and move the data from parent to partitions.
 To merge to adjacent partitions run merge_range_partitions() function:
 ```
 SELECT merge_range_partitions('range_rel_1', 'range_rel_2');

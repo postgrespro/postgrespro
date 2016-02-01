@@ -94,15 +94,11 @@ create_partitions_from_range(
 
 ### Утилиты
 ```
-partition_data(parent text)
-```
-Копирует данные из родительской таблицы `parent` в дочерние секции.
-```
 create_hash_update_trigger(parent TEXT)
 ```
 Создает триггер на UPDATE для HASH секций. По-умолчанию триггер на обновление данных не создается, т.к. это создает дополнительные накладные расходы. Триггер полезен только в том случае, когда меняется значение ключевого аттрибута.
 ```
-create_hash_update_trigger(parent TEXT)
+create_range_update_trigger(parent TEXT)
 ```
 Аналогично предыдущей, но для RANGE секций.
 
@@ -141,10 +137,6 @@ INSERT INTO hash_rel (value) SELECT g FROM generate_series(1, 10000) as g;
 ```
 SELECT create_hash_partitions('hash_rel', 'value', 100);
 ```
-Перенесем данные из родительской таблицы в дочерние секции.
-```
-SELECT partition_data('hash_rel');
-```
 Пример построения плана для запроса с фильтрацией по ключевому полю:
 ```
 SELECT * FROM hash_rel WHERE value = 1234;
@@ -178,11 +170,6 @@ INSERT INTO range_rel (dt) SELECT g FROM generate_series('2010-01-01'::date, '20
 Разобьем таблицу на 60 секций так, чтобы каждая секция содержала данные за один месяц:
 ```
 SELECT create_range_partitions('range_rel', 'dt', '2010-01-01'::date, '1 month'::interval, 60);
-```
-
-Перенесем данные из родительской таблицы в дочерние секции.
-```
-SELECT partition_data('range_rel');
 ```
 Объединим секции первые две секции:
 ```
