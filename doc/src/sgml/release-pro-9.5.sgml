@@ -57,11 +57,6 @@
      Dump/restore database statistics.
      </para>
      </listitem>
-     <listitem>
-     <para>
-     pg_pathman module - simple function interface to table partitioning
-     </para>
-    </listitem>
     <listitem>
     <para>Some hunspell dictionaries for full-text search are bundled
     with distribution</para>
@@ -278,15 +273,6 @@ Date:   Wed Dec 30 16:00:20 2015 +0300
      Several hunspell dictionaries for full-text search are now included
      as contrib modules and can be easily installed into the database
      using CREATE EXTENSION command.
-     </para>
-     </listitem>
-     <listitem>
-     <!-- [ede287ccaeb2] Ildar Musin -->
-     <para>
-     pg_pathman module provides set of function to automate process of
-     table partitioning, creating triggers for inserting data  into
-     partitioned tables, and distributing existing data between
-     partitions. k 
      </para>
      </listitem>
     </itemizedlist>
