@@ -54,7 +54,7 @@ create_hash_partitions(
     attribute TEXT,
     partitions_count INTEGER)
 ```
-Performs HASH partitioning for `relation` by integer key `attribute`. Creates `partitions_count` partitions and trigger on INSERT. Data doesn't automatically copied from parent table to partitions. Use `partition_data()` function (see below) to migrate data.
+Performs HASH partitioning for `relation` by integer key `attribute`. Creates `partitions_count` partitions and trigger on INSERT. All the data will be automatically copied from the parent to partitions.
 
 ```
 create_range_partitions(
@@ -71,7 +71,7 @@ create_range_partitions(
     interval INTERVAL,
     premake INTEGER)
 ```
-Performs RANGE partitioning for `relation` by partitioning key `attribute`. `start_value` argument specifies initial value, `interval` sets the range of values in a single partition, `premake` is the number of premade partitions.
+Performs RANGE partitioning for `relation` by partitioning key `attribute`. `start_value` argument specifies initial value, `interval` sets the range of values in a single partition, `premake` is the number of premade partitions. All the data will be automatically copied from the parent to partitions.
 
 ```
 create_partitions_from_range(
@@ -88,7 +88,7 @@ create_partitions_from_range(
     end_value ANYELEMENT,
     interval INTERVAL)
 ```
-Performs RANGE-partitioning from specified range for `relation` by partitioning key `attribute`.
+Performs RANGE-partitioning from specified range for `relation` by partitioning key `attribute`. Data will be copied to partitions as well.
 
 ### Utilities
 ```

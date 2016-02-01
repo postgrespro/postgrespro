@@ -5,11 +5,13 @@ CREATE SCHEMA test;
 CREATE TABLE test.hash_rel (
     id      SERIAL PRIMARY KEY,
     value   INTEGER);
+INSERT INTO test.hash_rel VALUES (1, 1);
+INSERT INTO test.hash_rel VALUES (2, 2);
+INSERT INTO test.hash_rel VALUES (3, 3);
 SELECT pathman.create_hash_partitions('test.hash_rel', 'value', 3);
 NOTICE:  function test.hash_rel_hash_insert_trigger_func() does not exist, skipping
 NOTICE:  function test.hash_rel_hash_update_trigger_func() does not exist, skipping
 NOTICE:  Copying data to partitions...
-NOTICE:  0 rows have been copied
  create_hash_partitions 
 ------------------------
                       3
@@ -18,7 +20,22 @@ NOTICE:  0 rows have been copied
 SELECT COUNT(*) FROM test.hash_rel;
  count 
 -------
+     3
+(1 row)
+
+SELECT COUNT(*) FROM ONLY test.hash_rel;
+ count 
+-------
      0
+(1 row)
+
+INSERT INTO test.hash_rel VALUES (4, 4);
+INSERT INTO test.hash_rel VALUES (5, 5);
+INSERT INTO test.hash_rel VALUES (6, 6);
+SELECT COUNT(*) FROM test.hash_rel;
+ count 
+-------
+     6
 (1 row)
 
 SELECT COUNT(*) FROM ONLY test.hash_rel;
@@ -37,7 +54,6 @@ SELECT g, md5(g::TEXT) FROM generate_series('2015-01-01', '2015-04-30', '1 day':
 SELECT pathman.create_range_partitions('test.range_rel', 'dt', '2015-01-01'::DATE, '1 month'::INTERVAL, 4);
 NOTICE:  sequence "range_rel_seq" does not exist, skipping
 NOTICE:  Copying data to partitions...
-NOTICE:  0 rows have been copied
  create_range_partitions 
 -------------------------
                        4
@@ -61,7 +77,6 @@ CREATE TABLE test.num_range_rel (
 SELECT pathman.create_range_partitions('test.num_range_rel', 'id', 0, 1000, 4);
 NOTICE:  sequence "num_range_rel_seq" does not exist, skipping
 NOTICE:  Copying data to partitions...
-NOTICE:  0 rows have been copied
  create_range_partitions 
 -------------------------
                        4
@@ -93,12 +108,6 @@ SELECT COUNT(*) FROM ONLY test.num_range_rel;
      0
 (1 row)
 
-INSERT INTO test.hash_rel VALUES (1, 1);
-INSERT INTO test.hash_rel VALUES (2, 2);
-INSERT INTO test.hash_rel VALUES (3, 3);
-INSERT INTO test.hash_rel VALUES (4, 4);
-INSERT INTO test.hash_rel VALUES (5, 5);
-INSERT INTO test.hash_rel VALUES (6, 6);
 VACUUM;
 /* update triggers test */
 SELECT pathman.create_hash_update_trigger('test.hash_rel');
@@ -486,7 +495,6 @@ CREATE TABLE test.range_rel (
     dt TIMESTAMP);
 SELECT pathman.create_range_partitions('test.range_rel', 'dt', '2015-01-01'::DATE, '10 days'::INTERVAL, 1);
 NOTICE:  Copying data to partitions...
-NOTICE:  0 rows have been copied
  create_range_partitions 
 -------------------------
                        1
@@ -558,7 +566,6 @@ SELECT create_hash_partitions('hash_rel', 'value', 3);
 NOTICE:  function hash_rel_hash_insert_trigger_func() does not exist, skipping
 NOTICE:  function hash_rel_hash_update_trigger_func() does not exist, skipping
 NOTICE:  Copying data to partitions...
-NOTICE:  0 rows have been copied
  create_hash_partitions 
 ------------------------
                       3
@@ -584,7 +591,6 @@ INSERT INTO range_rel (dt) SELECT g FROM generate_series('2010-01-01'::date, '20
 SELECT create_range_partitions('range_rel', 'dt', '2010-01-01'::date, '1 month'::interval, 12);
 NOTICE:  sequence "range_rel_seq" does not exist, skipping
 NOTICE:  Copying data to partitions...
-NOTICE:  0 rows have been copied
  create_range_partitions 
 -------------------------
                       12
@@ -669,7 +675,6 @@ SELECT drop_range_partitions('range_rel');
 
 SELECT create_partitions_from_range('range_rel', 'id', 1, 1000, 100);
 NOTICE:  Copying data to partitions...
-NOTICE:  0 rows have been copied
  create_partitions_from_range 
 ------------------------------
                            10
@@ -683,7 +688,6 @@ SELECT drop_range_partitions('range_rel');
 
 SELECT create_partitions_from_range('range_rel', 'dt', '2015-01-01'::date, '2015-12-01'::date, '1 month'::interval);
 NOTICE:  Copying data to partitions...
-NOTICE:  0 rows have been copied
  create_partitions_from_range 
 ------------------------------
                            12
