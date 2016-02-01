@@ -64,7 +64,7 @@ BEGIN
                 , p_parent
                 , p_parent);
     GET DIAGNOSTICS p_total = ROW_COUNT;
-    RAISE NOTICE '% rows have been copied', p_total;
+    -- RAISE NOTICE '% rows have been copied', p_total;
     RETURN;
 
 EXCEPTION WHEN others THEN

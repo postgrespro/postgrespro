@@ -7,7 +7,15 @@ CREATE SCHEMA test;
 CREATE TABLE test.hash_rel (
     id      SERIAL PRIMARY KEY,
     value   INTEGER);
+INSERT INTO test.hash_rel VALUES (1, 1);
+INSERT INTO test.hash_rel VALUES (2, 2);
+INSERT INTO test.hash_rel VALUES (3, 3);
 SELECT pathman.create_hash_partitions('test.hash_rel', 'value', 3);
+SELECT COUNT(*) FROM test.hash_rel;
+SELECT COUNT(*) FROM ONLY test.hash_rel;
+INSERT INTO test.hash_rel VALUES (4, 4);
+INSERT INTO test.hash_rel VALUES (5, 5);
+INSERT INTO test.hash_rel VALUES (6, 6);
 SELECT COUNT(*) FROM test.hash_rel;
 SELECT COUNT(*) FROM ONLY test.hash_rel;
 
@@ -32,13 +40,6 @@ INSERT INTO test.num_range_rel
     SELECT g, md5(g::TEXT) FROM generate_series(1, 3000) as g;
 SELECT COUNT(*) FROM test.num_range_rel;
 SELECT COUNT(*) FROM ONLY test.num_range_rel;
-
-INSERT INTO test.hash_rel VALUES (1, 1);
-INSERT INTO test.hash_rel VALUES (2, 2);
-INSERT INTO test.hash_rel VALUES (3, 3);
-INSERT INTO test.hash_rel VALUES (4, 4);
-INSERT INTO test.hash_rel VALUES (5, 5);
-INSERT INTO test.hash_rel VALUES (6, 6);
 
 VACUUM;
 
