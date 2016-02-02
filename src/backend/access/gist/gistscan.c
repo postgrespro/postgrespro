@@ -230,6 +230,10 @@ gistrescan(PG_FUNCTION_ARGS)
 		{
 			ScanKey		skey = scan->keyData + i;
 
+			/*
+			 * Copy consistent support function to ScanKey structure
+			 * instead of function implementing filtering operator.
+			 */
 			fmgr_info_copy(&(skey->sk_func),
 						   &(so->giststate->consistentFn[skey->sk_attno - 1]),
 						   so->giststate->scanCxt);
@@ -299,6 +303,10 @@ gistrescan(PG_FUNCTION_ARGS)
 			 */
 			so->orderByTypes[i] = get_func_rettype(skey->sk_func.fn_oid);
 
+			/*
+			 * Copy distance support function to ScanKey structure
+			 * instead of function implementing ordering operator.
+			 */
 			fmgr_info_copy(&(skey->sk_func), finfo, so->giststate->scanCxt);
 
 			/* Restore prior fn_extra pointers, if not first time */
