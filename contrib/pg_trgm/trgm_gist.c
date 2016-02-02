@@ -219,7 +219,7 @@ gtrgm_consistent(PG_FUNCTION_ARGS)
 		switch (strategy)
 		{
 			case SimilarityStrategyNumber:
-			case SubstringSimilarityStrategyNumber:
+			case SubwordSimilarityStrategyNumber:
 				qtrg = generate_trgm(VARDATA(query),
 									 querysize - VARHDRSZ);
 				break;
@@ -288,10 +288,11 @@ gtrgm_consistent(PG_FUNCTION_ARGS)
 	switch (strategy)
 	{
 		case SimilarityStrategyNumber:
-		case SubstringSimilarityStrategyNumber:
-			/* Similarity search is exact. Substring similarity search is inexact */
-			*recheck = (strategy == SubstringSimilarityStrategyNumber);
-			nlimit = (strategy == SimilarityStrategyNumber) ? trgm_limit : trgm_substring_limit;
+		case SubwordSimilarityStrategyNumber:
+			/* Similarity search is exact. Subword similarity search is inexact */
+			*recheck = (strategy == SubwordSimilarityStrategyNumber);
+			nlimit = (strategy == SimilarityStrategyNumber) ?
+				trgm_sml_limit : trgm_subword_limit;
 
 			if (GIST_LEAF(entry))
 			{					/* all leafs contains orig trgm */
@@ -430,6 +431,7 @@ gtrgm_distance(PG_FUNCTION_ARGS)
 	StrategyNumber strategy = (StrategyNumber) PG_GETARG_UINT16(2);
 
 	/* Oid		subtype = PG_GETARG_OID(3); */
+	bool	   *recheck = (bool *) PG_GETARG_POINTER(4);
 	TRGM	   *key = (TRGM *) DatumGetPointer(entry->key);
 	TRGM	   *qtrg;
 	float8		res;
@@ -465,9 +467,11 @@ gtrgm_distance(PG_FUNCTION_ARGS)
 	switch (strategy)
 	{
 		case DistanceStrategyNumber:
+		case SubwordDistanceStrategyNumber:
+			*recheck = strategy == SubwordDistanceStrategyNumber;
 			if (GIST_LEAF(entry))
 			{					/* all leafs contains orig trgm */
-				res = 1.0 - cnt_sml(key, qtrg, false);
+				res = 1.0 - cnt_sml(qtrg, key, *recheck);
 			}
 			else if (ISALLTRUE(key))
 			{					/* all leafs contains orig trgm */
