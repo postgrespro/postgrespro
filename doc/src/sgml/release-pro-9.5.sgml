@@ -153,7 +153,17 @@ commit [90e649a7afac8c76]   Thu Dec 31 09:52:30 2015 +0300
     when modifying state, shared between processes.
     </para>
     </listitem>
-    
+    <listitem>
+    <para>
+    Improve buffer manager concurrency for multicore architectures.
+    </para>
+    </listitem>
+    <listitem>
+    <para>
+    Improve LWLock concurrency for Power8 architecture.
+    </para>
+    </listitem>
+       
      </itemizedlist>
     </listitem>
     <listitem>
