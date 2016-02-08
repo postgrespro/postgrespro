@@ -5547,9 +5547,21 @@ get_insert_query_def(Query *query, deparse_context *context)
 			/* Add a WHERE clause (for partial indexes) if given */
 			if (confl->arbiterWhere != NULL)
 			{
+				bool		save_varprefix;
+
+				/*
+				 * Force non-prefixing of Vars, since parser assumes that they
+				 * belong to target relation.  WHERE clause does not use
+				 * InferenceElem, so this is separately required.
+				 */
+				save_varprefix = context->varprefix;
+				context->varprefix = false;
+
 				appendContextKeyword(context, " WHERE ",
 									 -PRETTYINDENT_STD, PRETTYINDENT_STD, 1);
 				get_rule_expr(confl->arbiterWhere, context, false);
+
+				context->varprefix = save_varprefix;
 			}
 		}
 		else if (confl->constraint != InvalidOid)
@@ -7971,13 +7983,14 @@ get_rule_expr(Node *node, deparse_context *context,
 		case T_InferenceElem:
 			{
 				InferenceElem *iexpr = (InferenceElem *) node;
-				bool		varprefix = context->varprefix;
+				bool		save_varprefix;
 				bool		need_parens;
 
 				/*
 				 * InferenceElem can only refer to target relation, so a
-				 * prefix is never useful.
+				 * prefix is not useful, and indeed would cause parse errors.
 				 */
+				save_varprefix = context->varprefix;
 				context->varprefix = false;
 
 				/*
@@ -7997,7 +8010,7 @@ get_rule_expr(Node *node, deparse_context *context,
 				if (need_parens)
 					appendStringInfoChar(buf, ')');
 
-				context->varprefix = varprefix;
+				context->varprefix = save_varprefix;
 
 				if (iexpr->infercollid)
 					appendStringInfo(buf, " COLLATE %s",
