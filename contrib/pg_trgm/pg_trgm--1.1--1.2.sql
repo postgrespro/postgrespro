@@ -19,12 +19,12 @@ AS 'MODULE_PATHNAME'
 LANGUAGE C STRICT STABLE;  -- stable because depends on pg_trgm.subword_limit
 
 CREATE FUNCTION subword_similarity_dist_op(text,text)
-RETURNS float4
+RETURNS float8
 AS 'MODULE_PATHNAME'
 LANGUAGE C STRICT IMMUTABLE;
 
 CREATE FUNCTION subword_similarity_dist_commutator_op(text,text)
-RETURNS float4
+RETURNS float8
 AS 'MODULE_PATHNAME'
 LANGUAGE C STRICT IMMUTABLE;
 

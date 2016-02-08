@@ -85,12 +85,12 @@ CREATE OPERATOR <-> (
 );
 
 CREATE FUNCTION subword_similarity_dist_op(text,text)
-RETURNS float4
+RETURNS float8
 AS 'MODULE_PATHNAME'
 LANGUAGE C STRICT IMMUTABLE;
 
 CREATE FUNCTION subword_similarity_dist_commutator_op(text,text)
-RETURNS float4
+RETURNS float8
 AS 'MODULE_PATHNAME'
 LANGUAGE C STRICT IMMUTABLE;
 
