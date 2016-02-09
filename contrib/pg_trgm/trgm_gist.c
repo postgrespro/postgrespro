@@ -471,6 +471,11 @@ gtrgm_distance(PG_FUNCTION_ARGS)
 			*recheck = strategy == SubwordDistanceStrategyNumber;
 			if (GIST_LEAF(entry))
 			{					/* all leafs contains orig trgm */
+				/*
+				 * Prevent gcc optimizing the sml variable using volatile
+				 * keyword. Otherwise res can differ from the
+				 * subword_similarity_dist_op() function.
+				 */
 				float4 volatile sml = cnt_sml(qtrg, key, *recheck);
 				res = 1.0 - sml;
 			}
