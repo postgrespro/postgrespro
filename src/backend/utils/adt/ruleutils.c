@@ -1134,9 +1134,22 @@ pg_get_indexdef_worker(Oid indexrelid, int colno,
 		Oid			keycoltype;
 		Oid			keycolcollation;
 
+		/* Report the INCLUDED attributes, if any. */
+		if(keyno == idxrec->indnkeyatts)
+		{
+			if(!attrsOnly)
+			{
+				appendStringInfoString(&buf, ") INCLUDING (");
+				sep = "";
+			}
+		}
+		else if (keyno > idxrec->indnkeyatts)
+			sep = ", ";
+
 		if (!colno)
 			appendStringInfoString(&buf, sep);
 		sep = ", ";
+
 
 		if (attnum != 0)
 		{
@@ -1145,8 +1158,13 @@ pg_get_indexdef_worker(Oid indexrelid, int colno,
 			int32		keycoltypmod;
 
 			attname = get_relid_attribute_name(indrelid, attnum);
+
 			if (!colno || colno == keyno + 1)
+			{
 				appendStringInfoString(&buf, quote_identifier(attname));
+				if (attrsOnly && keyno >= idxrec->indnkeyatts)
+					appendStringInfoString(&buf, " (included)");
+			}
 			get_atttypetypmodcoll(indrelid, attnum,
 								  &keycoltype, &keycoltypmod,
 								  &keycolcollation);
@@ -1185,6 +1203,9 @@ pg_get_indexdef_worker(Oid indexrelid, int colno,
 			if (OidIsValid(indcoll) && indcoll != keycolcollation)
 				appendStringInfo(&buf, " COLLATE %s",
 								 generate_collation_name((indcoll)));
+
+			if(keyno >= idxrec->indnkeyatts)
+				continue;
 
 			/* Add the operator class name, if not default */
 			get_opclass_name(indclass->values[keyno], keycoltype, &buf);

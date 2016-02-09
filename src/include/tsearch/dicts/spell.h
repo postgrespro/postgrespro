@@ -57,19 +57,16 @@ typedef struct SPNode
 
 typedef struct spell_struct
 {
-	union
+	struct
 	{
-		/*
-		 * flag is filled in by NIImportDictionary. After NISortDictionary, d
-		 * is valid and flag is invalid.
-		 */
-		char		flag[MAXFLAGLEN];
-		struct
-		{
-			int			affix;
-			int			len;
-		}			d;
-	}			p;
+		int			affix;
+		int			len;
+	}			d;
+	/*
+	 * flag is filled in by NIImportDictionary. After NISortDictionary, d
+	 * is valid and flag is invalid.
+	 */
+	char	   *flag;
 	char		word[FLEXIBLE_ARRAY_MEMBER];
 } SPELL;
 
@@ -77,7 +74,7 @@ typedef struct spell_struct
 
 typedef struct aff_struct
 {
-	uint32		flag:8,
+	uint32		flag:16,
 				type:1,
 				flagflags:7,
 				issimple:1,
@@ -132,6 +129,13 @@ typedef struct
 	bool		issuffix;
 } CMPDAffix;
 
+typedef enum
+{
+	FM_CHAR,
+	FM_LONG,
+	FM_NUM
+} FlagMode;
+
 typedef struct
 {
 	int			maffixes;
@@ -145,11 +149,13 @@ typedef struct
 	char	  **AffixData;
 	int			lenAffixData;
 	int			nAffixData;
+	bool		useFlagAliases;
 
 	CMPDAffix  *CompoundAffix;
 
-	unsigned char flagval[256];
+	unsigned char flagval[65000];
 	bool		usecompound;
+	FlagMode	flagMode;
 
 	/*
 	 * Remaining fields are only used during dictionary construction; they are

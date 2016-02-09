@@ -19,6 +19,7 @@
 #include "access/heapam.h"
 #include "access/itup.h"
 #include "access/tuptoaster.h"
+#include "utils/rel.h"
 
 
 /* ----------------------------------------------------------------
@@ -440,4 +441,31 @@ CopyIndexTuple(IndexTuple source)
 	result = (IndexTuple) palloc(size);
 	memcpy(result, source, size);
 	return result;
+}
+
+/*
+ * Reform index tuple. Truncate nonkey (INCLUDING) attributes.
+ */
+IndexTuple
+index_reform_tuple(Relation idxrel, IndexTuple olditup, int natts, int nkeyatts)
+{
+	TupleDesc   itupdesc = RelationGetDescr(idxrel);
+	Datum       values[INDEX_MAX_KEYS];
+	bool        isnull[INDEX_MAX_KEYS];
+	IndexTuple	newitup;
+
+	Assert(natts <= INDEX_MAX_KEYS);
+	Assert(nkeyatts > 0);
+	Assert(nkeyatts <= natts);
+
+	index_deform_tuple(olditup, itupdesc, values, isnull);
+
+	/* form new tuple that will contain only key attributes */
+	itupdesc->natts = nkeyatts;
+	newitup = index_form_tuple(itupdesc, values, isnull);
+	newitup->t_tid = olditup->t_tid;
+
+	itupdesc->natts = natts;
+
+	return newitup;
 }

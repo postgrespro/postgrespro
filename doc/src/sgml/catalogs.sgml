@@ -644,6 +644,13 @@
       <entry>Does an index of this type manage fine-grained predicate locks?</entry>
      </row>
 
+      <row>
+      <entry><structfield>amcaninclude</structfield></entry>
+      <entry><type>bool</type></entry>
+      <entry></entry>
+      <entry>Does the access method support included columns?</entry>
+     </row>
+
      <row>
       <entry><structfield>amkeytype</structfield></entry>
       <entry><type>oid</type></entry>
@@ -3712,6 +3719,14 @@
       <entry></entry>
       <entry>The number of columns in the index (duplicates
       <literal>pg_class.relnatts</literal>)</entry>
+     </row>
+
+      <row>
+      <entry><structfield>indnkeyatts</structfield></entry>
+      <entry><type>int2</type></entry>
+      <entry></entry>
+      <entry>The number of key columns in the index. "Key columns" are ordinary
+      index columns in contrast with "included" columns.</entry>
      </row>
 
      <row>

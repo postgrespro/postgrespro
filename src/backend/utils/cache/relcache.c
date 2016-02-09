@@ -1177,6 +1177,7 @@ RelationInitIndexAccessInfo(Relation relation)
 	MemoryContext indexcxt;
 	MemoryContext oldcontext;
 	int			natts;
+	int			nkeyatts;
 	uint16		amsupport;
 
 	/*
@@ -1212,6 +1213,7 @@ RelationInitIndexAccessInfo(Relation relation)
 		elog(ERROR, "relnatts disagrees with indnatts for index %u",
 			 RelationGetRelid(relation));
 	amsupport = aform->amsupport;
+	nkeyatts = IndexRelationGetNumberOfKeyAttributes(relation);
 
 	/*
 	 * Make the private context to hold index access info.  The reason we need
@@ -1235,9 +1237,9 @@ RelationInitIndexAccessInfo(Relation relation)
 		MemoryContextAllocZero(indexcxt, sizeof(RelationAmInfo));
 
 	relation->rd_opfamily = (Oid *)
-		MemoryContextAllocZero(indexcxt, natts * sizeof(Oid));
+		MemoryContextAllocZero(indexcxt, nkeyatts * sizeof(Oid));
 	relation->rd_opcintype = (Oid *)
-		MemoryContextAllocZero(indexcxt, natts * sizeof(Oid));
+		MemoryContextAllocZero(indexcxt, nkeyatts * sizeof(Oid));
 
 	if (amsupport > 0)
 	{
@@ -1292,7 +1294,7 @@ RelationInitIndexAccessInfo(Relation relation)
 	 */
 	IndexSupportInitialize(indclass, relation->rd_support,
 						   relation->rd_opfamily, relation->rd_opcintype,
-						   amsupport, natts);
+						   amsupport, nkeyatts);
 
 	/*
 	 * Similarly extract indoption and copy it to the cache entry
@@ -1938,6 +1940,7 @@ RelationReloadIndexInfo(Relation relation)
 		 * it's not worth it to track exactly which ones they are.  None of
 		 * the array fields are allowed to change, though.
 		 */
+		relation->rd_index->indnkeyatts = index->indnkeyatts;
 		relation->rd_index->indisunique = index->indisunique;
 		relation->rd_index->indisprimary = index->indisprimary;
 		relation->rd_index->indisexclusion = index->indisexclusion;
@@ -4363,7 +4366,7 @@ RelationGetExclusionInfo(Relation indexRelation,
 						 Oid **procs,
 						 uint16 **strategies)
 {
-	int			ncols = indexRelation->rd_rel->relnatts;
+	int			nkeycols;
 	Oid		   *ops;
 	Oid		   *funcs;
 	uint16	   *strats;
@@ -4375,17 +4378,19 @@ RelationGetExclusionInfo(Relation indexRelation,
 	MemoryContext oldcxt;
 	int			i;
 
+	nkeycols = IndexRelationGetNumberOfKeyAttributes(indexRelation);
+
 	/* Allocate result space in caller context */
-	*operators = ops = (Oid *) palloc(sizeof(Oid) * ncols);
-	*procs = funcs = (Oid *) palloc(sizeof(Oid) * ncols);
-	*strategies = strats = (uint16 *) palloc(sizeof(uint16) * ncols);
+	*operators = ops = (Oid *) palloc(sizeof(Oid) * nkeycols);
+	*procs = funcs = (Oid *) palloc(sizeof(Oid) * nkeycols);
+	*strategies = strats = (uint16 *) palloc(sizeof(uint16) * nkeycols);
 
 	/* Quick exit if we have the data cached already */
 	if (indexRelation->rd_exclstrats != NULL)
 	{
-		memcpy(ops, indexRelation->rd_exclops, sizeof(Oid) * ncols);
-		memcpy(funcs, indexRelation->rd_exclprocs, sizeof(Oid) * ncols);
-		memcpy(strats, indexRelation->rd_exclstrats, sizeof(uint16) * ncols);
+		memcpy(ops, indexRelation->rd_exclops, sizeof(Oid) * nkeycols);
+		memcpy(funcs, indexRelation->rd_exclprocs, sizeof(Oid) * nkeycols);
+		memcpy(strats, indexRelation->rd_exclstrats, sizeof(uint16) * nkeycols);
 		return;
 	}
 
@@ -4434,12 +4439,12 @@ RelationGetExclusionInfo(Relation indexRelation,
 		arr = DatumGetArrayTypeP(val);	/* ensure not toasted */
 		nelem = ARR_DIMS(arr)[0];
 		if (ARR_NDIM(arr) != 1 ||
-			nelem != ncols ||
+			nelem != nkeycols ||
 			ARR_HASNULL(arr) ||
 			ARR_ELEMTYPE(arr) != OIDOID)
 			elog(ERROR, "conexclop is not a 1-D Oid array");
 
-		memcpy(ops, ARR_DATA_PTR(arr), sizeof(Oid) * ncols);
+		memcpy(ops, ARR_DATA_PTR(arr), sizeof(Oid) * nkeycols);
 	}
 
 	systable_endscan(conscan);
@@ -4450,7 +4455,7 @@ RelationGetExclusionInfo(Relation indexRelation,
 			 RelationGetRelationName(indexRelation));
 
 	/* We need the func OIDs and strategy numbers too */
-	for (i = 0; i < ncols; i++)
+	for (i = 0; i < nkeycols; i++)
 	{
 		funcs[i] = get_opcode(ops[i]);
 		strats[i] = get_op_opfamily_strategy(ops[i],
@@ -4463,12 +4468,12 @@ RelationGetExclusionInfo(Relation indexRelation,
 
 	/* Save a copy of the results in the relcache entry. */
 	oldcxt = MemoryContextSwitchTo(indexRelation->rd_indexcxt);
-	indexRelation->rd_exclops = (Oid *) palloc(sizeof(Oid) * ncols);
-	indexRelation->rd_exclprocs = (Oid *) palloc(sizeof(Oid) * ncols);
-	indexRelation->rd_exclstrats = (uint16 *) palloc(sizeof(uint16) * ncols);
-	memcpy(indexRelation->rd_exclops, ops, sizeof(Oid) * ncols);
-	memcpy(indexRelation->rd_exclprocs, funcs, sizeof(Oid) * ncols);
-	memcpy(indexRelation->rd_exclstrats, strats, sizeof(uint16) * ncols);
+	indexRelation->rd_exclops = (Oid *) palloc(sizeof(Oid) * nkeycols);
+	indexRelation->rd_exclprocs = (Oid *) palloc(sizeof(Oid) * nkeycols);
+	indexRelation->rd_exclstrats = (uint16 *) palloc(sizeof(uint16) * nkeycols);
+	memcpy(indexRelation->rd_exclops, ops, sizeof(Oid) * nkeycols);
+	memcpy(indexRelation->rd_exclprocs, funcs, sizeof(Oid) * nkeycols);
+	memcpy(indexRelation->rd_exclstrats, strats, sizeof(uint16) * nkeycols);
 	MemoryContextSwitchTo(oldcxt);
 }
 

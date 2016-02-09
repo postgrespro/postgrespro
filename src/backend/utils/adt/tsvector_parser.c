@@ -89,7 +89,14 @@ do { \
 	} \
 } while (0)
 
-#define ISOPERATOR(x)	( pg_mblen(x)==1 && ( *(x)=='!' || *(x)=='&' || *(x)=='|' || *(x)=='(' || *(x)==')' ) )
+#define ISOPERATOR(x) \
+	( pg_mblen(x) == 1 && ( *(x) == '!' ||	\
+							*(x) == '&' ||	\
+							*(x) == '|' ||	\
+							*(x) == '?' ||	\
+							*(x) == '(' ||	\
+							*(x) == ')'		\
+						  ) )
 
 /* Fills gettoken_tsvector's output parameters, and returns true */
 #define RETURN_TOKEN \
