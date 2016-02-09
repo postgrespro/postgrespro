@@ -69,15 +69,15 @@ select t,subword_similarity('Kabankala',t) as sml from test_trgm2 where t %> 'Ka
 (4 rows)
 
 select t <->> 'Kabankala', t from test_trgm2 order by t <->> 'Kabankala' limit 7;
-     ?column?      |                t                 
--------------------+----------------------------------
-                 0 | Kabankala
- 0.100000023841858 | Kabankalan City Public Plaza
- 0.300000011920929 | Abankala
- 0.399999976158142 | Ntombankala School
- 0.416666686534882 | Kabakala
-               0.5 | Nehalla Bankalah Reserved Forest
- 0.538461536169052 | Kabikala
+ ?column? |                t                 
+----------+----------------------------------
+        0 | Kabankala
+      0.1 | Kabankalan City Public Plaza
+      0.3 | Abankala
+      0.4 | Ntombankala School
+ 0.416667 | Kabakala
+      0.5 | Nehalla Bankalah Reserved Forest
+ 0.538462 | Kabikala
 (7 rows)
 
 create index trgm_idx2 on test_trgm2 using gist (t gist_trgm_ops);
@@ -160,15 +160,15 @@ select t <->> 'Kabankala', t from test_trgm2 order by t <->> 'Kabankala' limit 7
 (3 rows)
 
 select t <->> 'Kabankala', t from test_trgm2 order by t <->> 'Kabankala' limit 7;
-     ?column?      |                t                 
--------------------+----------------------------------
-                 0 | Kabankala
- 0.100000023841858 | Kabankalan City Public Plaza
- 0.300000011920929 | Abankala
- 0.399999976158142 | Ntombankala School
- 0.416666686534882 | Kabakala
-               0.5 | Nehalla Bankalah Reserved Forest
- 0.538461536169052 | Kabikala
+ ?column? |                t                 
+----------+----------------------------------
+        0 | Kabankala
+      0.1 | Kabankalan City Public Plaza
+      0.3 | Abankala
+      0.4 | Ntombankala School
+ 0.416667 | Kabakala
+      0.5 | Nehalla Bankalah Reserved Forest
+ 0.538462 | Kabikala
 (7 rows)
 
 drop index trgm_idx2;

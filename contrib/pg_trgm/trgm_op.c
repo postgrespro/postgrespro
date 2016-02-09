@@ -1140,7 +1140,7 @@ subword_similarity_dist_op(PG_FUNCTION_ARGS)
 
 	PG_FREE_IF_COPY(in1, 0);
 	PG_FREE_IF_COPY(in2, 1);
-	PG_RETURN_FLOAT8(1.0 - res);
+	PG_RETURN_FLOAT4(1.0 - res);
 }
 
 Datum
@@ -1156,5 +1156,5 @@ subword_similarity_dist_commutator_op(PG_FUNCTION_ARGS)
 
 	PG_FREE_IF_COPY(in1, 0);
 	PG_FREE_IF_COPY(in2, 1);
-	PG_RETURN_FLOAT8(1.0 - res);
+	PG_RETURN_FLOAT4(1.0 - res);
 }

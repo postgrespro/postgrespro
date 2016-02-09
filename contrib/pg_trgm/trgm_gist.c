@@ -471,7 +471,8 @@ gtrgm_distance(PG_FUNCTION_ARGS)
 			*recheck = strategy == SubwordDistanceStrategyNumber;
 			if (GIST_LEAF(entry))
 			{					/* all leafs contains orig trgm */
-				res = 1.0 - cnt_sml(qtrg, key, *recheck);
+				float4 volatile sml = cnt_sml(qtrg, key, *recheck);
+				res = 1.0 - sml;
 			}
 			else if (ISALLTRUE(key))
 			{					/* all leafs contains orig trgm */
