@@ -161,5 +161,6 @@ int range_binary_search(const RangeRelation *rangerel, FmgrInfo *cmp_func, Datum
 char *get_extension_schema(void);
 FmgrInfo *get_cmp_func(Oid type1, Oid type2);
 Oid create_partitions_bg_worker(Oid relid, Datum value, Oid value_type);
+Oid create_partitions(Oid relid, Datum value, Oid value_type);
 
 #endif   /* PATHMAN_H */

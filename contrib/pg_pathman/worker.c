@@ -22,7 +22,7 @@
 static dsm_segment *segment;
 
 static void bg_worker_main(Datum main_arg);
-static Oid create_partitions(Oid relid, Datum value, Oid value_type);
+// static Oid create_partitions(Oid relid, Datum value, Oid value_type);
 
 typedef struct PartitionArgs
 {
@@ -102,6 +102,8 @@ bg_worker_main(Datum main_arg)
 	PartitionArgs *args;
 	dsm_handle		handle = DatumGetInt32(main_arg);
 
+	elog(WARNING, "Worker started. Handle %d", handle);
+
 	/* Create resource owner */
 	CurrentResourceOwner = ResourceOwnerCreate(NULL, "CreatePartitionsWorker");
 
@@ -134,7 +136,7 @@ bg_worker_main(Datum main_arg)
 /*
  * Create partitions and return an OID of the partition that contain value
  */
-static Oid
+Oid
 create_partitions(Oid relid, Datum value, Oid value_type)
 {
 	int 		ret;
@@ -152,6 +154,9 @@ create_partitions(Oid relid, Datum value, Oid value_type)
 	RangeRelation	*rangerel;
 	FmgrInfo   cmp_func;
 	char *schema;
+
+	// elog(WARNING, "WORKER PID >>>%d<<<", MyProcPid);
+	// sleep(10);
 
 	schema = get_extension_schema();
 

@@ -67,9 +67,9 @@ BEGIN
     -- RAISE NOTICE '% rows have been copied', p_total;
     RETURN;
 
-EXCEPTION WHEN others THEN
-    PERFORM on_remove_partitions(p_parent::regclass::integer);
-    RAISE EXCEPTION '% %', SQLERRM, SQLSTATE;
+-- EXCEPTION WHEN others THEN
+--     PERFORM on_remove_partitions(p_parent::regclass::integer);
+--     RAISE EXCEPTION '% %', SQLERRM, SQLSTATE;
 END
 $$
 LANGUAGE plpgsql;

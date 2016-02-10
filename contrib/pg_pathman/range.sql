@@ -14,6 +14,7 @@ $$
 DECLARE
     v_value     TEXT;
     i INTEGER;
+    sql TEXT;
 BEGIN
     p_relation := @extschema@.validate_relname(p_relation);
 
@@ -27,6 +28,22 @@ BEGIN
 
     EXECUTE format('DROP SEQUENCE IF EXISTS %s_seq', p_relation);
     EXECUTE format('CREATE SEQUENCE %s_seq START 1', p_relation);
+
+    /* check boundaries */
+    sql := format('SELECT @extschema@.check_boundaries(''%s'', ''%s'', ''%s'', ''%s''::%s)'
+                   , p_relation
+                   , p_attribute
+                   , p_start_value
+                   , p_start_value + p_interval*p_count
+                   , pg_typeof(p_start_value));
+    RAISE NOTICE 'sql: %', sql;
+
+    EXECUTE format('SELECT @extschema@.check_boundaries(''%s'', ''%s'', ''%s'', ''%s''::%s)'
+                   , p_relation
+                   , p_attribute
+                   , p_start_value
+                   , p_start_value + p_interval*p_count
+                   , pg_typeof(p_start_value));
 
     INSERT INTO @extschema@.pathman_config (relname, attname, parttype)
     VALUES (p_relation, p_attribute, 2);
@@ -81,6 +98,12 @@ BEGIN
     EXECUTE format('DROP SEQUENCE IF EXISTS %s_seq', p_relation);
     EXECUTE format('CREATE SEQUENCE %s_seq START 1', p_relation);
 
+    /* check boundaries */
+    PERFORM @extschema@.check_boundaries(p_relation
+                                         , p_attribute
+                                         , p_start_value
+                                         , p_start_value + p_interval*p_count);
+
     INSERT INTO @extschema@.pathman_config (relname, attname, parttype)
     VALUES (p_relation, p_attribute, 2);
 
@@ -103,6 +126,11 @@ BEGIN
     PERFORM @extschema@.partition_data(p_relation);
 
     RETURN p_count;
+
+EXCEPTION WHEN others THEN
+    EXECUTE format('DROP TABLE %s CASCADE', p_relation);
+    PERFORM on_remove_partitions(p_relation::regclass::integer);
+    RAISE EXCEPTION '% %', SQLERRM, SQLSTATE;
 END
 $$ LANGUAGE plpgsql;
 
@@ -138,6 +166,12 @@ BEGIN
     EXECUTE format('DROP SEQUENCE IF EXISTS %s_seq', p_relation);
     EXECUTE format('CREATE SEQUENCE %s_seq START 1', p_relation);
 
+    /* check boundaries */
+    PERFORM @extschema@.check_boundaries(p_relation
+                                         , p_attribute
+                                         , p_start_value
+                                         , p_end_value);
+
     INSERT INTO @extschema@.pathman_config (relname, attname, parttype)
     VALUES (p_relation, p_attribute, 2);
 
@@ -157,7 +191,7 @@ BEGIN
     PERFORM @extschema@.on_create_partitions(p_relation::regclass::oid);
 
     /* Copy data */
-    PERFORM @extschema@.partition_data(p_relation);
+    -- PERFORM @extschema@.partition_data(p_relation);
 
     RETURN i;
 END
@@ -191,6 +225,12 @@ BEGIN
     EXECUTE format('DROP SEQUENCE IF EXISTS %s_seq', p_relation);
     EXECUTE format('CREATE SEQUENCE %s_seq START 1', p_relation);
 
+    /* check boundaries */
+    PERFORM @extschema@.check_boundaries(p_relation
+                                         , p_attribute
+                                         , p_start_value
+                                         , p_end_value);
+
     INSERT INTO @extschema@.pathman_config (relname, attname, parttype)
     VALUES (p_relation, p_attribute, 2);
 
@@ -209,9 +249,51 @@ BEGIN
     PERFORM @extschema@.on_create_partitions(p_relation::regclass::oid);
 
     /* Copy data */
-    PERFORM @extschema@.partition_data(p_relation);
+    -- PERFORM @extschema@.partition_data(p_relation);
 
     RETURN i;
+END
+$$ LANGUAGE plpgsql;
+
+/*
+ * 
+ */
+CREATE OR REPLACE FUNCTION @extschema@.check_boundaries(
+    p_relname TEXT
+    , p_attribute TEXT
+    , p_start_value ANYELEMENT
+    , p_end_value ANYELEMENT)
+RETURNS VOID AS
+$$
+DECLARE
+    v_min p_start_value%TYPE;
+    v_max p_start_value%TYPE;
+    v_count INTEGER;
+BEGIN
+    RAISE NOTICE 'check_boundaries(%)', p_relname;
+    /* Get min and max values */
+    EXECUTE format('SELECT count(*), min(%s), max(%s) FROM %s WHERE NOT %s IS NULL',
+                   p_attribute, p_attribute, p_relname, p_attribute)
+    INTO v_count, v_min, v_max;
+
+    RAISE NOTICE '>>> MIN, MAX <<< %, %, %', v_count, v_min, v_max;
+
+    /* check if column has NULL values */
+    IF v_count > 0 AND (v_min IS NULL OR v_max IS NULL) THEN
+        RAISE EXCEPTION '''%'' column has NULL values', p_attribute;
+    END IF;
+
+    /* check lower boundary */
+    IF p_start_value < v_min THEN
+        RAISE EXCEPTION 'Start value is less than minimum value of ''%'''
+            , p_attribute;
+    END IF;
+
+    /* check upper boundary */
+    IF p_end_value >= v_max  THEN
+        RAISE EXCEPTION 'End value is greater than maximum value of ''%'''
+            , p_attribute;
+    END IF;
 END
 $$ LANGUAGE plpgsql;
 
@@ -271,7 +353,12 @@ BEGIN
 
     /* get next value from sequence */
     v_part_num := nextval(format('%s_seq', p_parent_relname));
-    v_child_relname := format('%s_%s', p_parent_relname, v_part_num);
+    v_child_relname := format('%s_%s'
+                              , p_parent_relname
+                              , v_part_num);
+    -- v_child_relname := format('%s_%s'
+    --                           , p_parent_relname
+    --                           , regexp_replace(p_start_value::text, '[ :-]*', '', 'g'));
 
     /* Skip existing partitions */
     IF EXISTS (SELECT * FROM pg_tables WHERE tablename = v_child_relname) THEN
@@ -775,7 +862,7 @@ DECLARE
     v_part TEXT;
 BEGIN
     IF p_new_value >= p_max THEN
-        WHILE (p_max + i * (p_max - p_min)) <= p_new_value OR i > 1000
+        WHILE (p_max + i * (p_max - p_min)) <= p_new_value AND i < 1000
         LOOP
             v_part := @extschema@.create_single_range_partition(
                             @extschema@.get_schema_qualified_name(p_relid::regclass, '.')
@@ -786,7 +873,7 @@ BEGIN
         END LOOP;
     ELSIF p_new_value <= p_min THEN
 
-        WHILE (p_min - i * (p_max - p_min)) >= p_new_value OR i > 1000
+        WHILE (p_min - i * (p_max - p_min)) >= p_new_value AND i < 1000
         LOOP
             v_part := @extschema@.create_single_range_partition(
                             @extschema@.get_schema_qualified_name(p_relid::regclass, '.')

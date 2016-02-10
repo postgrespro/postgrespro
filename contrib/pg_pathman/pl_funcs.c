@@ -6,7 +6,7 @@
 #include "access/nbtree.h"
 #include "access/xact.h"
 #include "catalog/pg_type.h"
-// #include "executor/spi.h"
+#include "executor/spi.h"
 #include "storage/lmgr.h"
 
 
@@ -136,7 +136,14 @@ find_or_create_range_partition(PG_FUNCTION_ARGS)
 		}
 
 		/* Start background worker to create new partitions */
+		elog(WARNING, "Starting worker");
 		child_oid = create_partitions_bg_worker(relid, value, value_type);
+		elog(WARNING, "BACKEND PID >>>%d<<<", MyProcPid);
+		// sleep(10);
+		// SPI_connect();
+		// child_oid = create_partitions(relid, value, value_type);
+		// SPI_finish();
+		// elog(WARNING, "Worker finished");
 
 		/* Release lock */
 		LWLockRelease(load_config_lock);

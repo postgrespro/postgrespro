@@ -55,7 +55,7 @@ load_config(void)
 	new_segment_created = init_dsm_segment(INITIAL_BLOCKS_COUNT, 32);
 
 	/* if config is not loaded */
-	if (shmem_cfg && shmem_cfg->config_loaded)
+	if (shmem_cfg && !shmem_cfg->config_loaded)
 	{
 		LWLockAcquire(load_config_lock, LW_EXCLUSIVE);
 		load_relations_hashtable(new_segment_created);
