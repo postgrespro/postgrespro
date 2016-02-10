@@ -85,14 +85,14 @@
       </entry>
      </row>
      <row>
-      <entry><function>substring_similarity(text, text)</function><indexterm><primary>substring_similarity</primary></indexterm></entry>
+      <entry><function>subword_similarity(text, text)</function><indexterm><primary>subword_similarity</primary></indexterm></entry>
       <entry><type>real</type></entry>
       <entry>
        Returns a number that indicates how similar the first string
-       to the most similar substring of the second string.  The range of
+       to the most similar word of the second string.  The range of
        the result is zero (indicating that the two strings are completely
        dissimilar) to one (indicating that the first string is identical
-       to substring of the second substring).
+       to one of the word of the second string).
       </entry>
      </row>
      <row>
@@ -145,16 +145,16 @@
       <entry>
        Returns <literal>true</> if its arguments have a similarity that is
        greater than the current similarity threshold set by
-       <varname>pg_trgm.limit</>.
+       <varname>pg_trgm.sml_limit</>.
       </entry>
      </row>
      <row>
-      <entry><type>text</> <literal>&lt;%</literal> <type>text</></entry>
+      <entry><type>text</> <literal>%&gt;</literal> <type>text</></entry>
       <entry><type>boolean</type></entry>
       <entry>
-       Returns <literal>true</> if its arguments have a substring similarity
-       that is greater than the current substring similarity threshold set by
-       <varname>pg_trgm.substring_limit</> parameter.
+       Returns <literal>true</> if its arguments have a subword similarity
+       that is greater than the current subword similarity threshold set by
+       <varname>pg_trgm.subword_limit</> parameter.
       </entry>
      </row>
      <row>
@@ -163,6 +163,14 @@
       <entry>
        Returns the <quote>distance</> between the arguments, that is
        one minus the <function>similarity()</> value.
+      </entry>
+     </row>
+     <row>
+      <entry><type>text</> <literal>&lt;-&gt;&gt;</literal> <type>text</></entry>
+      <entry><type>real</type></entry>
+      <entry>
+       Returns the <quote>distance</> between the arguments, that is
+       one minus the <function>subword_similarity()</> value.
       </entry>
      </row>
     </tbody>
@@ -174,11 +182,11 @@
   <title>GUC Parameters</title>
 
   <variablelist>
-   <varlistentry id="guc-pgtrgm-limit" xreflabel="pg_trgm.limit">
+   <varlistentry id="guc-pgtrgm-sml-limit" xreflabel="pg_trgm.sml_limit">
     <term>
-     <varname>pg_trgm.limit</> (<type>real</type>)
+     <varname>pg_trgm.sml_limit</> (<type>real</type>)
      <indexterm>
-      <primary><varname>pg_trgm.limit</> configuration parameter</primary>
+      <primary><varname>pg_trgm.sml_limit</> configuration parameter</primary>
      </indexterm>
     </term>
     <listitem>
@@ -189,17 +197,17 @@
     </listitem>
    </varlistentry>
 
-   <varlistentry id="guc-pgtrgm-substring-limit" xreflabel="pg_trgm.substring_limit">
+   <varlistentry id="guc-pgtrgm-subword-limit" xreflabel="pg_trgm.subword_limit">
     <term>
-     <varname>pg_trgm.substring_limit</> (<type>real</type>)
+     <varname>pg_trgm.subword_limit</> (<type>real</type>)
      <indexterm>
-      <primary><varname>pg_trgm.substring_limit</> configuration parameter</primary>
+      <primary><varname>pg_trgm.subword_limit</> configuration parameter</primary>
      </indexterm>
     </term>
     <listitem>
      <para>
-      Sets the current substring similarity threshold that is used by
-      the <literal>&lt;%</> operator.  The threshold must be between
+      Sets the current subword similarity threshold that is used by
+      the <literal>%&gt;</> operator.  The threshold must be between
       0 and 1 (default is 0.6).
      </para>
     </listitem>
@@ -262,18 +270,29 @@ SELECT t, t &lt;-&gt; '<replaceable>word</>' AS dist
   </para>
 
   <para>
-   Also you can use an index on the <structfield>t</> column for substring
+   Also you can use an index on the <structfield>t</> column for subword
    similarity.  For example:
 <programlisting>
-SELECT t, substring_similarity('<replaceable>word</>', t) AS sml
+SELECT t, subword_similarity('<replaceable>word</>', t) AS sml
   FROM test_trgm
-  WHERE '<replaceable>word</>' &lt;% t
+  WHERE t %&gt; '<replaceable>word</>'
   ORDER BY sml DESC, t;
 </programlisting>
-   This will return all values in the text column that have a substring
+   This will return all values in the text column that have a word
    which sufficiently similar to <replaceable>word</>, sorted from best
    match to worst.  The index will be used to make this a fast operation
    even over very large data sets.
+  </para>
+
+  <para>
+   A variant of the above query is
+<programlisting>
+SELECT t, t &lt;-&gt;&gt; '<replaceable>word</>' AS dist
+  FROM test_trgm
+  ORDER BY dist LIMIT 10;
+</programlisting>
+   This can be implemented quite efficiently by GiST indexes, but not
+   by GIN indexes.
   </para>
 
   <para>
