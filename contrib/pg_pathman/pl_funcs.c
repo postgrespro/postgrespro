@@ -10,9 +10,6 @@
 #include "storage/lmgr.h"
 
 
-#include "miscadmin.h"
-
-
 /* declarations */
 PG_FUNCTION_INFO_V1( on_partitions_created );
 PG_FUNCTION_INFO_V1( on_partitions_updated );
@@ -136,10 +133,8 @@ find_or_create_range_partition(PG_FUNCTION_ARGS)
 		}
 
 		/* Start background worker to create new partitions */
-		elog(WARNING, "Starting worker");
 		child_oid = create_partitions_bg_worker(relid, value, value_type);
-		elog(WARNING, "BACKEND PID >>>%d<<<", MyProcPid);
-		// sleep(10);
+
 		// SPI_connect();
 		// child_oid = create_partitions(relid, value, value_type);
 		// SPI_finish();
