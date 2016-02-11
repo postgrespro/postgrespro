@@ -17,9 +17,9 @@ DECLARE
 BEGIN
     p_relation := @extschema@.validate_relname(p_relation);
 
-    IF p_count <= 0 THEN
-        RAISE EXCEPTION 'Partitions count must be greater than zero';
-    END IF;
+    -- IF p_count <= 0 THEN
+    --     RAISE EXCEPTION 'Partitions count must be greater than zero';
+    -- END IF;
 
     IF EXISTS (SELECT * FROM @extschema@.pathman_config WHERE relname = p_relation) THEN
         RAISE EXCEPTION 'Relation "%" has already been partitioned', p_relation;
@@ -47,7 +47,18 @@ BEGIN
         END LOOP;
     END IF;
 
-    /* check boundaries */
+    /* TODO: think about reusing code */
+    -- EXECUTE format('SELECT @extschema@.create_partitions_from_range(''%s'', ''%s'', ''%s'', ''%s''::%s, ''%s''::interval)'
+    --     , p_relation
+    --     , p_attribute
+    --     , p_start_value
+    --     , p_start_value + p_interval*p_count
+    --     , pg_typeof(p_start_value)
+    --     , p_interval);
+
+    -- RETURN p_count;
+
+    /* Check boundaries */
     EXECUTE format('SELECT @extschema@.check_boundaries(''%s'', ''%s'', ''%s'', ''%s''::%s)'
                    , p_relation
                    , p_attribute
@@ -55,12 +66,13 @@ BEGIN
                    , p_start_value + p_interval*p_count
                    , pg_typeof(p_start_value));
 
-
+    /* Create sequence for child partitions names */
     EXECUTE format('DROP SEQUENCE IF EXISTS %s_seq', p_relation);
     EXECUTE format('CREATE SEQUENCE %s_seq START 1', p_relation);
 
-    INSERT INTO @extschema@.pathman_config (relname, attname, parttype)
-    VALUES (p_relation, p_attribute, 2);
+    /* Insert new entry to pathman config */
+    INSERT INTO @extschema@.pathman_config (relname, attname, parttype, range_interval)
+    VALUES (p_relation, p_attribute, 2, p_interval::text);
 
     /* create first partition */
     FOR i IN 1..p_count
@@ -146,8 +158,9 @@ BEGIN
     EXECUTE format('DROP SEQUENCE IF EXISTS %s_seq', p_relation);
     EXECUTE format('CREATE SEQUENCE %s_seq START 1', p_relation);
 
-    INSERT INTO @extschema@.pathman_config (relname, attname, parttype)
-    VALUES (p_relation, p_attribute, 2);
+    /* Insert new entry to pathman config */
+    INSERT INTO @extschema@.pathman_config (relname, attname, parttype, range_interval)
+    VALUES (p_relation, p_attribute, 2, p_interval::text);
 
     /* create first partition */
     FOR i IN 1..p_count
@@ -190,7 +203,6 @@ DECLARE
     v_interval  DOUBLE PRECISION;
     v_dt_interval INTERVAL;
     v_type      REGTYPE;
-    v_is_date   BOOL;
     i INTEGER := 0;
 BEGIN
     p_relation := @extschema@.validate_relname(p_relation);
@@ -212,8 +224,9 @@ BEGIN
                                          , p_start_value
                                          , p_end_value);
 
-    INSERT INTO @extschema@.pathman_config (relname, attname, parttype)
-    VALUES (p_relation, p_attribute, 2);
+    /* Insert new entry to pathman config */
+    INSERT INTO @extschema@.pathman_config (relname, attname, parttype, range_interval)
+    VALUES (p_relation, p_attribute, 2, p_interval::text);
 
     WHILE p_start_value <= p_end_value
     LOOP
@@ -256,7 +269,6 @@ DECLARE
     v_interval  DOUBLE PRECISION;
     v_dt_interval INTERVAL;
     v_type      REGTYPE;
-    v_is_date   BOOL;
     i INTEGER := 0;
 BEGIN
     p_relation := @extschema@.validate_relname(p_relation);
@@ -274,8 +286,9 @@ BEGIN
                                          , p_start_value
                                          , p_end_value);
 
-    INSERT INTO @extschema@.pathman_config (relname, attname, parttype)
-    VALUES (p_relation, p_attribute, 2);
+    /* Insert new entry to pathman config */
+    INSERT INTO @extschema@.pathman_config (relname, attname, parttype, range_interval)
+    VALUES (p_relation, p_attribute, 2, p_interval::text);
 
     WHILE p_start_value <= p_end_value
     LOOP
@@ -642,15 +655,18 @@ DECLARE
     v_attname TEXT;
     v_atttype TEXT;
     v_part_name TEXT;
+    v_interval TEXT;
 BEGIN
     p_relation := @extschema@.validate_relname(p_relation);
+    
+    SELECT attname, range_interval INTO v_attname, v_interval
+    FROM @extschema@.pathman_config WHERE relname = p_relation;
 
-    v_attname := attname FROM @extschema@.pathman_config WHERE relname = p_relation;
     v_atttype := @extschema@.get_attribute_type_name(p_relation, v_attname);
-    EXECUTE format('SELECT @extschema@.append_partition_internal($1, ARRAY[]::%s[])'
-                   , v_atttype)
+    
+    EXECUTE format('SELECT @extschema@.append_partition_internal($1, $2, $3, ARRAY[]::%s[])', v_atttype)
     INTO v_part_name
-    USING p_relation;
+    USING p_relation, v_atttype, v_interval;
 
     RETURN v_part_name;
 END
@@ -660,6 +676,8 @@ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION @extschema@.append_partition_internal(
     p_relation TEXT
+    , p_atttype TEXT
+    , p_interval TEXT
     , p_range ANYARRAY DEFAULT NULL)
 RETURNS TEXT AS
 $$
@@ -668,9 +686,15 @@ DECLARE
 BEGIN
     p_range := @extschema@.get_range_by_idx(p_relation::regclass::oid, -1, 0);
     RAISE NOTICE 'Appending new partition...';
-    v_part_name := @extschema@.create_single_range_partition(p_relation
-                                                             , p_range[2]
-                                                             , p_range[2] + (p_range[2] - p_range[1]));
+    IF @extschema@.is_date(p_atttype::regtype) THEN
+        v_part_name := @extschema@.create_single_range_partition(p_relation
+                                                                 , p_range[2]
+                                                                 , p_range[2] + p_interval::interval);
+    ELSE
+        EXECUTE format('SELECT @extschema@.create_single_range_partition($1, $2, $2 + $3::%s)', p_atttype)
+        USING p_relation, p_range[2], p_interval
+        INTO v_part_name;
+    END IF;
 
     /* Tell backend to reload configuration */
     PERFORM @extschema@.on_create_partitions(p_relation::regclass::oid);
@@ -682,7 +706,7 @@ LANGUAGE plpgsql;
 
 
 /*
- * Append new partition
+ * Prepend new partition
  */
 CREATE OR REPLACE FUNCTION @extschema@.prepend_partition(p_relation TEXT)
 RETURNS TEXT AS
@@ -691,15 +715,17 @@ DECLARE
     v_attname TEXT;
     v_atttype TEXT;
     v_part_name TEXT;
+    v_interval TEXT;
 BEGIN
     p_relation := @extschema@.validate_relname(p_relation);
 
-    v_attname := attname FROM @extschema@.pathman_config WHERE relname = p_relation;
+    SELECT attname, range_interval INTO v_attname, v_interval
+    FROM @extschema@.pathman_config WHERE relname = p_relation;
     v_atttype := @extschema@.get_attribute_type_name(p_relation, v_attname);
-    EXECUTE format('SELECT @extschema@.prepend_partition_internal($1, ARRAY[]::%s[])'
-                   , v_atttype)
+
+    EXECUTE format('SELECT @extschema@.prepend_partition_internal($1, $2, $3, ARRAY[]::%s[])', v_atttype)
     INTO v_part_name
-    USING p_relation;
+    USING p_relation, v_atttype, v_interval;
 
     RETURN v_part_name;
 END
@@ -709,6 +735,8 @@ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION @extschema@.prepend_partition_internal(
     p_relation TEXT
+    , p_atttype TEXT
+    , p_interval TEXT
     , p_range ANYARRAY DEFAULT NULL)
 RETURNS TEXT AS
 $$
@@ -717,9 +745,19 @@ DECLARE
 BEGIN
     p_range := @extschema@.get_range_by_idx(p_relation::regclass::oid, 0, 0);
     RAISE NOTICE 'Prepending new partition...';
-    v_part_name := @extschema@.create_single_range_partition(p_relation
-                                                             , p_range[1] - (p_range[2] - p_range[1])
-                                                             , p_range[1]);
+    -- v_part_name := @extschema@.create_single_range_partition(p_relation
+    --                                                          , p_range[1] - (p_range[2] - p_range[1])
+    --                                                          , p_range[1]);
+
+    IF @extschema@.is_date(p_atttype::regtype) THEN
+        v_part_name := @extschema@.create_single_range_partition(p_relation
+                                                                 , p_range[1]
+                                                                 , p_range[1] - p_interval::interval);
+    ELSE
+        EXECUTE format('SELECT @extschema@.create_single_range_partition($1, $2, $2 - $3::%s)', p_atttype)
+        USING p_relation, p_range[1], p_interval
+        INTO v_part_name;
+    END IF;
 
     /* Tell backend to reload configuration */
     PERFORM @extschema@.on_create_partitions(p_relation::regclass::oid);
@@ -901,29 +939,58 @@ CREATE OR REPLACE FUNCTION @extschema@.append_partitions_on_demand_internal(
 RETURNS OID AS
 $$
 DECLARE
+    v_relation TEXT;
     v_cnt INTEGER := 0;
     i INTEGER := 0;
     v_part TEXT;
+    v_interval TEXT;
+    v_attname TEXT;
+    v_cur_value p_new_value%TYPE;
+    v_next_value p_new_value%TYPE;
+    v_is_date BOOLEAN;
 BEGIN
+    v_relation := @extschema@.validate_relname(p_relid::regclass::text);
+
+    /* get attribute name and interval */
+    SELECT attname, range_interval INTO v_attname, v_interval
+    FROM @extschema@.pathman_config WHERE relname = v_relation;
+
+    v_is_date := @extschema@.is_date(pg_typeof(p_new_value)::regtype);
+
     IF p_new_value >= p_max THEN
-        WHILE (p_max + i * (p_max - p_min)) <= p_new_value AND i < 1000
+        v_cur_value := p_max;
+        WHILE v_cur_value <= p_new_value AND i < 1000
         LOOP
+            IF v_is_date THEN
+                v_next_value := v_cur_value + v_interval::interval;
+            ELSE
+                v_next_value := v_cur_value + v_interval;
+            END IF;
+
             v_part := @extschema@.create_single_range_partition(
                             @extschema@.get_schema_qualified_name(p_relid::regclass, '.')
-                            , p_max + (i * (p_max - p_min))
-                            , p_max + ((i+1) * (p_max - p_min)));
+                            , v_cur_value
+                            , v_next_value);
             i := i + 1;
+            v_cur_value := v_next_value;
             RAISE NOTICE 'partition % created', v_part;
         END LOOP;
     ELSIF p_new_value <= p_min THEN
-
-        WHILE (p_min - i * (p_max - p_min)) >= p_new_value AND i < 1000
+        v_cur_value := p_min;
+        WHILE v_cur_value >= p_new_value AND i < 1000
         LOOP
+            IF v_is_date THEN
+                v_next_value := v_cur_value - v_interval::interval;
+            ELSE
+                v_next_value := v_cur_value - v_interval;
+            END IF;
+
             v_part := @extschema@.create_single_range_partition(
                             @extschema@.get_schema_qualified_name(p_relid::regclass, '.')
-                            , p_min - ((i+1) * (p_max - p_min))
-                            , p_min - (i * (p_max - p_min)));
+                            , v_next_value
+                            , v_cur_value);
             i := i + 1;
+            v_cur_value := v_next_value;
             RAISE NOTICE 'partition % created', v_part;
         END LOOP;
     ELSE

@@ -537,8 +537,8 @@ SELECT * FROM test.range_rel WHERE dt = '2015-03-15';
 DROP TABLE test.range_rel CASCADE;
 NOTICE:  drop cascades to 16 other objects
 SELECT * FROM pathman.pathman_config;
- id | relname | attname | parttype 
-----+---------+---------+----------
+ id | relname | attname | parttype | range_interval 
+----+---------+---------+----------+----------------
 (0 rows)
 
 DROP EXTENSION pg_pathman;
