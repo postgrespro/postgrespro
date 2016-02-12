@@ -886,8 +886,11 @@ $$ LANGUAGE plpgsql;
 
 /*
  * Drop partitions
+ * If delete_data set to TRUE then partitions will be dropped with all the data
  */
-CREATE OR REPLACE FUNCTION @extschema@.drop_range_partitions(IN relation TEXT)
+CREATE OR REPLACE FUNCTION @extschema@.drop_range_partitions(
+    relation TEXT,
+    delete_data BOOLEAN DEFAULT FALSE)
 RETURNS INTEGER AS
 $$
 DECLARE
@@ -904,13 +907,15 @@ BEGIN
     FOR v_rec IN (SELECT inhrelid::regclass::text AS tbl
                   FROM pg_inherits WHERE inhparent = relation::regclass::oid)
     LOOP
-        EXECUTE format('WITH part_data AS (DELETE FROM %s RETURNING *)
-                        INSERT INTO %s SELECT * FROM part_data'
-                       , v_rec.tbl
-                       , relation);
-        GET DIAGNOSTICS v_rows = ROW_COUNT;
+        IF NOT delete_data THEN
+            EXECUTE format('WITH part_data AS (DELETE FROM %s RETURNING *)
+                            INSERT INTO %s SELECT * FROM part_data'
+                           , v_rec.tbl
+                           , relation);
+            GET DIAGNOSTICS v_rows = ROW_COUNT;
+            RAISE NOTICE '% rows copied from %', v_rows, v_rec.tbl;
+        END IF;
         EXECUTE format('DROP TABLE %s', v_rec.tbl);
-        RAISE NOTICE '% rows copied from %', v_rows, v_rec.tbl;
         v_part_count := v_part_count + 1;
     END LOOP;
 

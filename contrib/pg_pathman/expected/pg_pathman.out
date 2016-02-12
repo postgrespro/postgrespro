@@ -688,17 +688,7 @@ NOTICE:  Copying data to partitions...
                            10
 (1 row)
 
-SELECT drop_range_partitions('range_rel');
-NOTICE:  0 rows copied from range_rel_10
-NOTICE:  0 rows copied from range_rel_9
-NOTICE:  0 rows copied from range_rel_8
-NOTICE:  0 rows copied from range_rel_7
-NOTICE:  0 rows copied from range_rel_6
-NOTICE:  0 rows copied from range_rel_5
-NOTICE:  65 rows copied from range_rel_4
-NOTICE:  100 rows copied from range_rel_3
-NOTICE:  100 rows copied from range_rel_2
-NOTICE:  100 rows copied from range_rel_1
+SELECT drop_range_partitions('range_rel', TRUE);
  drop_range_partitions 
 -----------------------
                     10
