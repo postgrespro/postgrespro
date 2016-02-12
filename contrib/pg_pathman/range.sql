@@ -719,20 +719,30 @@ $$ LANGUAGE plpgsql;
  * Drop partitions
  */
 CREATE OR REPLACE FUNCTION @extschema@.drop_range_partitions(IN relation TEXT)
-RETURNS VOID AS
+RETURNS INTEGER AS
 $$
 DECLARE
     v_rec   RECORD;
+    -- v_total_rows INTEGER;
+    v_rows INTEGER;
+    v_part_count INTEGER := 0;
 BEGIN
     relation := @extschema@.validate_relname(relation);
 
     /* Drop trigger first */
     PERFORM @extschema@.drop_range_triggers(relation);
 
-    FOR v_rec IN (SELECT inhrelid::regclass AS tbl
+    FOR v_rec IN (SELECT inhrelid::regclass::text AS tbl
                   FROM pg_inherits WHERE inhparent = relation::regclass::oid)
     LOOP
+        EXECUTE format('WITH part_data AS (DELETE FROM %s RETURNING *)
+                        INSERT INTO %s SELECT * FROM part_data'
+                       , v_rec.tbl
+                       , relation);
+        GET DIAGNOSTICS v_rows = ROW_COUNT;
         EXECUTE format('DROP TABLE %s', v_rec.tbl);
+        RAISE NOTICE '% rows copied from %', v_rows, v_rec.tbl;
+        v_part_count := v_part_count + 1;
     END LOOP;
 
     DELETE FROM @extschema@.pathman_config WHERE relname = relation;
@@ -740,6 +750,8 @@ BEGIN
 
     /* Notify backend about changes */
     PERFORM @extschema@.on_remove_partitions(relation::regclass::oid);
+
+    RETURN v_part_count;
 END
 $$ LANGUAGE plpgsql;
 
