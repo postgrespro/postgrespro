@@ -870,12 +870,6 @@ dispell_list_dicts(PG_FUNCTION_ARGS)
 		dictname = cstring_to_text(dict->dictFile);
 		affname  = cstring_to_text(dict->affixFile);
 
-		// SET_VARSIZE(dictname, strlen(dict->dictFile) + VARHDRSZ);
-		// SET_VARSIZE(affname,  strlen(dict->affixFile)  + VARHDRSZ);
-
-		// strcpy(dictname, dict->dictFile);
-		// strcpy(affname,  dict->affixFile);
-
 		values[0] = PointerGetDatum(dictname);
 		values[1] = PointerGetDatum(affname);
 		values[2] = UInt32GetDatum(dict->nwords);
@@ -958,10 +952,6 @@ dispell_list_stoplists(PG_FUNCTION_ARGS)
 		memset(nulls, 0, sizeof(nulls));
 
 		stopname = cstring_to_text(stoplist->stopFile);
-
-		// SET_VARSIZE(stopname, strlen(stoplist->stopFile) + VARHDRSZ);
-
-		// strcpy(VARDATA(stopname), stoplist->stopFile);
 
 		values[0] = PointerGetDatum(stopname);
 		values[1] = UInt32GetDatum(stoplist->stop.len);
