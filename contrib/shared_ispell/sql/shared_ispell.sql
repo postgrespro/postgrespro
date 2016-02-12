@@ -1,10 +1,14 @@
 CREATE EXTENSION shared_ispell;
 
+SELECT shared_ispell_mem_available();
+SELECT shared_ispell_mem_used();
+
 -- Test ISpell dictionary with ispell affix file
 CREATE TEXT SEARCH DICTIONARY shared_ispell (
                         Template=shared_ispell,
                         DictFile=ispell_sample,
-                        AffFile=ispell_sample
+                        AffFile=ispell_sample,
+                        Stopwords=english
 );
 
 SELECT ts_lexize('shared_ispell', 'skies');
@@ -23,6 +27,9 @@ SELECT ts_lexize('shared_ispell', 'footklubber');
 SELECT ts_lexize('shared_ispell', 'footballklubber');
 SELECT ts_lexize('shared_ispell', 'ballyklubber');
 SELECT ts_lexize('shared_ispell', 'footballyklubber');
+
+SELECT shared_ispell_mem_available();
+SELECT shared_ispell_mem_used();
 
 -- Test ISpell dictionary with hunspell affix file
 CREATE TEXT SEARCH DICTIONARY shared_hunspell (
@@ -47,3 +54,14 @@ SELECT ts_lexize('shared_hunspell', 'footklubber');
 SELECT ts_lexize('shared_hunspell', 'footballklubber');
 SELECT ts_lexize('shared_hunspell', 'ballyklubber');
 SELECT ts_lexize('shared_hunspell', 'footballyklubber');
+
+SELECT shared_ispell_mem_available();
+SELECT shared_ispell_mem_used();
+
+SELECT * FROM shared_ispell_dicts();
+SELECT * FROM shared_ispell_stoplists();
+
+SELECT shared_ispell_reset();
+
+SELECT shared_ispell_mem_available();
+SELECT shared_ispell_mem_used();

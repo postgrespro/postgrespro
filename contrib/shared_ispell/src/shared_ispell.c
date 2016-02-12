@@ -57,10 +57,10 @@
 #include "tsearch/ts_locale.h"
 #include "access/htup_details.h"
 #include "funcapi.h"
+#include "utils/builtins.h"
 
 #include "shared_ispell.h"
 #include "tsearch/dicts/spell.h"
-#include "regex/regguts.h"
 
 PG_MODULE_MAGIC;
 
@@ -248,6 +248,28 @@ get_shared_stop_list(char *stop)
 }
 
 /*
+ * Cleares IspellDict fields which are used for store affix list.
+ */
+static void
+clean_dict_affix(IspellDict *dict)
+{
+	dict->maffixes = 0;
+	dict->naffixes = 0;
+	dict->Affix = NULL;
+
+	dict->Suffix = NULL;
+	dict->Prefix = NULL;
+
+	dict->AffixData = NULL;
+	dict->lenAffixData = 0;
+	dict->nAffixData = 0;
+
+	dict->CompoundAffix = NULL;
+
+	dict->avail = 0;
+}
+
+/*
  * Initializes the dictionary for use in backends - checks whether such dictionary
  * and list of stopwords is already used, and if not then parses it and loads it into
  * the shared segment.
@@ -277,6 +299,9 @@ init_shared_dict(DictInfo *info, char *dictFile, char *affFile, char *stopFile)
 
 	/* lookup if the dictionary (words and affixes) is already loaded in the shared segment */
 	shdict = get_shared_dict(dictFile, affFile);
+
+	/* clear dict affix sources */
+	clean_dict_affix(&(info->dict));
 
 	/* load affix list */
 	NIStartBuild(&(info->dict));
@@ -397,7 +422,7 @@ PG_FUNCTION_INFO_V1(dispell_list_stoplists);
 
 /*
  * Resets the shared dictionary memory, i.e. removes all the dictionaries. This
- * is the only way to remove dictionaries from the memory - either when when
+ * is the only way to remove dictionaries from the memory - either when
  * a dictionary is no longer needed or needs to be reloaded (e.g. to update
  * list of words / affixes).
  */
@@ -791,7 +816,6 @@ dispell_list_dicts(PG_FUNCTION_ARGS)
 {
 	FuncCallContext	   *funcctx;
 	TupleDesc			tupdesc;
-	AttInMetadata	   *attinmeta;
 	SharedIspellDict   *dict;
 
 	/* init on the first call */
@@ -817,8 +841,7 @@ dispell_list_dicts(PG_FUNCTION_ARGS)
 		 * generate attribute metadata needed later to produce tuples from raw
 		 * C strings
 		 */
-		attinmeta = TupleDescGetAttInMetadata(tupdesc);
-		funcctx->attinmeta = attinmeta;
+		funcctx->attinmeta = TupleDescGetAttInMetadata(tupdesc);
 		funcctx->tuple_desc = tupdesc;
 
 		/* switch back to the old context */
@@ -844,14 +867,14 @@ dispell_list_dicts(PG_FUNCTION_ARGS)
 
 		memset(nulls, 0, sizeof(nulls));
 
-		dictname = (text *) palloc(strlen(dict->dictFile) + VARHDRSZ);
-		affname  = (text *) palloc(strlen(dict->affixFile) + VARHDRSZ);
+		dictname = cstring_to_text(dict->dictFile);
+		affname  = cstring_to_text(dict->affixFile);
 
-		SET_VARSIZE(dictname, strlen(dict->dictFile) + VARHDRSZ);
-		SET_VARSIZE(affname,  strlen(dict->affixFile)  + VARHDRSZ);
+		// SET_VARSIZE(dictname, strlen(dict->dictFile) + VARHDRSZ);
+		// SET_VARSIZE(affname,  strlen(dict->affixFile)  + VARHDRSZ);
 
-		strcpy(VARDATA(dictname), dict->dictFile);
-		strcpy(VARDATA(affname),  dict->affixFile);
+		// strcpy(dictname, dict->dictFile);
+		// strcpy(affname,  dict->affixFile);
 
 		values[0] = PointerGetDatum(dictname);
 		values[1] = PointerGetDatum(affname);
@@ -884,7 +907,6 @@ dispell_list_stoplists(PG_FUNCTION_ARGS)
 {
 	FuncCallContext	   *funcctx;
 	TupleDesc			tupdesc;
-	AttInMetadata	   *attinmeta;
 	SharedStopList	   *stoplist;
 
 	/* init on the first call */
@@ -910,8 +932,7 @@ dispell_list_stoplists(PG_FUNCTION_ARGS)
 		 * generate attribute metadata needed later to produce tuples from raw
 		 * C strings
 		 */
-		attinmeta = TupleDescGetAttInMetadata(tupdesc);
-		funcctx->attinmeta = attinmeta;
+		funcctx->attinmeta = TupleDescGetAttInMetadata(tupdesc);
 		funcctx->tuple_desc = tupdesc;
 
 		/* switch back to the old context */
@@ -936,11 +957,11 @@ dispell_list_stoplists(PG_FUNCTION_ARGS)
 
 		memset(nulls, 0, sizeof(nulls));
 
-		stopname = (text *) palloc(strlen(stoplist->stopFile) + VARHDRSZ);
+		stopname = cstring_to_text(stoplist->stopFile);
 
-		SET_VARSIZE(stopname, strlen(stoplist->stopFile) + VARHDRSZ);
+		// SET_VARSIZE(stopname, strlen(stoplist->stopFile) + VARHDRSZ);
 
-		strcpy(VARDATA(stopname), stoplist->stopFile);
+		// strcpy(VARDATA(stopname), stoplist->stopFile);
 
 		values[0] = PointerGetDatum(stopname);
 		values[1] = UInt32GetDatum(stoplist->stop.len);
