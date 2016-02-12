@@ -4,7 +4,7 @@ MODULE_big = shared_ispell
 OBJS = src/shared_ispell.o
 
 EXTENSION = shared_ispell
-DATA = sql/shared_ispell--1.1.0.sql
+DATA = shared_ispell--1.1.0.sql
 
 REGRESS = shared_ispell
 
