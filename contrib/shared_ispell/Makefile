@@ -1,4 +1,4 @@
-	# contrib/shared_ispell/Makefile
+# contrib/shared_ispell/Makefile
 
 MODULE_big = shared_ispell
 OBJS = src/shared_ispell.o
