@@ -1,11 +1,18 @@
 /*
- * Relations using partitioning
+ * Pathman config
+ *  relname - schema qualified relation name
+ *  attname - partitioning key
+ *  parttype - partitioning type:
+ *      1 - HASH
+ *      2 - RANGE
+ *  range_interval - base interval for RANGE partitioning in string representation
  */
 CREATE TABLE IF NOT EXISTS @extschema@.pathman_config (
-    id         SERIAL PRIMARY KEY,
-    relname    VARCHAR(127),
-    attname    VARCHAR(127),
-    parttype   INTEGER
+    id             SERIAL PRIMARY KEY,
+    relname        VARCHAR(127),
+    attname        VARCHAR(127),
+    parttype       INTEGER,
+    range_interval TEXT
 );
 
 
@@ -67,9 +74,9 @@ BEGIN
     -- RAISE NOTICE '% rows have been copied', p_total;
     RETURN;
 
-EXCEPTION WHEN others THEN
-    PERFORM on_remove_partitions(p_parent::regclass::integer);
-    RAISE EXCEPTION '% %', SQLERRM, SQLSTATE;
+-- EXCEPTION WHEN others THEN
+--     PERFORM on_remove_partitions(p_parent::regclass::integer);
+--     RAISE EXCEPTION '% %', SQLERRM, SQLSTATE;
 END
 $$
 LANGUAGE plpgsql;
@@ -135,6 +142,18 @@ RETURNS TEXT AS
 $$
 BEGIN
     RETURN relnamespace::regnamespace || delimiter || relname FROM pg_class WHERE oid = cls::oid;
+END
+$$
+LANGUAGE plpgsql;
+
+/*
+ * Check if regclass if date or timestamp
+ */
+CREATE OR REPLACE FUNCTION @extschema@.is_date(cls REGTYPE)
+RETURNS BOOLEAN AS
+$$
+BEGIN
+    RETURN cls IN ('timestamp'::regtype, 'timestamptz'::regtype, 'date'::regtype);
 END
 $$
 LANGUAGE plpgsql;

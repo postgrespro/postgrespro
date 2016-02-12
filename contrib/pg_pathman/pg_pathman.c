@@ -147,6 +147,25 @@ get_pathman_range_relation(Oid relid, bool *found)
 	return hash_search(range_restrictions, (const void *) &key, HASH_FIND, found);
 }
 
+FmgrInfo *
+get_cmp_func(Oid type1, Oid type2)
+{
+	FmgrInfo   *cmp_func;
+	Oid			cmp_proc_oid;
+	TypeCacheEntry	*tce;
+
+	cmp_func = palloc(sizeof(FmgrInfo));
+	tce = lookup_type_cache(type1,
+							TYPECACHE_EQ_OPR | TYPECACHE_LT_OPR | TYPECACHE_GT_OPR |
+							TYPECACHE_CMP_PROC | TYPECACHE_CMP_PROC_FINFO);
+	cmp_proc_oid = get_opfamily_proc(tce->btree_opf,
+									 type1,
+									 type2,
+									 BTORDER_PROC);
+	fmgr_info(cmp_proc_oid, cmp_func);
+	return cmp_func;
+}
+
 /*
  * Planner hook. It disables inheritance for tables that have been partitioned
  * by pathman to prevent standart PostgreSQL partitioning mechanism from
@@ -233,9 +252,8 @@ pathman_shmem_startup(void)
 	LWLockAcquire(AddinShmemInitLock, LW_EXCLUSIVE);
 
 	/* Allocate shared memory objects */
-	alloc_dsm_table();
-	create_relations_hashtable();
-	create_range_restrictions_hashtable();
+	init_dsm_config();
+	init_shmem_config();
 
 	LWLockRelease(AddinShmemInitLock);
 

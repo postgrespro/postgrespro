@@ -116,16 +116,9 @@ find_or_create_range_partition(PG_FUNCTION_ARGS)
 		PG_RETURN_OID(ranges[pos].child_oid);
 	else
 	{
-		int 		ret;
-		Datum		vals[4];
-		Oid			oids[] = {OIDOID, value_type, value_type, value_type};
-		bool		nulls[] = {false, false, false, false};
-		RangeEntry *re = &ranges[rangerel->ranges.length-1];
-		int 		cmp_upper = FunctionCall2(&cmp_func, value, ranges[rangerel->ranges.length-1].max);
-		int 		cmp_lower = FunctionCall2(&cmp_func, value, ranges[0].min);
-		char	   *sql;
+		Oid child_oid;
 
-		/* Lock relation before appending new partitions */
+		/* Lock config before appending new partitions */
 		LWLockAcquire(load_config_lock, LW_EXCLUSIVE);
 
 		/*
@@ -139,45 +132,22 @@ find_or_create_range_partition(PG_FUNCTION_ARGS)
 			PG_RETURN_OID(ranges[pos].child_oid);
 		}
 
-		/* Determine nearest range partition */
-		if (cmp_upper > 0)
-			re = &ranges[rangerel->ranges.length-1];
-		else if (cmp_lower < 0)
-			re = &ranges[0];
+		/* Start background worker to create new partitions */
+		child_oid = create_partitions_bg_worker(relid, value, value_type);
 
-		vals[0] = ObjectIdGetDatum(relid);
-		vals[1] = re->min;
-		vals[2] = re->max;
-		vals[3] = value;
+		// SPI_connect();
+		// child_oid = create_partitions(relid, value, value_type);
+		// SPI_finish();
+		// elog(WARNING, "Worker finished");
 
-		/* Create new partitions */
-		SPI_connect();
-		sql = psprintf("SELECT %s.append_partitions_on_demand_internal($1, $2, $3, $4)",
-					   get_extension_schema());
-		ret = SPI_execute_with_args(sql, 4, oids, vals, nulls, false, 0);
-		// ret = SPI_execute_with_args("SELECT append_partitions_on_demand_internal($1, $2, $3, $4)",
-		// 							4, oids, vals, nulls, false, 0);
-		if (ret > 0)
-		{
-			/* Update relation info */
-			free_dsm_array(&rangerel->ranges);
-			free_dsm_array(&prel->children);
-			load_check_constraints(relid, GetCatalogSnapshot(relid));
-		}
-		else
-			elog(WARNING, "Attempt to create new partitions failed");
-
-		SPI_finish();
-
-		/* Release locks */
+		/* Release lock */
 		LWLockRelease(load_config_lock);
-		// pfree(sql);
 
 		/* Repeat binary search */
 		ranges = dsm_array_get_pointer(&rangerel->ranges);
 		pos = range_binary_search(rangerel, &cmp_func, value, &found);
 		if (found)
-			PG_RETURN_OID(ranges[pos].child_oid);
+			PG_RETURN_OID(child_oid);
 	}
 
 	PG_RETURN_NULL();

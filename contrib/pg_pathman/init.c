@@ -16,13 +16,32 @@
 
 HTAB   *relations = NULL;
 HTAB   *range_restrictions = NULL;
+// bool   *config_loaded = NULL;
 bool	initialization_needed = true;
+
+typedef struct ShmemConfig
+{
+	bool config_loaded;
+} ShmemConfig;
+ShmemConfig *shmem_cfg;
 
 static FmgrInfo *qsort_type_cmp_func;
 
 static bool validate_range_constraint(Expr *, PartRelationInfo *, Datum *, Datum *);
 static bool validate_hash_constraint(Expr *expr, PartRelationInfo *prel, int *hash);
 static int cmp_range_entries(const void *p1, const void *p2);
+
+void
+init_shmem_config()
+{
+	bool found;
+	create_relations_hashtable();
+	create_range_restrictions_hashtable();
+	shmem_cfg = (ShmemConfig *)
+		ShmemInitStruct("pathman shmem config", sizeof(ShmemConfig), &found);
+	shmem_cfg->config_loaded = false;
+	// *config_loaded = false;
+}
 
 /*
  * Initialize hashtables
@@ -35,9 +54,15 @@ load_config(void)
 	initialization_needed = false;
 	new_segment_created = init_dsm_segment(INITIAL_BLOCKS_COUNT, 32);
 
-	LWLockAcquire(load_config_lock, LW_EXCLUSIVE);
-	load_relations_hashtable(new_segment_created);
-	LWLockRelease(load_config_lock);
+	/* if config is not loaded */
+	if (shmem_cfg && !shmem_cfg->config_loaded)
+	{
+		LWLockAcquire(load_config_lock, LW_EXCLUSIVE);
+		load_relations_hashtable(new_segment_created);
+		LWLockRelease(load_config_lock);
+		// *config_loaded = true;
+		shmem_cfg->config_loaded = true;
+	}
 }
 
 /*
