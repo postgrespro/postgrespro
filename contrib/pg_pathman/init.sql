@@ -44,6 +44,19 @@ CREATE OR REPLACE FUNCTION @extschema@.get_range_by_idx(
     parent_relid OID, idx INTEGER, dummy ANYELEMENT)
 RETURNS ANYARRAY AS 'pg_pathman', 'get_range_by_idx' LANGUAGE C STRICT;
 
+/*
+ * Returns min value of the first range for relation
+ */
+CREATE OR REPLACE FUNCTION @extschema@.get_min_range_value(
+    parent_relid OID, dummy ANYELEMENT)
+RETURNS ANYELEMENT AS 'pg_pathman', 'get_min_range_value' LANGUAGE C STRICT;
+
+/*
+ * Returns max value of the last range for relation
+ */
+CREATE OR REPLACE FUNCTION @extschema@.get_max_range_value(
+    parent_relid OID, dummy ANYELEMENT)
+RETURNS ANYELEMENT AS 'pg_pathman', 'get_max_range_value' LANGUAGE C STRICT;
 
 /*
  * Copy rows to partitions
@@ -182,3 +195,15 @@ LANGUAGE plpgsql;
 CREATE EVENT TRIGGER pathman_ddl_trigger
 ON sql_drop
 EXECUTE PROCEDURE @extschema@.pathman_ddl_trigger_func();
+
+/*
+ * Acquire partitions lock to prevent concurrent partitions creation
+ */
+CREATE OR REPLACE FUNCTION @extschema@.acquire_partitions_lock()
+RETURNS VOID AS 'pg_pathman', 'acquire_partitions_lock' LANGUAGE C STRICT;
+
+/*
+ * Release partitions lock
+ */
+CREATE OR REPLACE FUNCTION @extschema@.release_partitions_lock()
+RETURNS VOID AS 'pg_pathman', 'release_partitions_lock' LANGUAGE C STRICT;

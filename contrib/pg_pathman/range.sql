@@ -663,12 +663,25 @@ BEGIN
     FROM @extschema@.pathman_config WHERE relname = p_relation;
 
     v_atttype := @extschema@.get_attribute_type_name(p_relation, v_attname);
+
+    /* Prevent concurrent partition creation */
+    PERFORM @extschema@.acquire_partitions_lock();
     
     EXECUTE format('SELECT @extschema@.append_partition_internal($1, $2, $3, ARRAY[]::%s[])', v_atttype)
     INTO v_part_name
     USING p_relation, v_atttype, v_interval;
 
+    /* Release lock */
+    PERFORM @extschema@.release_partitions_lock();
+
+    /* Tell backend to reload configuration */
+    PERFORM @extschema@.on_create_partitions(p_relation::regclass::oid);
+    RAISE NOTICE 'Done!';
     RETURN v_part_name;
+
+EXCEPTION WHEN others THEN
+    PERFORM @extschema@.release_partitions_lock();
+    RAISE EXCEPTION '% %', SQLERRM, SQLSTATE;
 END
 $$
 LANGUAGE plpgsql;
@@ -696,9 +709,6 @@ BEGIN
         INTO v_part_name;
     END IF;
 
-    /* Tell backend to reload configuration */
-    PERFORM @extschema@.on_create_partitions(p_relation::regclass::oid);
-    RAISE NOTICE 'Done!';
     RETURN v_part_name;
 END
 $$
@@ -723,11 +733,24 @@ BEGIN
     FROM @extschema@.pathman_config WHERE relname = p_relation;
     v_atttype := @extschema@.get_attribute_type_name(p_relation, v_attname);
 
+    /* Prevent concurrent partition creation */
+    PERFORM @extschema@.acquire_partitions_lock();
+
     EXECUTE format('SELECT @extschema@.prepend_partition_internal($1, $2, $3, ARRAY[]::%s[])', v_atttype)
     INTO v_part_name
     USING p_relation, v_atttype, v_interval;
 
+    /* Release lock */
+    PERFORM @extschema@.release_partitions_lock();
+
+    /* Tell backend to reload configuration */
+    PERFORM @extschema@.on_create_partitions(p_relation::regclass::oid);
+    RAISE NOTICE 'Done!';
     RETURN v_part_name;
+
+EXCEPTION WHEN others THEN
+    PERFORM @extschema@.release_partitions_lock();
+    RAISE EXCEPTION '% %', SQLERRM, SQLSTATE;
 END
 $$
 LANGUAGE plpgsql;
@@ -758,10 +781,6 @@ BEGIN
         USING p_relation, p_range[1], p_interval
         INTO v_part_name;
     END IF;
-
-    /* Tell backend to reload configuration */
-    PERFORM @extschema@.on_create_partitions(p_relation::regclass::oid);
-    RAISE NOTICE 'Done!';
 
     RETURN v_part_name;
 END
@@ -933,8 +952,6 @@ $$ LANGUAGE plpgsql;
  */
 CREATE OR REPLACE FUNCTION @extschema@.append_partitions_on_demand_internal(
     p_relid OID
-    , p_min ANYELEMENT
-    , p_max ANYELEMENT
     , p_new_value ANYELEMENT)
 RETURNS OID AS
 $$
@@ -945,6 +962,8 @@ DECLARE
     v_part TEXT;
     v_interval TEXT;
     v_attname TEXT;
+    v_min p_new_value%TYPE;
+    v_max p_new_value%TYPE;
     v_cur_value p_new_value%TYPE;
     v_next_value p_new_value%TYPE;
     v_is_date BOOLEAN;
@@ -955,16 +974,21 @@ BEGIN
     SELECT attname, range_interval INTO v_attname, v_interval
     FROM @extschema@.pathman_config WHERE relname = v_relation;
 
+    v_min := @extschema@.get_min_range_value(p_relid::regclass::oid, p_new_value);
+    v_max := @extschema@.get_max_range_value(p_relid::regclass::oid, p_new_value);
+
     v_is_date := @extschema@.is_date(pg_typeof(p_new_value)::regtype);
 
-    IF p_new_value >= p_max THEN
-        v_cur_value := p_max;
+    IF p_new_value >= v_max THEN
+        v_cur_value := v_max;
         WHILE v_cur_value <= p_new_value AND i < 1000
         LOOP
             IF v_is_date THEN
                 v_next_value := v_cur_value + v_interval::interval;
             ELSE
-                v_next_value := v_cur_value + v_interval;
+                EXECUTE format('SELECT $1 + $2::%s', pg_typeof(p_new_value))
+                USING v_cur_value, v_interval
+                INTO v_next_value;
             END IF;
 
             v_part := @extschema@.create_single_range_partition(
@@ -975,14 +999,16 @@ BEGIN
             v_cur_value := v_next_value;
             RAISE NOTICE 'partition % created', v_part;
         END LOOP;
-    ELSIF p_new_value <= p_min THEN
-        v_cur_value := p_min;
+    ELSIF p_new_value <= v_min THEN
+        v_cur_value := v_min;
         WHILE v_cur_value >= p_new_value AND i < 1000
         LOOP
             IF v_is_date THEN
                 v_next_value := v_cur_value - v_interval::interval;
             ELSE
-                v_next_value := v_cur_value - v_interval;
+                EXECUTE format('SELECT $1 - $2::%s', pg_typeof(p_new_value))
+                USING v_cur_value, v_interval
+                INTO v_next_value;
             END IF;
 
             v_part := @extschema@.create_single_range_partition(

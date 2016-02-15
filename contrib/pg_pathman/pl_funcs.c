@@ -17,6 +17,10 @@ PG_FUNCTION_INFO_V1( on_partitions_removed );
 PG_FUNCTION_INFO_V1( find_or_create_range_partition);
 PG_FUNCTION_INFO_V1( get_range_by_idx );
 PG_FUNCTION_INFO_V1( get_partition_range );
+PG_FUNCTION_INFO_V1( acquire_partitions_lock );
+PG_FUNCTION_INFO_V1( release_partitions_lock );
+PG_FUNCTION_INFO_V1( get_min_range_value );
+PG_FUNCTION_INFO_V1( get_max_range_value );
 
 /*
  * Callbacks
@@ -248,4 +252,67 @@ get_range_by_idx(PG_FUNCTION_ARGS)
 	PG_RETURN_ARRAYTYPE_P(
 		construct_array(elems, 2, prel->atttype,
 						tce->typlen, tce->typbyval, tce->typalign));
+}
+
+/*
+ * Returns min value of the first range for relation
+ */
+Datum
+get_min_range_value(PG_FUNCTION_ARGS)
+{
+	int parent_oid = DatumGetInt32(PG_GETARG_DATUM(0));
+	PartRelationInfo *prel;
+	RangeRelation	*rangerel;
+	RangeEntry		*ranges;
+
+	prel = get_pathman_relation_info(parent_oid, NULL);
+	rangerel = get_pathman_range_relation(parent_oid, NULL);
+
+	if (!prel || !rangerel || prel->parttype != PT_RANGE || rangerel->ranges.length == 0)
+		PG_RETURN_NULL();
+
+	ranges = dsm_array_get_pointer(&rangerel->ranges);
+	PG_RETURN_DATUM(ranges[0].min);
+}
+
+/*
+ * Returns max value of the last range for relation
+ */
+Datum
+get_max_range_value(PG_FUNCTION_ARGS)
+{
+	int parent_oid = DatumGetInt32(PG_GETARG_DATUM(0));
+	PartRelationInfo *prel;
+	RangeRelation	*rangerel;
+	RangeEntry		*ranges;
+
+	prel = get_pathman_relation_info(parent_oid, NULL);
+	rangerel = get_pathman_range_relation(parent_oid, NULL);
+
+	if (!prel || !rangerel || prel->parttype != PT_RANGE || rangerel->ranges.length == 0)
+		PG_RETURN_NULL();
+
+	ranges = dsm_array_get_pointer(&rangerel->ranges);
+	PG_RETURN_DATUM(ranges[rangerel->ranges.length-1].max);
+}
+
+/*
+ * Acquire partitions lock
+ */
+Datum
+acquire_partitions_lock(PG_FUNCTION_ARGS)
+{
+	// int relid = DatumGetInt32(PG_GETARG_DATUM(0));
+	// LockRelationOid(relid, AccessExclusiveLock);
+	LWLockAcquire(edit_partitions_lock, LW_EXCLUSIVE);
+	PG_RETURN_NULL();
+}
+
+Datum
+release_partitions_lock(PG_FUNCTION_ARGS)
+{
+	// int relid = DatumGetInt32(PG_GETARG_DATUM(0));
+	// UnlockRelationOid(relid, AccessExclusiveLock);
+	LWLockRelease(edit_partitions_lock);
+	PG_RETURN_NULL();
 }

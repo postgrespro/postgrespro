@@ -141,12 +141,9 @@ create_partitions(Oid relid, Datum value, Oid value_type)
 {
 	int 		ret;
 	RangeEntry *ranges;
-	Datum		vals[4];
-	Oid			oids[] = {OIDOID, value_type, value_type, value_type};
-	bool		nulls[] = {false, false, false, false};
-	RangeEntry *re;
-	int 		cmp_upper;
-	int 		cmp_lower;
+	Datum		vals[2];
+	Oid			oids[] = {OIDOID, value_type};
+	bool		nulls[] = {false, false};
 	char	   *sql;
 	bool		found;
 	int pos;
@@ -167,24 +164,16 @@ create_partitions(Oid relid, Datum value, Oid value_type)
 	/* Comparison function */
 	cmp_func = *get_cmp_func(value_type, prel->atttype);
 
-	/* Determine nearest range partition */
-	re = &ranges[rangerel->ranges.length-1];
-	cmp_upper = FunctionCall2(&cmp_func, value, ranges[rangerel->ranges.length-1].max);
-	cmp_lower = FunctionCall2(&cmp_func, value, ranges[0].min);
-	if (cmp_upper > 0)
-		re = &ranges[rangerel->ranges.length-1];
-	else if (cmp_lower < 0)
-		re = &ranges[0];
-
 	vals[0] = ObjectIdGetDatum(relid);
-	vals[1] = re->min;
-	vals[2] = re->max;
-	vals[3] = value;
+	vals[1] = value;
+
+	/* Restrict concurrent partition creation */
+	LWLockAcquire(edit_partitions_lock, LW_EXCLUSIVE);
 
 	/* Perform PL procedure */
-	sql = psprintf("SELECT %s.append_partitions_on_demand_internal($1, $2, $3, $4)",
+	sql = psprintf("SELECT %s.append_partitions_on_demand_internal($1, $2)",
 				   schema);
-	ret = SPI_execute_with_args(sql, 4, oids, vals, nulls, false, 0);
+	ret = SPI_execute_with_args(sql, 2, oids, vals, nulls, false, 0);
 	if (ret > 0)
 	{
 		/* Update relation info */
@@ -194,6 +183,9 @@ create_partitions(Oid relid, Datum value, Oid value_type)
 	}
 	else
 		elog(WARNING, "Attempt to create new partitions failed");
+
+	/* Release lock */
+	LWLockRelease(edit_partitions_lock);
 
 	/* Repeat binary search */
 	ranges = dsm_array_get_pointer(&rangerel->ranges);

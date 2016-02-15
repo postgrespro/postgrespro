@@ -245,9 +245,10 @@ static void
 pathman_shmem_startup(void)
 {
 	/* Initialize locks */
-	RequestAddinLWLocks(2);
+	RequestAddinLWLocks(3);
 	load_config_lock = LWLockAssign();
 	dsm_init_lock    = LWLockAssign();
+	edit_partitions_lock = LWLockAssign();
 
 	LWLockAcquire(AddinShmemInitLock, LW_EXCLUSIVE);
 

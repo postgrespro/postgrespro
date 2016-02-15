@@ -128,6 +128,7 @@ bool irange_list_find(List *rangeset, int index, bool *lossy);
 
 LWLock *load_config_lock;
 LWLock *dsm_init_lock;
+LWLock *edit_partitions_lock;
 
 
 /* Dynamic shared memory functions */
