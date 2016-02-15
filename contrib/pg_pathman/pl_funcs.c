@@ -125,6 +125,9 @@ find_or_create_range_partition(PG_FUNCTION_ARGS)
 		/* Lock config before appending new partitions */
 		LWLockAcquire(load_config_lock, LW_EXCLUSIVE);
 
+		/* Restrict concurrent partition creation */
+		LWLockAcquire(edit_partitions_lock, LW_EXCLUSIVE);
+
 		/*
 		 * Check if someone else has already created partition.
 		 */
@@ -144,7 +147,8 @@ find_or_create_range_partition(PG_FUNCTION_ARGS)
 		// SPI_finish();
 		// elog(WARNING, "Worker finished");
 
-		/* Release lock */
+		/* Release locks */
+		LWLockRelease(edit_partitions_lock);
 		LWLockRelease(load_config_lock);
 
 		/* Repeat binary search */

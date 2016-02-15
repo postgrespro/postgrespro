@@ -647,7 +647,7 @@ $$ LANGUAGE plpgsql;
 /*
  * Append new partition
  */
-CREATE OR REPLACE FUNCTION @extschema@.append_partition(
+CREATE OR REPLACE FUNCTION @extschema@.append_range_partition(
     p_relation TEXT)
 RETURNS TEXT AS
 $$
@@ -671,11 +671,13 @@ BEGIN
     INTO v_part_name
     USING p_relation, v_atttype, v_interval;
 
+    /* Tell backend to reload configuration */
+    PERFORM @extschema@.on_create_partitions(p_relation::regclass::oid);
+    -- PERFORM @extschema@.on_update_partitions(p_relation::regclass::oid);
+
     /* Release lock */
     PERFORM @extschema@.release_partitions_lock();
 
-    /* Tell backend to reload configuration */
-    PERFORM @extschema@.on_create_partitions(p_relation::regclass::oid);
     RAISE NOTICE 'Done!';
     RETURN v_part_name;
 
@@ -718,7 +720,7 @@ LANGUAGE plpgsql;
 /*
  * Prepend new partition
  */
-CREATE OR REPLACE FUNCTION @extschema@.prepend_partition(p_relation TEXT)
+CREATE OR REPLACE FUNCTION @extschema@.prepend_range_partition(p_relation TEXT)
 RETURNS TEXT AS
 $$
 DECLARE
@@ -740,11 +742,13 @@ BEGIN
     INTO v_part_name
     USING p_relation, v_atttype, v_interval;
 
+    /* Tell backend to reload configuration */
+    PERFORM @extschema@.on_create_partitions(p_relation::regclass::oid);
+    -- PERFORM @extschema@.on_update_partitions(p_relation::regclass::oid);
+
     /* Release lock */
     PERFORM @extschema@.release_partitions_lock();
 
-    /* Tell backend to reload configuration */
-    PERFORM @extschema@.on_create_partitions(p_relation::regclass::oid);
     RAISE NOTICE 'Done!';
     RETURN v_part_name;
 
@@ -783,6 +787,157 @@ BEGIN
     END IF;
 
     RETURN v_part_name;
+END
+$$
+LANGUAGE plpgsql;
+
+
+/*
+ * Add new partition
+ */
+CREATE OR REPLACE FUNCTION @extschema@.add_range_partition(
+    p_relation TEXT
+    , p_start_value ANYELEMENT
+    , p_end_value ANYELEMENT)
+RETURNS TEXT AS
+$$
+DECLARE
+    v_part_name TEXT;
+BEGIN
+    /* Prevent concurrent partition creation */
+    PERFORM @extschema@.acquire_partitions_lock();
+
+    p_relation := @extschema@.validate_relname(p_relation);
+
+    /* TODO: check range overlap */
+
+    IF p_start_value >= p_end_value THEN
+        RAISE EXCEPTION 'Failed to create partition: p_start_value is greater than p_end_value';
+    END IF;
+
+    /* Create new partition */
+    v_part_name := @extschema@.create_single_range_partition(p_relation, p_start_value, p_end_value);
+    PERFORM @extschema@.on_update_partitions(p_relation::regclass::oid);
+
+    /* Release lock */
+    PERFORM @extschema@.release_partitions_lock();
+
+    RAISE NOTICE 'Done!';
+    RETURN v_part_name;
+
+EXCEPTION WHEN others THEN
+    RAISE EXCEPTION '% %', SQLERRM, SQLSTATE;
+    PERFORM @extschema@.release_partitions_lock();
+END
+$$
+LANGUAGE plpgsql;
+
+
+/*
+ * Drop range partition
+ */
+CREATE OR REPLACE FUNCTION @extschema@.drop_range_partition(
+    p_partition TEXT)
+RETURNS TEXT AS
+$$
+DECLARE
+    v_part_name TEXT;
+    v_parent TEXT;
+    v_count INTEGER;
+BEGIN
+    /* Prevent concurrent partition management */
+    PERFORM @extschema@.acquire_partitions_lock();
+
+    /* Parent table name */
+    SELECT inhparent::regclass INTO v_parent
+    FROM pg_inherits WHERE inhrelid = p_partition::regclass::oid;
+
+    IF v_parent IS NULL THEN
+        RAISE EXCEPTION 'Partition ''%'' not found', p_partition;
+    END IF;
+
+    /* Drop table and update cache */
+    EXECUTE format('DROP TABLE %s', p_partition);
+    PERFORM @extschema@.on_update_partitions(v_parent::regclass::oid);
+
+    /* Release lock */
+    PERFORM @extschema@.release_partitions_lock();
+
+    RETURN p_partition;
+
+EXCEPTION WHEN others THEN
+    RAISE EXCEPTION '% %', SQLERRM, SQLSTATE;
+    PERFORM @extschema@.release_partitions_lock();
+END
+$$
+LANGUAGE plpgsql;
+
+
+/*
+ * Attach range partition
+ */
+CREATE OR REPLACE FUNCTION @extschema@.attach_range_partition(
+    p_relation TEXT
+    , p_partition TEXT
+    , p_start_value ANYELEMENT
+    , p_end_value ANYELEMENT)
+RETURNS TEXT AS
+$$
+DECLARE
+    v_attname TEXT;
+    v_cond TEXT;
+BEGIN
+    /* Prevent concurrent partition management */
+    PERFORM @extschema@.acquire_partitions_lock();
+
+    p_relation := @extschema@.validate_relname(p_relation);
+
+    /* Set inheritance */
+    EXECUTE format('ALTER TABLE %s INHERIT %s'
+                   , p_partition
+                   , p_relation);
+
+    /* Set check constraint */
+    v_attname := attname FROM @extschema@.pathman_config WHERE relname = p_relation;
+    v_cond := @extschema@.get_range_condition(v_attname, p_start_value, p_end_value);
+    EXECUTE format('ALTER TABLE %s ADD CONSTRAINT %s_check CHECK (%s)'
+                   , p_partition
+                   , @extschema@.get_schema_qualified_name(p_partition::regclass)
+                   , v_cond);
+
+    /* Invalidate cache */
+    PERFORM @extschema@.on_update_partitions(p_relation::regclass::oid);
+
+    /* Release lock */
+    PERFORM @extschema@.release_partitions_lock();
+    RETURN p_partition;
+
+EXCEPTION WHEN others THEN
+    RAISE EXCEPTION '% %', SQLERRM, SQLSTATE;
+    PERFORM @extschema@.release_partitions_lock();
+END
+$$
+LANGUAGE plpgsql;
+
+
+/*
+ * Detach range partition
+ */
+CREATE OR REPLACE FUNCTION @extschema@.attach_range_partition(
+    p_partition TEXT)
+RETURNS TEXT AS
+$$
+BEGIN
+    /* Prevent concurrent partition management */
+    PERFORM @extschema@.acquire_partitions_lock();
+
+    /* Release lock */
+    PERFORM @extschema@.release_partitions_lock();
+    RETURN p_partition;
+
+EXCEPTION WHEN others THEN
+    RAISE EXCEPTION '% %', SQLERRM, SQLSTATE;
+    PERFORM @extschema@.release_partitions_lock();
 END
 $$
 LANGUAGE plpgsql;

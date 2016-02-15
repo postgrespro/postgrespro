@@ -167,9 +167,6 @@ create_partitions(Oid relid, Datum value, Oid value_type)
 	vals[0] = ObjectIdGetDatum(relid);
 	vals[1] = value;
 
-	/* Restrict concurrent partition creation */
-	LWLockAcquire(edit_partitions_lock, LW_EXCLUSIVE);
-
 	/* Perform PL procedure */
 	sql = psprintf("SELECT %s.append_partitions_on_demand_internal($1, $2)",
 				   schema);
@@ -183,9 +180,6 @@ create_partitions(Oid relid, Datum value, Oid value_type)
 	}
 	else
 		elog(WARNING, "Attempt to create new partitions failed");
-
-	/* Release lock */
-	LWLockRelease(edit_partitions_lock);
 
 	/* Repeat binary search */
 	ranges = dsm_array_get_pointer(&rangerel->ranges);

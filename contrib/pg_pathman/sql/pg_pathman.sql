@@ -105,11 +105,20 @@ EXPLAIN (COSTS OFF) SELECT * FROM test.num_range_rel WHERE id BETWEEN 100 AND 70
 SELECT pathman.merge_range_partitions('test.range_rel_1', 'test.range_rel_' || currval('test.range_rel_seq'));
 
 /* Append and prepend partitions */
-SELECT pathman.append_partition('test.num_range_rel');
-SELECT pathman.prepend_partition('test.num_range_rel');
+SELECT pathman.append_range_partition('test.num_range_rel');
+SELECT pathman.prepend_range_partition('test.num_range_rel');
+SELECT pathman.drop_range_partition('test.num_range_rel_7');
 
-SELECT pathman.append_partition('test.range_rel');
-SELECT pathman.prepend_partition('test.range_rel');
+SELECT pathman.append_range_partition('test.range_rel');
+SELECT pathman.prepend_range_partition('test.range_rel');
+EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt BETWEEN '2014-12-15' AND '2015-01-15';
+SELECT pathman.drop_range_partition('test.range_rel_7');
+EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt BETWEEN '2014-12-15' AND '2015-01-15';
+SELECT pathman.add_range_partition('test.range_rel', '2014-12-01'::DATE, '2015-01-01'::DATE);
+EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt BETWEEN '2014-12-15' AND '2015-01-15';
+CREATE TABLE test.range_rel_archive (LIKE test.range_rel INCLUDING ALL);
+SELECT pathman.attach_range_partition('test.range_rel', 'test.range_rel_archive', '2014-01-01'::DATE, '2014-12-01'::DATE);
+EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt BETWEEN '2014-11-15' AND '2015-01-15';
 
 /*
  * Clean up
@@ -162,8 +171,8 @@ INSERT INTO range_rel (dt) SELECT g FROM generate_series('2010-01-01'::date, '20
 SELECT create_range_partitions('range_rel', 'dt', '2010-01-01'::date, '1 month'::interval, 12);
 SELECT merge_range_partitions('range_rel_1', 'range_rel_2');
 SELECT split_range_partition('range_rel_1', '2010-02-15'::date);
-SELECT append_partition('range_rel');
-SELECT prepend_partition('range_rel');
+SELECT append_range_partition('range_rel');
+SELECT prepend_range_partition('range_rel');
 EXPLAIN (COSTS OFF) SELECT * FROM range_rel WHERE dt < '2010-03-01';
 EXPLAIN (COSTS OFF) SELECT * FROM range_rel WHERE dt > '2010-12-15';
 
