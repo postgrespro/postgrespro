@@ -1,16 +1,4 @@
 CREATE EXTENSION shared_ispell;
-SELECT shared_ispell_mem_available();
- shared_ispell_mem_available 
------------------------------
-                     1048528
-(1 row)
-
-SELECT shared_ispell_mem_used();
- shared_ispell_mem_used 
-------------------------
-                     48
-(1 row)
-
 -- Test ISpell dictionary with ispell affix file
 CREATE TEXT SEARCH DICTIONARY shared_ispell (
                         Template=shared_ispell,
@@ -60,12 +48,6 @@ SELECT ts_lexize('shared_ispell', 'rebooking');
  {booking,book}
 (1 row)
 
-SELECT ts_lexize('shared_ispell', 'rebook');
- ts_lexize 
------------
- 
-(1 row)
-
 SELECT ts_lexize('shared_ispell', 'unbookings');
  ts_lexize 
 -----------
@@ -106,18 +88,6 @@ SELECT ts_lexize('shared_ispell', 'footballyklubber');
       ts_lexize      
 ---------------------
  {foot,ball,klubber}
-(1 row)
-
-SELECT shared_ispell_mem_available();
- shared_ispell_mem_available 
------------------------------
-                      980312
-(1 row)
-
-SELECT shared_ispell_mem_used();
- shared_ispell_mem_used 
-------------------------
-                  68264
 (1 row)
 
 -- Test ISpell dictionary with hunspell affix file
@@ -168,12 +138,6 @@ SELECT ts_lexize('shared_hunspell', 'rebooking');
  {booking,book}
 (1 row)
 
-SELECT ts_lexize('shared_hunspell', 'rebook');
- ts_lexize 
------------
- 
-(1 row)
-
 SELECT ts_lexize('shared_hunspell', 'unbookings');
  ts_lexize 
 -----------
@@ -216,29 +180,17 @@ SELECT ts_lexize('shared_hunspell', 'footballyklubber');
  {foot,ball,klubber}
 (1 row)
 
-SELECT shared_ispell_mem_available();
- shared_ispell_mem_available 
------------------------------
-                      914208
-(1 row)
-
-SELECT shared_ispell_mem_used();
- shared_ispell_mem_used 
-------------------------
-                 134368
-(1 row)
-
-SELECT * FROM shared_ispell_dicts();
-   dict_name   |   affix_name    | words | affixes | bytes 
----------------+-----------------+-------+---------+-------
- ispell_sample | hunspell_sample |     8 |       0 | 66104
- ispell_sample | ispell_sample   |     8 |       0 | 66104
+SELECT dict_name, affix_name, words, affixes FROM shared_ispell_dicts();
+   dict_name   |   affix_name    | words | affixes 
+---------------+-----------------+-------+---------
+ ispell_sample | hunspell_sample |     8 |       7
+ ispell_sample | ispell_sample   |     8 |       7
 (2 rows)
 
-SELECT * FROM shared_ispell_stoplists();
- stop_name | words | bytes 
------------+-------+-------
- english   |   127 |  2112
+SELECT stop_name, words FROM shared_ispell_stoplists();
+ stop_name | words 
+-----------+-------
+ english   |   127
 (1 row)
 
 SELECT shared_ispell_reset();
@@ -247,15 +199,15 @@ SELECT shared_ispell_reset();
  
 (1 row)
 
-SELECT shared_ispell_mem_available();
- shared_ispell_mem_available 
------------------------------
-                     1048528
+SELECT ts_lexize('shared_ispell', 'skies');
+ ts_lexize 
+-----------
+ {sky}
 (1 row)
 
-SELECT shared_ispell_mem_used();
- shared_ispell_mem_used 
-------------------------
-                     48
+SELECT ts_lexize('shared_hunspell', 'skies');
+ ts_lexize 
+-----------
+ {sky}
 (1 row)
 

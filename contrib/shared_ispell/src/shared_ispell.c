@@ -347,6 +347,7 @@ init_shared_dict(DictInfo *info, char *dictFile, char *affFile, char *stopFile)
 
 		/* fine, there's enough space - copy the dictionary */
 		shdict = copyIspellDict(dict, dictFile, affFile, size, dict->nspell);
+		shdict->dict.naffixes = info->dict.naffixes;
 
 		/* add the new dictionary to the linked list (of SharedIspellDict structures) */
 		shdict->next = segment_info->shdict;
