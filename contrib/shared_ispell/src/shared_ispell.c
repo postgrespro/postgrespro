@@ -342,7 +342,7 @@ init_shared_dict(DictInfo *info, char *dictFile, char *affFile, char *stopFile)
 		/* check available space in shared segment */
 		size = sizeIspellDict(dict, dictFile, affFile);
 		if (size > segment_info->available)
-			elog(ERROR, "shared dictionary %s.dict / %s.affix needs %d B, only %ld B available",
+			elog(ERROR, "shared dictionary %s.dict / %s.affix needs %d B, only %zd B available",
 				dictFile, affFile, size, segment_info->available);
 
 		/* fine, there's enough space - copy the dictionary */
@@ -377,7 +377,7 @@ init_shared_dict(DictInfo *info, char *dictFile, char *affFile, char *stopFile)
 
 			size = sizeStopList(&stoplist, stopFile);
 			if (size > segment_info->available)
-				elog(ERROR, "shared stoplist %s.stop needs %d B, only %ld B available",
+				elog(ERROR, "shared stoplist %s.stop needs %d B, only %zd B available",
 					stopFile, size, segment_info->available);
 
 			/* fine, there's enough space - copy the stoplist */
