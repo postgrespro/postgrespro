@@ -142,6 +142,7 @@
 <!ENTITY seg             SYSTEM "seg.sgml">
 <!ENTITY contrib-spi     SYSTEM "contrib-spi.sgml">
 <!ENTITY sepgsql         SYSTEM "sepgsql.sgml">
+<!ENTITY shared-ispell   SYSTEM "shared-ispell.sgml">
 <!ENTITY sr-plan         SYSTEM "sr_plan.sgml">
 <!ENTITY sslinfo         SYSTEM "sslinfo.sgml">
 <!ENTITY tablefunc       SYSTEM "tablefunc.sgml">
