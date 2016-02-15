@@ -175,7 +175,7 @@ EXPLAIN (COSTS OFF) SELECT * FROM range_rel WHERE dt < '2010-03-01';
 /* Create range partitions from whole range */
 SELECT drop_range_partitions('range_rel');
 SELECT create_partitions_from_range('range_rel', 'id', 1, 1000, 100);
-SELECT drop_range_partitions('range_rel');
+SELECT drop_range_partitions('range_rel', TRUE);
 SELECT create_partitions_from_range('range_rel', 'dt', '2015-01-01'::date, '2015-12-01'::date, '1 month'::interval);
 EXPLAIN (COSTS OFF) SELECT * FROM range_rel WHERE dt = '2015-12-15';
 
