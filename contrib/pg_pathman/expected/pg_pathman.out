@@ -533,6 +533,21 @@ EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt BETWEEN '2014-11-15' A
          Index Cond: (dt <= 'Thu Jan 15 00:00:00 2015'::timestamp without time zone)
 (6 rows)
 
+SELECT pathman.detach_range_partition('test.range_rel_archive');
+ detach_range_partition 
+------------------------
+ test.range_rel_archive
+(1 row)
+
+EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt BETWEEN '2014-11-15' AND '2015-01-15';
+                                     QUERY PLAN                                      
+-------------------------------------------------------------------------------------
+ Append
+   ->  Seq Scan on range_rel_8
+   ->  Index Scan using range_rel_1_dt_idx on range_rel_1
+         Index Cond: (dt <= 'Thu Jan 15 00:00:00 2015'::timestamp without time zone)
+(4 rows)
+
 /*
  * Clean up
  */
