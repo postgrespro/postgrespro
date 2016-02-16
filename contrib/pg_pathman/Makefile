@@ -28,7 +28,10 @@ check: EXTRA_REGRESS_OPTS=--temp-config=$(top_srcdir)/$(subdir)/conf.add
 
 ISOLATIONCHECKS=insert_trigger
 
-isolationcheck:
+submake-isolation:
+	$(MAKE) -C $(top_builddir)/src/test/isolation all
+
+isolationcheck: | submake-isolation
 	$(MKDIR_P) isolation_output
 	$(pg_isolation_regress_check) \
 	    --temp-config=$(top_srcdir)/$(subdir)/conf.add \
