@@ -99,16 +99,16 @@ find_or_create_range_partition(PG_FUNCTION_ARGS)
 		TYPECACHE_CMP_PROC | TYPECACHE_CMP_PROC_FINFO);
 
 	prel = get_pathman_relation_info(relid, NULL);
+	rangerel = get_pathman_range_relation(relid, NULL);
+
+	if (!prel || !rangerel || rangerel->ranges.length == 0)
+		PG_RETURN_NULL();
+
 	cmp_proc_oid = get_opfamily_proc(tce->btree_opf,
 									 value_type,
 									 prel->atttype,
 									 BTORDER_PROC);
 	fmgr_info(cmp_proc_oid, &cmp_func);
-
-	rangerel = get_pathman_range_relation(relid, NULL);
-
-	if (!rangerel || rangerel->ranges.length == 0)
-		PG_RETURN_NULL();
 
 	ranges = dsm_array_get_pointer(&rangerel->ranges);
 	pos = range_binary_search(rangerel, &cmp_func, value, &found);

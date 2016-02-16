@@ -140,7 +140,7 @@ attach_range_partition(
     start_value ANYELEMENT,
     end_value ANYELEMENT)
 ```
-Присоединяет существующую таблицу `partition` в качестве секции к ранее секционированной таблице `relation`.
+Присоединяет существующую таблицу `partition` в качестве секции к ранее секционированной таблице `relation`. Структура присоединяемой таблицы должна в точности повторять структуру родительской.
 
 ```
 detach_range_partition(partition TEXT)

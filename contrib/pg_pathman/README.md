@@ -138,7 +138,7 @@ attach_range_partition(
     start_value ANYELEMENT,
     end_value ANYELEMENT)
 ```
-Attaches partition to existing RANGE partitioned relation.
+Attaches partition to existing RANGE partitioned relation. The table being attached must have exact same structure as the parent one.
 
 ```
 detach_range_partition(partition TEXT)
