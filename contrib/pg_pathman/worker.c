@@ -102,8 +102,6 @@ bg_worker_main(Datum main_arg)
 	PartitionArgs *args;
 	dsm_handle		handle = DatumGetInt32(main_arg);
 
-	elog(WARNING, "Worker started. Handle %d", handle);
-
 	/* Create resource owner */
 	CurrentResourceOwner = ResourceOwnerCreate(NULL, "CreatePartitionsWorker");
 

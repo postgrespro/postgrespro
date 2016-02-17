@@ -9,6 +9,7 @@ DATA_built = $(EXTENSION)--$(EXTVERSION).sql
 PGFILEDESC = "pg_pathman - partitioning tool"
 
 REGRESS = pg_pathman
+EXTRA_REGRESS_OPTS=--temp-config=$(top_srcdir)/$(subdir)/conf.add
 EXTRA_CLEAN = $(EXTENSION)--$(EXTVERSION).sql ./isolation_output
 
 ifdef USE_PGXS
@@ -24,7 +25,6 @@ endif
 
 $(EXTENSION)--$(EXTVERSION).sql: init.sql hash.sql range.sql
 	cat $^ > $@
-check: EXTRA_REGRESS_OPTS=--temp-config=$(top_srcdir)/$(subdir)/conf.add
 
 ISOLATIONCHECKS=insert_trigger
 
