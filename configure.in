@@ -17,7 +17,7 @@ dnl Read the Autoconf manual for details.
 dnl
 m4_pattern_forbid(^PGAC_)dnl to catch undefined macros
 
-AC_INIT([PostgresPro], [9.5.0.1], [pgsql-bugs@postgrespro.com])
+AC_INIT([PostgresPro], [9.5.1.1], [pgsql-bugs@postgrespro.com])
 
 m4_if(m4_defn([m4_PACKAGE_VERSION]), [2.69], [], [m4_fatal([Autoconf version 2.69 is required.
 Untested combinations of 'autoconf' and PostgreSQL versions are not
@@ -1056,14 +1056,18 @@ if test "$with_icu" = yes ; then
   AC_SEARCH_LIBS(ucol_open_50, [icui18n icuin], [], [
    AC_SEARCH_LIBS(ucol_open_48, [icui18n icuin], [], [
     AC_SEARCH_LIBS(ucol_open_46, [icui18n icuin], [], [
-      AC_SEARCH_LIBS(ucol_open_44, [icui18n icuin], [], [
-        AC_SEARCH_LIBS(ucol_open_43, [icui18n icuin], [], [
-		AC_SEARCH_LIBS(ucol_open_4_2, [icui18n icuin], [], [
+     AC_SEARCH_LIBS(ucol_open_44, [icui18n icuin], [], [
+      AC_SEARCH_LIBS(ucol_open_43, [icui18n icuin], [], [
+	   AC_SEARCH_LIBS(ucol_open_4_2, [icui18n icuin], [], [
+		AC_SEARCH_LIBS(ucol_open_4_1, [icui18n icuin], [], [
+		 AC_SEARCH_LIBS(ucol_open_4_0, [icui18n icuin], [], [
           AC_SEARCH_LIBS(ucol_open_3_8, [icui18n icuin], [], [
             AC_SEARCH_LIBS(ucol_open_3_6, [icui18n icuin], [], [
               AC_SEARCH_LIBS(ucol_open_3_4, [icui18n icuin], [], [AC_MSG_ERROR([library 'icui18n' is required for ICU])])
             ])
           ])
+        ])
+        ])
         ])
       ])
     ])
@@ -1088,11 +1092,15 @@ if test "$with_icu" = yes ; then
       AC_CHECK_LIB(icuuc, ucnv_fromUChars_44, [], [
         AC_CHECK_LIB(icuuc, ucnv_fromUChars_43, [], [
 		AC_CHECK_LIB(icuuc, ucnv_fromUChars_4_2, [], [
+		AC_CHECK_LIB(icuuc, ucnv_fromUChars_4_1, [], [
+		AC_CHECK_LIB(icuuc, ucnv_fromUChars_4_0, [], [
           AC_CHECK_LIB(icuuc, ucnv_fromUChars_3_8, [], [
             AC_CHECK_LIB(icuuc, ucnv_fromUChars_3_6, [], [
               AC_CHECK_LIB(icuuc, ucnv_fromUChars_3_4, [], [AC_MSG_ERROR([library 'icuuc' is required for ICU])])
             ])
           ])
+        ])
+        ])
         ])
 		])
       ])

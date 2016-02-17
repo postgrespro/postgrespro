@@ -4839,9 +4839,9 @@ DESCR("get record fields from a jsonb object");
 DATA(insert OID = 3475 (  jsonb_populate_recordset	PGNSP PGUID 12 1 100 0 0 f f f f f t s 2 0 2283 "2283 3802" _null_ _null_ _null_ _null_ _null_ jsonb_populate_recordset _null_ _null_ _null_ ));
 DESCR("get set of records with fields from a jsonb array of objects");
 DATA(insert OID = 3490 (  jsonb_to_record			PGNSP PGUID 12 1 0 0 0 f f f f t f s 1 0 2249 "3802" _null_ _null_ _null_ _null_ _null_ jsonb_to_record _null_ _null_ _null_ ));
-DESCR("get record fields from a json object");
+DESCR("get record fields from a jsonb object");
 DATA(insert OID = 3491 (  jsonb_to_recordset		PGNSP PGUID 12 1 100 0 0 f f f f f t s 1 0 2249 "3802" _null_ _null_ _null_ _null_ _null_ jsonb_to_recordset _null_ _null_ _null_ ));
-DESCR("get set of records with fields from a json array of objects");
+DESCR("get set of records with fields from a jsonb array of objects");
 DATA(insert OID = 3210 (  jsonb_typeof				PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 25 "3802" _null_ _null_ _null_ _null_ _null_ jsonb_typeof _null_ _null_ _null_ ));
 DESCR("get the type of a jsonb value");
 DATA(insert OID = 4038 (  jsonb_ne		   PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 16 "3802 3802" _null_ _null_ _null_ _null_ _null_ jsonb_ne _null_ _null_ _null_ ));
@@ -5334,6 +5334,12 @@ DESCR("get an individual replication origin's replication progress");
 DATA(insert OID = 6014 ( pg_show_replication_origin_status PGNSP PGUID 12 1 100 0 0 f f f f f t v 0 0 2249 "" "{26,25,3220,3220}" "{o,o,o,o}" "{local_id, external_id, remote_lsn, local_lsn}" _null_ _null_ pg_show_replication_origin_status _null_ _null_ _null_ ));
 DESCR("get progress for all replication origins");
 
+/* rls */
+DATA(insert OID = 3298 (  row_security_active	   PGNSP PGUID 12 1 0 0 0 f f f f t f s 1 0 16 "26" _null_ _null_ _null_ _null_ _null_	row_security_active _null_ _null_ _null_ ));
+DESCR("row security for current context active on table by table oid");
+DATA(insert OID = 3299 (  row_security_active	   PGNSP PGUID 12 1 0 0 0 f f f f t f s 1 0 16 "25" _null_ _null_ _null_ _null_ _null_	row_security_active_name _null_ _null_ _null_ ));
+DESCR("row security for current context active on table by table name");
+
 /*
  * Symbolic values for provolatile column: these indicate whether the result
  * of a function is dependent *only* on the values of its explicit arguments,
@@ -5345,12 +5351,6 @@ DESCR("get progress for all replication origins");
 #define PROVOLATILE_IMMUTABLE	'i'		/* never changes for given input */
 #define PROVOLATILE_STABLE		's'		/* does not change within a scan */
 #define PROVOLATILE_VOLATILE	'v'		/* can change even within a scan */
-
-/* rls */
-DATA(insert OID = 3298 (  row_security_active	   PGNSP PGUID 12 1 0 0 0 f f f f t f s 1 0 16 "26" _null_ _null_ _null_ _null_ _null_	row_security_active _null_ _null_ _null_ ));
-DESCR("row security for current context active on table by table oid");
-DATA(insert OID = 3299 (  row_security_active	   PGNSP PGUID 12 1 0 0 0 f f f f t f s 1 0 16 "25" _null_ _null_ _null_ _null_ _null_	row_security_active_name _null_ _null_ _null_ ));
-DESCR("row security for current context active on table by table name");
 
 /*
  * Symbolic values for proargmodes column.  Note that these must agree with
