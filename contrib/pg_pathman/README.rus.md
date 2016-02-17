@@ -64,16 +64,16 @@ create_range_partitions(
     attribute TEXT,
     start_value ANYELEMENT,
     interval ANYELEMENT,
-    premake INTEGER)
+    premake INTEGER DEFAULT NULL)
 
 create_range_partitions(
     relation TEXT,
     attribute TEXT,
     start_value ANYELEMENT,
     interval INTERVAL,
-    premake INTEGER)
+    premake INTEGER DEFAULT NULL)
 ```
-Выполняет RANGE-секционирование таблицы `relation` по полю `attribute`. Аргумент `start_value` задает начальное значение, `interval` -- диапазон значений внутри одной секции, `premake` -- количество заранее создаваемых секций. Данные из родительской таблицы будут автоматически скопированы в дочерние.
+Выполняет RANGE-секционирование таблицы `relation` по полю `attribute`. Аргумент `start_value` задает начальное значение, `interval` -- диапазон значений внутри одной секции, `premake` -- количество заранее создаваемых секций (если не задано, то pathman попытается определить количество секций на основе значений аттрибута). Данные из родительской таблицы будут автоматически скопированы в дочерние.
 
 ```
 create_partitions_from_range(
@@ -112,13 +112,41 @@ merge_range_partitions(partition1 TEXT, partition2 TEXT)
 ```
 Объединяет две смежные RANGE секции. Данные из `partition2` копируются в `partition1`, после чего секция `partition2` удаляется.
 ```
-append_partition(p_relation TEXT)
+append_range_partition(p_relation TEXT)
 ```
-Добавляет новую секцию в конец списка секций. Диапазон значений устанавливается равным последней секции.
+Добавляет новую RANGE секцию в конец списка секций.
 ```
-prepend_partition(p_relation TEXT)
+prepend_range_partition(p_relation TEXT)
 ```
-Добавляет новую секцию в начало списка секций.
+Добавляет новую RANGE секцию в начало списка секций.
+
+```
+add_range_partition(
+    relation TEXT,
+    start_value ANYELEMENT,
+    end_value ANYELEMENT)
+```
+Добавляет новую RANGE секцию с заданным диапазоном к секционированной таблице `relation`.
+
+```
+drop_range_partition(partition TEXT)
+```
+Удаляет RANGE секцию вместе с содержащимися в ней данными.
+
+```
+attach_range_partition(
+    relation TEXT,
+    partition TEXT,
+    start_value ANYELEMENT,
+    end_value ANYELEMENT)
+```
+Присоединяет существующую таблицу `partition` в качестве секции к ранее секционированной таблице `relation`. Структура присоединяемой таблицы должна в точности повторять структуру родительской.
+
+```
+detach_range_partition(partition TEXT)
+```
+Отсоединяет секцию `partition`, после чего она становится независимой таблицей.
+
 ```
 disable_partitioning(relation TEXT)
 ```

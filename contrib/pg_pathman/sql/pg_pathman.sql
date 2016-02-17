@@ -119,11 +119,17 @@ EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt BETWEEN '2014-12-15' A
 CREATE TABLE test.range_rel_archive (LIKE test.range_rel INCLUDING ALL);
 SELECT pathman.attach_range_partition('test.range_rel', 'test.range_rel_archive', '2014-01-01'::DATE, '2014-12-01'::DATE);
 EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt BETWEEN '2014-11-15' AND '2015-01-15';
+SELECT pathman.detach_range_partition('test.range_rel_archive');
+EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt BETWEEN '2014-11-15' AND '2015-01-15';
 
 /*
  * Clean up
  */
 SELECT pathman.drop_hash_partitions('test.hash_rel');
+SELECT COUNT(*) FROM ONLY test.hash_rel;
+SELECT pathman.create_hash_partitions('test.hash_rel', 'value', 3);
+SELECT pathman.drop_hash_partitions('test.hash_rel', TRUE);
+SELECT COUNT(*) FROM ONLY test.hash_rel;
 DROP TABLE test.hash_rel CASCADE;
 
 SELECT pathman.drop_range_partitions('test.num_range_rel');

@@ -1,0 +1,84 @@
+Parsed test spec with 2 sessions
+
+starting permutation: s1b s1_insert_150 s1r s1_show_partitions s2b s2_insert_150 s2c s2_show_partitions
+create_range_partitions
+
+1              
+step s1b: BEGIN;
+step s1_insert_150: INSERT INTO range_rel SELECT generate_series(1, 150);
+step s1r: ROLLBACK;
+step s1_show_partitions: SELECT * FROM pg_inherits WHERE inhparent = 'range_rel'::regclass::oid;
+inhrelid       inhparent      inhseqno       
+
+16453          16445          1              
+16462          16445          1              
+step s2b: BEGIN;
+step s2_insert_150: INSERT INTO range_rel SELECT generate_series(1, 150);
+step s2c: COMMIT;
+step s2_show_partitions: SELECT * FROM pg_inherits WHERE inhparent = 'range_rel'::regclass::oid;
+inhrelid       inhparent      inhseqno       
+
+16453          16445          1              
+16462          16445          1              
+
+starting permutation: s1b s1_insert_150 s1r s1_show_partitions s2b s2_insert_300 s2c s2_show_partitions
+create_range_partitions
+
+1              
+step s1b: BEGIN;
+step s1_insert_150: INSERT INTO range_rel SELECT generate_series(1, 150);
+step s1r: ROLLBACK;
+step s1_show_partitions: SELECT * FROM pg_inherits WHERE inhparent = 'range_rel'::regclass::oid;
+inhrelid       inhparent      inhseqno       
+
+16537          16529          1              
+16545          16529          1              
+step s2b: BEGIN;
+step s2_insert_300: INSERT INTO range_rel SELECT generate_series(151, 300);
+step s2c: COMMIT;
+step s2_show_partitions: SELECT * FROM pg_inherits WHERE inhparent = 'range_rel'::regclass::oid;
+inhrelid       inhparent      inhseqno       
+
+16537          16529          1              
+16545          16529          1              
+16552          16529          1              
+
+starting permutation: s1b s1_insert_300 s1r s1_show_partitions s2b s2_insert_150 s2c s2_show_partitions
+create_range_partitions
+
+1              
+step s1b: BEGIN;
+step s1_insert_300: INSERT INTO range_rel SELECT generate_series(151, 300);
+step s1r: ROLLBACK;
+step s1_show_partitions: SELECT * FROM pg_inherits WHERE inhparent = 'range_rel'::regclass::oid;
+inhrelid       inhparent      inhseqno       
+
+16627          16619          1              
+16635          16619          1              
+16642          16619          1              
+step s2b: BEGIN;
+step s2_insert_150: INSERT INTO range_rel SELECT generate_series(1, 150);
+step s2c: COMMIT;
+step s2_show_partitions: SELECT * FROM pg_inherits WHERE inhparent = 'range_rel'::regclass::oid;
+inhrelid       inhparent      inhseqno       
+
+16627          16619          1              
+16635          16619          1              
+16642          16619          1              
+
+starting permutation: s1b s1_insert_150 s2b s2_insert_300 s1r s2r s2_show_partitions
+create_range_partitions
+
+1              
+step s1b: BEGIN;
+step s1_insert_150: INSERT INTO range_rel SELECT generate_series(1, 150);
+step s2b: BEGIN;
+step s2_insert_300: INSERT INTO range_rel SELECT generate_series(151, 300);
+step s1r: ROLLBACK;
+step s2r: ROLLBACK;
+step s2_show_partitions: SELECT * FROM pg_inherits WHERE inhparent = 'range_rel'::regclass::oid;
+inhrelid       inhparent      inhseqno       
+
+16717          16709          1              
+16725          16709          1              
+16732          16709          1              

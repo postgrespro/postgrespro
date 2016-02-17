@@ -923,13 +923,32 @@ LANGUAGE plpgsql;
 /*
  * Detach range partition
  */
-CREATE OR REPLACE FUNCTION @extschema@.attach_range_partition(
+CREATE OR REPLACE FUNCTION @extschema@.detach_range_partition(
     p_partition TEXT)
 RETURNS TEXT AS
 $$
+DECLARE
+    v_parent TEXT;
 BEGIN
     /* Prevent concurrent partition management */
     PERFORM @extschema@.acquire_partitions_lock();
+
+    /* Parent table */
+    SELECT inhparent::regclass INTO v_parent
+    FROM pg_inherits WHERE inhrelid = p_partition::regclass::oid;
+
+    /* Remove inheritance */
+    EXECUTE format('ALTER TABLE %s NO INHERIT %s'
+                   , p_partition
+                   , v_parent);
+
+    /* Remove check constraint */
+    EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %s_check'
+                   , p_partition
+                   , @extschema@.get_schema_qualified_name(p_partition::regclass));
+
+    /* Invalidate cache */
+    PERFORM @extschema@.on_update_partitions(v_parent::regclass::oid);
 
     /* Release lock */
     PERFORM @extschema@.release_partitions_lock();
@@ -1063,13 +1082,12 @@ $$ LANGUAGE plpgsql;
  * If delete_data set to TRUE then partitions will be dropped with all the data
  */
 CREATE OR REPLACE FUNCTION @extschema@.drop_range_partitions(
-    relation TEXT,
-    delete_data BOOLEAN DEFAULT FALSE)
+    relation TEXT
+    , delete_data BOOLEAN DEFAULT FALSE)
 RETURNS INTEGER AS
 $$
 DECLARE
     v_rec   RECORD;
-    -- v_total_rows INTEGER;
     v_rows INTEGER;
     v_part_count INTEGER := 0;
 BEGIN
