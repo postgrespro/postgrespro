@@ -126,6 +126,10 @@ EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt BETWEEN '2014-11-15' A
  * Clean up
  */
 SELECT pathman.drop_hash_partitions('test.hash_rel');
+SELECT COUNT(*) FROM ONLY test.hash_rel;
+SELECT pathman.create_hash_partitions('test.hash_rel', 'value', 3);
+SELECT pathman.drop_hash_partitions('test.hash_rel', TRUE);
+SELECT COUNT(*) FROM ONLY test.hash_rel;
 DROP TABLE test.hash_rel CASCADE;
 
 SELECT pathman.drop_range_partitions('test.num_range_rel');

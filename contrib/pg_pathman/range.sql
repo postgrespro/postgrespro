@@ -949,7 +949,7 @@ BEGIN
 
     /* Invalidate cache */
     PERFORM @extschema@.on_update_partitions(v_parent::regclass::oid);
-    
+
     /* Release lock */
     PERFORM @extschema@.release_partitions_lock();
     RETURN p_partition;
@@ -1082,13 +1082,12 @@ $$ LANGUAGE plpgsql;
  * If delete_data set to TRUE then partitions will be dropped with all the data
  */
 CREATE OR REPLACE FUNCTION @extschema@.drop_range_partitions(
-    relation TEXT,
-    delete_data BOOLEAN DEFAULT FALSE)
+    relation TEXT
+    , delete_data BOOLEAN DEFAULT FALSE)
 RETURNS INTEGER AS
 $$
 DECLARE
     v_rec   RECORD;
-    -- v_total_rows INTEGER;
     v_rows INTEGER;
     v_part_count INTEGER := 0;
 BEGIN
