@@ -6,8 +6,8 @@
 
   <note>
    <title>Release Date</title>
-   <simpara>2016-??-??</simpara>
-   <simpara>Current as of 2015-12-30</simpara>
+   <simpara>2016-02-01</simpara>
+   <simpara>Current as of 2016-01-28</simpara>
   </note>
 
   <sect2>
@@ -27,11 +27,43 @@
      </para>
     </listitem>
     <listitem>
-     <para>
-       Contrib module pg_trgm supports substring searches (Arthur Zakirov).
-     </para>
+    <para>
+    Covering indexes.
+    </para>
     </listitem>
-
+    <listitem>
+    <para>
+    Use portable implementation of the internationalization functions
+    (libicu) instead of system specific.
+    </para>
+    </listitem>
+    <listitem>
+    <para>
+    Speedup of two-phase commit
+    </para>
+    </listitem>
+    <listitem>
+     <para>
+       Contrib module pg_trgm supports substring searches.
+     </para>
+     </listitem>
+     <listitem>
+     <para>
+        Save-restore execution plan extension.
+     </para>
+     </listitem>
+     <listitem>
+     <para>
+     Dump/restore database statistics.
+     </para>
+     </listitem>
+    <listitem>
+    <para>Some hunspell dictionaries for full-text search are bundled
+    with distribution</para>
+    </listitem>
+    <listitem>
+    <para>Phrase search support in full text search</para>
+    </listitem>
 
    </itemizedlist>
 
@@ -43,23 +75,16 @@
 
   <sect2>
 
-  <title>Migration to Version 9.5</title>
-
+  <title>Migration to PostgresPro 9.5</title>
    <para>
     A dump/restore using <xref linkend="app-pg-dumpall">, or use
     of <xref linkend="pgupgrade">, is required for those wishing to migrate
     data from any previous release.
    </para>
-
-
-   <itemizedlist>
-    <listitem>
     <para>
-    <!-- to be filled in -->
+    Dump/restore is not neccessary when migrating from PostgreSQL 9.5 to
+    PostgresPro 9.5.
     </para>
-    </listitem>
-   </itemizedlist>
-
   </sect2>
 
   <sect2>
@@ -81,7 +106,10 @@
 
       <listitem>
        <para>
-       <!-- to be filled -->
+       Covering indexes. Now CREATE INDEX supports optional INCLUDING
+       clause, which allows to include additional columns, which would
+       not affect sort order or uniqueness, but allow speed up some
+       queries using index only scans.
        </para>
 
       </listitem>
@@ -125,35 +153,91 @@ commit [90e649a7afac8c76]   Thu Dec 31 09:52:30 2015 +0300
     when modifying state, shared between processes.
     </para>
     </listitem>
+    <listitem>
+    <para>
+    Improve buffer manager concurrency for multicore architectures.
+    </para>
+    </listitem>
+    <listitem>
+    <para>
+    Improve LWLock concurrency for Power8 architecture.
+    </para>
+    </listitem>
+       
      </itemizedlist>
+    </listitem>
+    <listitem>
+    <!-- Commit  b1a1741f3a7eecae by Stas Kelvich -->
+    <para>
+     Speedup two phase commit by skipping two phase state files in normal path
+      2PC state info is written only to WAL at PREPARE, then read back
+      from WAL at
+      COMMIT PREPARED/ABORT PREPARED. Prepared transactions that live
+      past one bufmgr
+      checkpoint cycle will be written to disk in the same form as
+      previously. Crash
+      recovery path is not altered. Measured performance gains of
+      50-100% for short
+      2PC transactions by completely avoiding writing files and
+      fsyncing. Other
+      optimizations still available, further patches in related areas
+      expected.
+     </para>
+     <para>
+      Stas Kelvich and heavily edited by Simon Riggs.
+     </para>
+     <para>
+      Based upon earlier ideas and patches by Michael Paquier and
+      Heikki Linnakangas,
+      a concrete example of how Postgres-XC has fed back ideas into
+      PostgreSQL.
+     </para>
+     <para>
+      Reviewed by Michael Paquier, Jeff Janes and Andres Freund
+      Performance testing by Jesper Pedersen
+    </para>
     </listitem>
      </itemizedlist>
 
     </sect4>
 
 
+   <sect4>
+    <title>Full text search</title>
+    <itemizedlist>
+    <listitem>
+    <para>
+    Phrase search - it is now possible to specify order of words in the
+    text search query.
+    </para>
+    </listitem>
+    <listitem>
+    <para>
+    Improved hunspell dictionaries support.  Now it is possible to hunspell
+    dictionaries with complex affix files, which were not supported in
+    earlier versions. 
+    </para>
+    <para>
+    Some hunspell dictionaries are included in the distribution. See
+    <xref linkend="relnotes-contrib-modules"> below.
+    </para>
+    </listitem>
+    </itemizedlist>
+    </sect4>
    </sect3>
-
-   <sect3>
-    <title>Replication and Recovery</title>
-
-     <itemizedlist>
-
-      <listitem>
-
-<!-- Put commit message here -->      
-       <para>
-       <!-- to be filled -->
-       </para>
-
-      </listitem>
-     </itemizedlist>
-
-   </sect3>
-
-
-
-   <sect3>
+    <sect3><title>Portability improvements</title>
+    <itemizedlist>
+    <listitem><para>
+    Use libicu instead of system specific locale handling functions.
+    This ensures same collating order on all platforms 
+    Based on patch by Palle Girgensohn
+    <ulink url="http://people.freebsd.org/~girgen/postgresql-icu/README.html"></ulink>,
+    ported to 9.5 and abbreviated sort key support added by Teodor
+    Sigaev.</para>
+    </listitem>
+    </itemizedlist>
+    </sect3>
+   <sect3 id="relnotes-contrib-modules">
     <title>Additional Modules</title>
 
     <itemizedlist>
@@ -178,6 +262,27 @@ Date:   Wed Dec 30 16:00:20 2015 +0300
         <!-- [04f01383f104] Arthur Zakirov Add substring_simularity functin -->
         pg_trgm contrib module, which allows to do fuzzy string
         comparations, now supports substring searches.
+     </para>
+     <para>
+       <!-- [ba84d7b467fb5] Zhuravlev Uriy add sr_plan module -->
+     sr_plan contrib module, which allows to save execution plan and
+     force use of saved, known-good plan instead of computing new one
+     each time.
+     </para>
+     </listitem>
+     <listitem>
+     <para>
+     <!-- [ea7ed4de1e8891f0] Merge dump_stat module by Dmitry Ivanov -->
+     dump_stat contrib module. This module allows to dump table
+     statistics and restore it, thus eliminate need to run VACUUM
+     ANALYZE after restoration of base or server upgrade
+     </para>
+     </listitem>
+     <listitem>
+     <para>
+     Several hunspell dictionaries for full-text search are now included
+     as contrib modules and can be easily installed into the database
+     using CREATE EXTENSION command.
      </para>
      </listitem>
     </itemizedlist>

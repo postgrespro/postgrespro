@@ -16,10 +16,15 @@ SUBDIRS = \
 		dblink		\
 		dict_int	\
 		dict_xsyn	\
+		dump_stat   \
 		earthdistance	\
 		file_fdw	\
 		fuzzystrmatch	\
 		hstore		\
+		hunspell_en_us \
+		hunspell_fr \
+		hunspell_nl_nl \
+		hunspell_ru_ru \
 		intagg		\
 		intarray	\
 		isn		\
@@ -28,7 +33,6 @@ SUBDIRS = \
 		oid2name	\
 		pageinspect	\
 		passwordcheck	\
-		pg_pathman	\
 		pg_buffercache	\
 		pg_freespacemap \
 		pg_prewarm	\
@@ -41,6 +45,7 @@ SUBDIRS = \
 		postgres_fdw	\
 		seg		\
 		spi		\
+		sr_plan \
 		tablefunc	\
 		tcn		\
 		test_decoding	\

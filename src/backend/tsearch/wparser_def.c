@@ -2027,15 +2027,36 @@ typedef struct
 } hlCheck;
 
 static bool
-checkcondition_HL(void *checkval, QueryOperand *val)
+checkcondition_HL(void *opaque, QueryOperand *val, ExecPhraseData *data)
 {
 	int			i;
+	hlCheck	   *checkval = (hlCheck *) opaque;
 
-	for (i = 0; i < ((hlCheck *) checkval)->len; i++)
+	for (i = 0; i < checkval->len; i++)
 	{
-		if (((hlCheck *) checkval)->words[i].item == val)
-			return true;
+		if (checkval->words[i].item == val)
+		{
+			/* don't need to find all positions */
+			if (!data)
+				return true;
+
+			if (!data->pos)
+			{
+				data->pos = palloc(sizeof(WordEntryPos) * checkval->len);
+				data->allocated = true;
+				data->npos = 1;
+				data->pos[0] = checkval->words[i].pos;
+			}
+			else if (data->pos[data->npos-1] < checkval->words[i].pos)
+			{
+				data->pos[data->npos++] = checkval->words[i].pos;
+			}
+		}
 	}
+
+	if (data && data->npos > 0)
+		return true;
+
 	return false;
 }
 

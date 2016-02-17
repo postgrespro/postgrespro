@@ -20,9 +20,25 @@
 #include "storage/lwlock.h"
 #include "storage/shmem.h"
 #include "storage/smgr.h"
+#include "port/atomics.h"
 #include "storage/spin.h"
 #include "utils/relcache.h"
 
+
+/*
+ * State is:
+ * 10 bit flags
+ * 4 bit usage count
+ * 18 bit refcount
+ */
+#define BUF_REFCOUNT_ONE 1
+#define BUF_REFCOUNT_MASK ((1U << 18) - 1)
+#define BUF_STATE_GET_REFCOUNT(state) ((state) & BUF_REFCOUNT_MASK)
+#define BUF_USAGECOUNT_MASK 0x003C0000U
+#define BUF_USAGECOUNT_ONE (1U << 18)
+#define BUF_USAGECOUNT_SHIFT 18
+#define BUF_STATE_GET_USAGECOUNT(state) (((state) & BUF_USAGECOUNT_MASK) >> BUF_USAGECOUNT_SHIFT)
+#define BUF_FLAG_MASK 0xFFC00000U
 
 /*
  * Flags for buffer descriptors
@@ -30,19 +46,17 @@
  * Note: TAG_VALID essentially means that there is a buffer hashtable
  * entry associated with the buffer's tag.
  */
-#define BM_DIRTY				(1 << 0)		/* data needs writing */
-#define BM_VALID				(1 << 1)		/* data is valid */
-#define BM_TAG_VALID			(1 << 2)		/* tag is assigned */
-#define BM_IO_IN_PROGRESS		(1 << 3)		/* read or write in progress */
-#define BM_IO_ERROR				(1 << 4)		/* previous I/O failed */
-#define BM_JUST_DIRTIED			(1 << 5)		/* dirtied since write started */
-#define BM_PIN_COUNT_WAITER		(1 << 6)		/* have waiter for sole pin */
-#define BM_CHECKPOINT_NEEDED	(1 << 7)		/* must write for checkpoint */
-#define BM_PERMANENT			(1 << 8)		/* permanent relation (not
+#define BM_LOCKED				(1U << 22)		/* buffer header is locked */
+#define BM_DIRTY				(1U << 23)		/* data needs writing */
+#define BM_VALID				(1U << 24)		/* data is valid */
+#define BM_TAG_VALID			(1U << 25)		/* tag is assigned */
+#define BM_IO_IN_PROGRESS		(1U << 26)		/* read or write in progress */
+#define BM_IO_ERROR				(1U << 27)		/* previous I/O failed */
+#define BM_JUST_DIRTIED			(1U << 28)		/* dirtied since write started */
+#define BM_PIN_COUNT_WAITER		(1U << 29)		/* have waiter for sole pin */
+#define BM_CHECKPOINT_NEEDED	(1U << 30)		/* must write for checkpoint */
+#define BM_PERMANENT			(1U << 31)		/* permanent relation (not
 												 * unlogged) */
-
-typedef bits16 BufFlags;
-
 /*
  * The maximum allowed value of usage_count represents a tradeoff between
  * accuracy and speed of the clock-sweep buffer management algorithm.  A
@@ -137,12 +151,12 @@ typedef struct buftag
 typedef struct BufferDesc
 {
 	BufferTag	tag;			/* ID of page contained in buffer */
-	BufFlags	flags;			/* see bit definitions above */
-	uint16		usage_count;	/* usage counter for clock sweep code */
-	unsigned	refcount;		/* # of backends holding pins on buffer */
-	int			wait_backend_pid;		/* backend PID of pin-count waiter */
 
-	slock_t		buf_hdr_lock;	/* protects the above fields */
+	/* state of the tag, containing flags, refcount and usagecount */
+	pg_atomic_uint32 state;
+
+
+	int			wait_backend_pid;		/* backend PID of pin-count waiter */
 
 	int			buf_id;			/* buffer's index number (from 0) */
 	int			freeNext;		/* link in freelist chain */
@@ -192,16 +206,11 @@ typedef union BufferDescPadded
 #define FREENEXT_NOT_IN_LIST	(-2)
 
 /*
- * Macros for acquiring/releasing a shared buffer header's spinlock.
- * Do not apply these to local buffers!
- *
- * Note: as a general coding rule, if you are using these then you probably
- * need to be using a volatile-qualified pointer to the buffer header, to
- * ensure that the compiler doesn't rearrange accesses to the header to
- * occur before or after the spinlock is acquired/released.
+ * Functions for acquiring/releasing a shared buffer header's spinlock.  Do
+ * not apply these to local buffers! FIXUP!
  */
-#define LockBufHdr(bufHdr)		SpinLockAcquire(&(bufHdr)->buf_hdr_lock)
-#define UnlockBufHdr(bufHdr)	SpinLockRelease(&(bufHdr)->buf_hdr_lock)
+extern uint32 LockBufHdr(volatile BufferDesc *desc);
+extern void UnlockBufHdr(volatile BufferDesc *desc);
 
 
 /* in buf_init.c */
@@ -216,7 +225,8 @@ extern BufferDesc *LocalBufferDescriptors;
  */
 
 /* freelist.c */
-extern volatile BufferDesc *StrategyGetBuffer(BufferAccessStrategy strategy);
+extern BufferDesc *StrategyGetBuffer(BufferAccessStrategy strategy,
+											  uint32 *state);
 extern void StrategyFreeBuffer(volatile BufferDesc *buf);
 extern bool StrategyRejectBuffer(BufferAccessStrategy strategy,
 					 volatile BufferDesc *buf);
