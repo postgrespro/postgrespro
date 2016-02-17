@@ -3,8 +3,54 @@
  * spell.c
  *		Normalizing word with ISpell
  *
- * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
  *
+ * Ispell dictionary
+ * --------------------------------
+ *
+ * Rules of dictionaries are defined in two files with .affix and .dict
+ * extensions. They are used by spell checker programs Ispell and Hunspell.
+ *
+ * An .affix file declares morphological rules to get a basic form of words.
+ * The format of an .affix file has different structure for Ispell and Hunspell
+ * dictionaries. The Hunspell format is more complicated. But when an .affix
+ * file is imported and compiled, it is stored in the same structure AffixNode.
+ *
+ * A .dict file stores a list of basic forms of words with references to
+ * affix rules. The format of a .dict file has the same structure for Ispell
+ * and Hunspell dictionaries.
+ *
+ * Compilation of a dictionary
+ * ---------------------------
+ *
+ * A compiled dictionary is stored in the IspellDict structure. Compilation of
+ * a dictionary is divided into the several steps:
+ *  - NIImportDictionary() - stores each word of a .dict file in the
+ *    temporary Spell field.
+ *  - NIImportAffixes() - stores affix rules of an .affix file in the
+ *    Affix field (not temporary) if an .affix file has the Ispell format.
+ *    -> NIImportOOAffixes() - stores affix rules if an .affix file has the
+ *       Hunspell format. The AffixData field is initialized if AF parameter
+ *       is defined.
+ *  - NISortDictionary() - builds a prefix tree (Trie) from the words list
+ *    and stores it in the Dictionary field. The words list is got from the
+ *    Spell field. The AffixData field is initialized if AF parameter is not defined.
+ *  - NISortAffixes():
+ *    - builds a list of compond affixes from the affix list and stores it
+ *      in the CompoundAffix.
+ *    - builds prefix trees (Trie) from the affix list for prefixes and suffixes
+ *      and stores them in Suffix and Prefix fields.
+ *    The affix list is got from the Affix field.
+ *
+ * Memory management
+ * -----------------
+ *
+ * The IspellDict structure has the Spell field which is used only in compile
+ * time. The Spell field stores a words list. It can take a lot of memory.
+ * Therefore when a dictionary is compiled this field is cleared by NIFinishBuild().
+ *
+ * All resources which should cleared by NIFinishBuild() is initialized using
+ * tmpalloc() and tmpalloc0().
  *
  * IDENTIFICATION
  *	  src/backend/tsearch/spell.c
@@ -153,7 +199,7 @@ cmpspell(const void *s1, const void *s2)
 static int
 cmpspellaffix(const void *s1, const void *s2)
 {
-	return (strncmp((*(SPELL *const *) s1)->flag, (*(SPELL *const *) s2)->flag, MAXFLAGLEN));
+	return (strcmp((*(SPELL *const *) s1)->p.flag, (*(SPELL *const *) s2)->p.flag));
 }
 
 static char *
@@ -220,6 +266,11 @@ strbncmp(const unsigned char *s1, const unsigned char *s2, size_t count)
 	return 0;
 }
 
+/*
+ * Compares affixes.
+ * First compares the type of an affix. Prefixes should go before affixes.
+ * If types are equal then compares replaceable string.
+ */
 static int
 cmpaffix(const void *s1, const void *s2)
 {
@@ -237,8 +288,30 @@ cmpaffix(const void *s1, const void *s2)
 					   (const unsigned char *) a2->repl);
 }
 
+/*
+ * Gets an affix flag from string representation (a set of affixes).
+ *
+ * Several flags can be stored in a single string. Flags can be represented by:
+ * - 1 character (FM_CHAR).
+ * - 2 characters (FM_LONG).
+ * - numbers from 1 to 65000 (FM_NUM).
+ *
+ * Depending on the flagMode an affix string can have the following format:
+ * - FM_CHAR: ABCD
+ *   Here we have 4 flags: A, B, C and D
+ * - FM_LONG: ABCDE*
+ *   Here we have 3 flags: AB, CD and E*
+ * - FM_NUM: 200,205,50
+ *   Here we have 3 flags: 200, 205 and 50
+ *
+ * Conf: current dictionary.
+ * sflag: string representation (a set of affixes) of an affix flag.
+ * sflagnext: returns reference to the start of a next affix flag in the sflag.
+ *
+ * Returns an integer representation of the affix flag.
+ */
 static unsigned short
-decodeFlag(IspellDict *Conf, char *sflag, char **sflagnext)
+DecodeFlag(IspellDict *Conf, char *sflag, char **sflagnext)
 {
 	unsigned short	s;
 	char		   *next;
@@ -246,14 +319,26 @@ decodeFlag(IspellDict *Conf, char *sflag, char **sflagnext)
 	switch (Conf->flagMode)
 	{
 		case FM_LONG:
+			if ((int)sflag[0] > FLAGCHAR_MAXSIZE || (int)sflag[1] > FLAGCHAR_MAXSIZE)
+				ereport(ERROR,
+						(errcode(ERRCODE_CONFIG_FILE_ERROR),
+						 errmsg("invalid affix flag \"%s\"", sflag)));
+
 			s = (int)sflag[0] << 8 | (int)sflag[1];
 			if (sflagnext)
-				*sflagnext = sflag + 2;
+				/* Go to start of the next flag */
+				*sflagnext = sflag + pg_mblen(sflag) * 2;
 			break;
 		case FM_NUM:
 			s = (unsigned short) strtol(sflag, &next, 10);
+			if (s > FLAGNUM_MAXSIZE)
+				ereport(ERROR,
+						(errcode(ERRCODE_CONFIG_FILE_ERROR),
+						 errmsg("invalid affix flag \"%s\"", sflag)));
+
 			if (sflagnext)
 			{
+				/* Go to start of the next flag */
 				if (next)
 				{
 					*sflagnext = next;
@@ -261,10 +346,11 @@ decodeFlag(IspellDict *Conf, char *sflag, char **sflagnext)
 					{
 						if (**sflagnext == ',')
 						{
-							*sflagnext = *sflagnext + 1;
+							/* Found start of the next flag */
+							*sflagnext += pg_mblen(*sflagnext);
 							break;
 						}
-						*sflagnext = *sflagnext + 1;
+						*sflagnext += pg_mblen(*sflagnext);
 					}
 				}
 				else
@@ -273,15 +359,34 @@ decodeFlag(IspellDict *Conf, char *sflag, char **sflagnext)
 			break;
 		default:
 			s = (unsigned short) *((unsigned char *)sflag);
+			if (s > FLAGCHAR_MAXSIZE)
+				ereport(ERROR,
+						(errcode(ERRCODE_CONFIG_FILE_ERROR),
+						 errmsg("invalid affix flag \"%s\"", sflag)));
+
 			if (sflagnext)
-				*sflagnext = sflag + 1;
+				/* Go to start of the next flag */
+				*sflagnext = sflag + pg_mblen(sflag);
 	}
 
 	return s;
 }
 
+/*
+ * Checks if the affix set Conf->AffixData[affix] contains affixflag.
+ * Conf->AffixData[affix] is the string representation of an affix flags.
+ * Conf->AffixData[affix] does not contain affixflag if this flag is not used
+ * actually by the .dict file.
+ *
+ * Conf: current dictionary.
+ * affix: index of the Conf->AffixData array.
+ * affixflag: integer representation of the affix flag.
+ *
+ * Returns true if the string Conf->AffixData[affix] contains affixflag,
+ * otherwise returns false.
+ */
 static bool
-isAffixFlagInUse(IspellDict *Conf, int affix, unsigned short affixflag)
+IsAffixFlagInUse(IspellDict *Conf, int affix, unsigned short affixflag)
 {
 	char *flagcur;
 	char *flagnext = 0;
@@ -293,17 +398,29 @@ isAffixFlagInUse(IspellDict *Conf, int affix, unsigned short affixflag)
 
 	while (*flagcur)
 	{
-		if (decodeFlag(Conf, flagcur, &flagnext) == affixflag)
+		/* Compare first affix flag in flagcur with affixflag */
+		if (DecodeFlag(Conf, flagcur, &flagnext) == affixflag)
 			return true;
+		/* Otherwise go to next flag */
 		if (flagnext)
 			flagcur = flagnext;
+		/* If we have not flags anymore then exit */
 		else
 			break;
 	}
 
+	/* Could not find affixflag */
 	return false;
 }
 
+/*
+ * Adds the new word into the temporary array Spell.
+ *
+ * Conf: current dictionary.
+ * word: new word.
+ * flag: set of affix flags. Integer representation of flag can be got by
+ *       DecodeFlag().
+ */
 static void
 NIAddSpell(IspellDict *Conf, const char *word, const char *flag)
 {
@@ -322,14 +439,17 @@ NIAddSpell(IspellDict *Conf, const char *word, const char *flag)
 	}
 	Conf->Spell[Conf->nspell] = (SPELL *) tmpalloc(SPELLHDRSZ + strlen(word) + 1);
 	strcpy(Conf->Spell[Conf->nspell]->word, word);
-	Conf->Spell[Conf->nspell]->flag = (*flag != '\0') ? cpstrdup(Conf, flag) : VoidString;
+	Conf->Spell[Conf->nspell]->p.flag = (*flag != '\0') ? cpstrdup(Conf, flag) : VoidString;
 	Conf->nspell++;
 }
 
 /*
- * import dictionary
+ * Imports dictionary into the temporary array Spell.
  *
- * Note caller must already have applied get_tsearch_config_filename
+ * Note caller must already have applied get_tsearch_config_filename.
+ *
+ * Conf: current dictionary.
+ * filename: path to the .dict file.
  */
 void
 NIImportDictionary(IspellDict *Conf, const char *filename)
@@ -347,6 +467,7 @@ NIImportDictionary(IspellDict *Conf, const char *filename)
 	{
 		char	   *s,
 				   *pstr;
+		/* Set of affix flags */
 		const char *flag;
 
 		/* Extract flag from the line */
@@ -391,7 +512,30 @@ NIImportDictionary(IspellDict *Conf, const char *filename)
 	tsearch_readline_end(&trst);
 }
 
-
+/*
+ * Searches a basic form of word in the prefix tree. This word was generated
+ * using an affix rule. This rule may not be presented in an affix set of
+ * a basic form of word.
+ *
+ * For example, we have the entry in the .dict file:
+ * meter/GMD
+ *
+ * The affix rule with the flag S:
+ * SFX S   y     ies        [^aeiou]y
+ * is not presented here.
+ *
+ * The affix rule with the flag M:
+ * SFX M   0     's         .
+ * is presented here.
+ *
+ * Conf: current dictionary.
+ * word: basic form of word.
+ * affixflag: integer representation of the affix flag, by which a basic form of
+ *            word was generated.
+ * flag: compound flag used to compare with StopMiddle->compoundflag.
+ *
+ * Returns 1 if the word was found in the prefix tree, else returns 0.
+ */
 static int
 FindWord(IspellDict *Conf, const char *word, int affixflag, int flag)
 {
@@ -416,13 +560,22 @@ FindWord(IspellDict *Conf, const char *word, int affixflag, int flag)
 				{
 					if (flag == 0)
 					{
+						/*
+						 * The word can be formed only with another word.
+						 * And in the flag parameter there is not a sign
+						 * that we search compound words.
+						 */
 						if (StopMiddle->compoundflag & FF_COMPOUNDONLY)
 							return 0;
 					}
 					else if ((flag & StopMiddle->compoundflag) == 0)
 						return 0;
 
-					if (isAffixFlagInUse(Conf, StopMiddle->affix, affixflag))
+					/*
+					 * Check if this affix rule is presented in the affix set
+					 * with index StopMiddle->affix.
+					 */
+					if (IsAffixFlagInUse(Conf, StopMiddle->affix, affixflag))
 						return 1;
 				}
 				node = StopMiddle->node;
@@ -440,6 +593,24 @@ FindWord(IspellDict *Conf, const char *word, int affixflag, int flag)
 	return 0;
 }
 
+/*
+ * Adds a new affix rule to the Affix field.
+ *
+ * Conf: current dictionary.
+ * flag: integer representation of the affix flag ('\' in the below example).
+ * flagflags: set of flags from the flagval field for this affix rule. This set
+ *            is listed after '/' character in the added string (repl).
+ *
+ *            For example L flag in the hunspell_sample.affix:
+ *            SFX \   0	Y/L	[^Y]
+ *
+ * mask: condition for search ('[^Y]' in the above example).
+ * find: stripping characters from beginning (at prefix) or end (at suffix)
+ *       of the word ('0' in the above example, 0 means that there is not
+ *       stripping character).
+ * repl: adding string after stripping ('Y' in the above example).
+ * type: FF_SUFFIX or FF_PREFIX.
+ */
 static void
 NIAddAffix(IspellDict *Conf, int flag, char flagflags, const char *mask, const char *find, const char *repl, int type)
 {
@@ -461,18 +632,21 @@ NIAddAffix(IspellDict *Conf, int flag, char flagflags, const char *mask, const c
 
 	Affix = Conf->Affix + Conf->naffixes;
 
+	/* This affix rule can be applied for words with any ending */
 	if (strcmp(mask, ".") == 0 || *mask == '\0')
 	{
 		Affix->issimple = 1;
 		Affix->isregis = 0;
 	}
+	/* This affix rule will use regis to search word ending */
 	else if (RS_isRegis(mask))
 	{
 		Affix->issimple = 0;
 		Affix->isregis = 1;
-		RS_compile(&(Affix->reg.regis), (type == FF_SUFFIX) ? true : false,
+		RS_compile(&(Affix->reg.regis), (type == FF_SUFFIX),
 				   *mask ? mask : VoidString);
 	}
+	/* This affix rule will use regex_t to search word ending */
 	else
 	{
 		int			masklen;
@@ -496,9 +670,15 @@ NIAddAffix(IspellDict *Conf, int flag, char flagflags, const char *mask, const c
 		err = pg_regcomp(&(Affix->reg.regex), wmask, wmasklen,
 						 REG_ADVANCED | REG_NOSUB,
 						 DEFAULT_COLLATION_OID);
-		/* Ignore regular expression error and do not add wrong affix */
 		if (err)
-			return;
+		{
+			char		errstr[100];
+
+			pg_regerror(err, &(Affix->reg.regex), errstr, sizeof(errstr));
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_REGULAR_EXPRESSION),
+					 errmsg("invalid regular expression: %s", errstr)));
+		}
 	}
 
 	Affix->flagflags = flagflags;
@@ -517,7 +697,6 @@ NIAddAffix(IspellDict *Conf, int flag, char flagflags, const char *mask, const c
 		Affix->repl = VoidString;
 	Conf->naffixes++;
 }
-
 
 /* Parsing states for parse_affentry() and friends */
 #define PAE_WAIT_MASK	0
@@ -773,9 +952,16 @@ parse_affentry(char *str, char *mask, char *find, char *repl)
 
 	*pmask = *pfind = *prepl = '\0';
 
-	return (*mask && (*find || *repl)) ? true : false;
+	return (*mask && (*find || *repl));
 }
 
+/*
+ * Sets up a correspondence for the affix parameter with the affix flag.
+ *
+ * Conf: current dictionary.
+ * s: affix flag in string.
+ * val: affix parameter.
+ */
 static void
 addFlagValue(IspellDict *Conf, char *s, uint32 val)
 {
@@ -792,10 +978,14 @@ addFlagValue(IspellDict *Conf, char *s, uint32 val)
 				(errcode(ERRCODE_CONFIG_FILE_ERROR),
 				 errmsg("multibyte flag character is not allowed")));
 
-	Conf->flagval[decodeFlag(Conf, s, (char **)NULL)] = (unsigned char) val;
+	Conf->flagval[DecodeFlag(Conf, s, (char **)NULL)] = (unsigned char) val;
 	Conf->usecompound = true;
 }
 
+/*
+ * Returns a set of affix parameters which correspondence to the set of affix
+ * flags s.
+ */
 static int
 getFlagValues(IspellDict *Conf, char *s)
 {
@@ -806,7 +996,7 @@ getFlagValues(IspellDict *Conf, char *s)
 	flagcur = s;
 	while (*flagcur)
 	{
-		flag |= Conf->flagval[decodeFlag(Conf, flagcur, &flagnext)];
+		flag |= Conf->flagval[DecodeFlag(Conf, flagcur, &flagnext)];
 		if (flagnext)
 			flagcur = flagnext;
 		else
@@ -817,12 +1007,11 @@ getFlagValues(IspellDict *Conf, char *s)
 }
 
 /*
- * Get flag set from "s".
+ * Returns a flag set using the s parameter.
  *
- * Returns flag set from AffixData array if AF parameter used (useFlagAliases is true).
- * In this case "s" is alias for flag set.
- *
- * Otherwise returns "s".
+ * If Conf->useFlagAliases is true then the s parameter is index of the
+ * Conf->AffixData array and function returns its entry.
+ * Else function returns the s parameter.
  */
 static char *
 getFlags(IspellDict *Conf, char *s)
@@ -845,7 +1034,10 @@ getFlags(IspellDict *Conf, char *s)
 }
 
 /*
- * Import an affix file that follows MySpell or Hunspell format
+ * Import an affix file that follows MySpell or Hunspell format.
+ *
+ * Conf: current dictionary.
+ * filename: path to the .affix file.
  */
 static void
 NIImportOOAffixes(IspellDict *Conf, const char *filename)
@@ -863,7 +1055,6 @@ NIImportOOAffixes(IspellDict *Conf, const char *filename)
 	int			naffix = 0,
 				curaffix = 0;
 	int			flag = 0,
-				flagprev = 0,
 				sflaglen = 0;
 	char		flagflags = 0;
 	tsearch_readline_state trst;
@@ -956,20 +1147,71 @@ NIImportOOAffixes(IspellDict *Conf, const char *filename)
 		if (ptype)
 			pfree(ptype);
 		ptype = lowerstr_ctx(Conf, type);
+
+		/* First try to parse AF parameter (alias compression) */
+		if (STRNCMP(ptype, "af") == 0)
+		{
+			/* First line is the number of aliases */
+			if (!Conf->useFlagAliases)
+			{
+				Conf->useFlagAliases = true;
+				naffix = atoi(sflag);
+				if (naffix == 0)
+					ereport(ERROR,
+						(errcode(ERRCODE_CONFIG_FILE_ERROR),
+						 errmsg("invalid number of flag vector aliases")));
+
+				/* Also reserve place for empty flag set */
+				naffix++;
+
+				Conf->AffixData = (char **) palloc0(naffix * sizeof(char *));
+				Conf->lenAffixData = Conf->nAffixData = naffix;
+
+				/* Add empty flag set into AffixData */
+				Conf->AffixData[curaffix] = VoidString;
+				curaffix++;
+			}
+			/* Other lines is aliases */
+			else
+			{
+				if (curaffix < naffix)
+				{
+					Conf->AffixData[curaffix] = cpstrdup(Conf, sflag);
+					curaffix++;
+				}
+			}
+			goto nextline;
+		}
+		/* Else try to parse prefixes and suffixes */
 		if (fields_read < 4 ||
 			(STRNCMP(ptype, "sfx") != 0 && STRNCMP(ptype, "pfx") != 0))
 			goto nextline;
 
+		sflaglen = strlen(sflag);
+		if (sflaglen == 0
+			|| (sflaglen > 1 && Conf->flagMode == FM_CHAR)
+			|| (sflaglen > 2 && Conf->flagMode == FM_LONG))
+			goto nextline;
+
+		/*
+		 * Affix header. For example:
+		 * SFX \ N 1
+		 */
 		if (fields_read == 4)
 		{
-			flagprev = flag;
-			isSuffix = (STRNCMP(ptype, "sfx") == 0) ? true : false;
+			/* Convert the affix flag to int */
+			flag = DecodeFlag(Conf, sflag, (char **)NULL);
+
+			isSuffix = (STRNCMP(ptype, "sfx") == 0);
 			if (t_iseq(find, 'y') || t_iseq(find, 'Y'))
 				flagflags = FF_CROSSPRODUCT;
 			else
 				flagflags = 0;
 		}
-		/* Affix fields */
+		/*
+		 * Affix fields. For example:
+		 * SFX \   0	Y/L	[^Y]
+		 */
 		else
 		{
 			char	   *ptr;
@@ -1163,6 +1405,11 @@ isnewformat:
 	NIImportOOAffixes(Conf, filename);
 }
 
+/*
+ * Merges two affix flag sets and stores a new affix flag set into Conf->AffixData.
+ *
+ * Returns index of a new affix flag set.
+ */
 static int
 MergeAffix(IspellDict *Conf, int a1, int a2)
 {
@@ -1187,6 +1434,10 @@ MergeAffix(IspellDict *Conf, int a1, int a2)
 	return Conf->nAffixData - 1;
 }
 
+/*
+ * Returns a set of affix parameters which correspondence to the set of affix
+ * flags with the given index.
+ */
 static uint32
 makeCompoundFlags(IspellDict *Conf, int affix)
 {
@@ -1194,6 +1445,14 @@ makeCompoundFlags(IspellDict *Conf, int affix)
 	return (getFlagValues(Conf, str) & FF_DICTFLAGMASK);
 }
 
+/*
+ * Makes a prefix tree for the given level.
+ *
+ * Conf: current dictionary.
+ * low: lower index of the Conf->Spell array.
+ * high: upper index of the Conf->Spell array.
+ * level: current prefix tree level.
+ */
 static SPNode *
 mkSPNode(IspellDict *Conf, int low, int high, int level)
 {
@@ -1205,7 +1464,7 @@ mkSPNode(IspellDict *Conf, int low, int high, int level)
 	int			lownew = low;
 
 	for (i = low; i < high; i++)
-		if (Conf->Spell[i]->d.len > level && lastchar != Conf->Spell[i]->word[level])
+		if (Conf->Spell[i]->p.d.len > level && lastchar != Conf->Spell[i]->word[level])
 		{
 			nchar++;
 			lastchar = Conf->Spell[i]->word[level];
@@ -1220,12 +1479,13 @@ mkSPNode(IspellDict *Conf, int low, int high, int level)
 
 	lastchar = '\0';
 	for (i = low; i < high; i++)
-		if (Conf->Spell[i]->d.len > level)
+		if (Conf->Spell[i]->p.d.len > level)
 		{
 			if (lastchar != Conf->Spell[i]->word[level])
 			{
 				if (lastchar)
 				{
+					/* Next level of the prefix tree */
 					data->node = mkSPNode(Conf, lownew, i, level + 1);
 					lownew = i;
 					data++;
@@ -1233,11 +1493,11 @@ mkSPNode(IspellDict *Conf, int low, int high, int level)
 				lastchar = Conf->Spell[i]->word[level];
 			}
 			data->val = ((uint8 *) (Conf->Spell[i]->word))[level];
-			if (Conf->Spell[i]->d.len == level + 1)
+			if (Conf->Spell[i]->p.d.len == level + 1)
 			{
 				bool		clearCompoundOnly = false;
 
-				if (data->isword && data->affix != Conf->Spell[i]->d.affix)
+				if (data->isword && data->affix != Conf->Spell[i]->p.d.affix)
 				{
 					/*
 					 * MergeAffix called a few times. If one of word is
@@ -1246,12 +1506,12 @@ mkSPNode(IspellDict *Conf, int low, int high, int level)
 					 */
 
 					clearCompoundOnly = (FF_COMPOUNDONLY & data->compoundflag
-						& makeCompoundFlags(Conf, Conf->Spell[i]->d.affix))
+						& makeCompoundFlags(Conf, Conf->Spell[i]->p.d.affix))
 						? false : true;
-					data->affix = MergeAffix(Conf, data->affix, Conf->Spell[i]->d.affix);
+					data->affix = MergeAffix(Conf, data->affix, Conf->Spell[i]->p.d.affix);
 				}
 				else
-					data->affix = Conf->Spell[i]->d.affix;
+					data->affix = Conf->Spell[i]->p.d.affix;
 				data->isword = 1;
 
 				data->compoundflag = makeCompoundFlags(Conf, data->affix);
@@ -1265,6 +1525,7 @@ mkSPNode(IspellDict *Conf, int low, int high, int level)
 			}
 		}
 
+	/* Next level of the prefix tree */
 	data->node = mkSPNode(Conf, lownew, high, level + 1);
 
 	return rs;
@@ -1283,19 +1544,24 @@ NISortDictionary(IspellDict *Conf)
 
 	/* compress affixes */
 
-	/* If we use flag aliases then we need to use Conf->AffixData filled in NIImportOOAffixes.
-	 * If Conf->Spell[i]->flag is empty, then get empty value of Conf->AffixData (0 index)
+	/*
+	 * If we use flag aliases then we need to use Conf->AffixData filled
+	 * in the NIImportOOAffixes().
 	 */
 	if (Conf->useFlagAliases)
 	{
 		for (i = 0; i < Conf->nspell; i++)
 		{
-			curaffix = strtol(Conf->Spell[i]->flag, (char **)NULL, 10);
+			curaffix = strtol(Conf->Spell[i]->p.flag, (char **)NULL, 10);
 			if (curaffix && curaffix <= Conf->nAffixData)
-				Conf->Spell[i]->d.affix = curaffix;
+				Conf->Spell[i]->p.d.affix = curaffix;
 			else
-				Conf->Spell[i]->d.affix = 0;
-			Conf->Spell[i]->d.len = strlen(Conf->Spell[i]->word);
+				/*
+				 * If Conf->Spell[i]->p.flag is empty, then get empty value of
+				 * Conf->AffixData (0 index).
+				 */
+				Conf->Spell[i]->p.d.affix = 0;
+			Conf->Spell[i]->p.d.len = strlen(Conf->Spell[i]->word);
 		}
 	}
 	/* Otherwise fill Conf->AffixData here */
@@ -1307,7 +1573,7 @@ NISortDictionary(IspellDict *Conf)
 		naffix = 0;
 		for (i = 0; i < Conf->nspell; i++)
 		{
-			if (i == 0 || strcmp(Conf->Spell[i]->flag, Conf->Spell[i - 1]->flag))
+			if (i == 0 || strcmp(Conf->Spell[i]->p.flag, Conf->Spell[i - 1]->p.flag))
 				naffix++;
 		}
 
@@ -1321,24 +1587,36 @@ NISortDictionary(IspellDict *Conf)
 		curaffix = -1;
 		for (i = 0; i < Conf->nspell; i++)
 		{
-			if (i == 0 || strcmp(Conf->Spell[i]->flag, Conf->AffixData[curaffix]))
+			if (i == 0 || strcmp(Conf->Spell[i]->p.flag, Conf->AffixData[curaffix]))
 			{
 				curaffix++;
 				Assert(curaffix < naffix);
-				Conf->AffixData[curaffix] = cpstrdup(Conf, Conf->Spell[i]->flag);
+				Conf->AffixData[curaffix] = cpstrdup(Conf, Conf->Spell[i]->p.flag);
 			}
 
-			Conf->Spell[i]->d.affix = curaffix;
-			Conf->Spell[i]->d.len = strlen(Conf->Spell[i]->word);
+			Conf->Spell[i]->p.d.affix = curaffix;
+			Conf->Spell[i]->p.d.len = strlen(Conf->Spell[i]->word);
 		}
 
 		Conf->lenAffixData = Conf->nAffixData = naffix;
 	}
 
+	/* Start build a prefix tree */
 	qsort((void *) Conf->Spell, Conf->nspell, sizeof(SPELL *), cmpspell);
 	Conf->Dictionary = mkSPNode(Conf, 0, Conf->nspell, 0);
 }
 
+/*
+ * Makes a prefix tree for the given level using the repl string of an affix rule.
+ * Affixes with empty replace string do not include in the prefix tree. This
+ * affixes are included by mkVoidAffix().
+ *
+ * Conf: current dictionary.
+ * low: lower index of the Conf->Affix array.
+ * high: upper index of the Conf->Affix array.
+ * level: current prefix tree level.
+ * type: FF_SUFFIX or FF_PREFIX.
+ */
 static AffixNode *
 mkANode(IspellDict *Conf, int low, int high, int level, int type)
 {
@@ -1376,6 +1654,7 @@ mkANode(IspellDict *Conf, int low, int high, int level, int type)
 			{
 				if (lastchar)
 				{
+					/* Next level of the prefix tree */
 					data->node = mkANode(Conf, lownew, i, level + 1, type);
 					if (naff)
 					{
@@ -1396,6 +1675,7 @@ mkANode(IspellDict *Conf, int low, int high, int level, int type)
 			}
 		}
 
+	/* Next level of the prefix tree */
 	data->node = mkANode(Conf, lownew, high, level + 1, type);
 	if (naff)
 	{
@@ -1410,6 +1690,10 @@ mkANode(IspellDict *Conf, int low, int high, int level, int type)
 	return rs;
 }
 
+/*
+ * Makes the root void node in the prefix tree. The root void node is created
+ * for affixes which have empty replace string ("repl" field).
+ */
 static void
 mkVoidAffix(IspellDict *Conf, bool issuffix, int startsuffix)
 {
@@ -1433,11 +1717,12 @@ mkVoidAffix(IspellDict *Conf, bool issuffix, int startsuffix)
 		Conf->Prefix = Affix;
 	}
 
-
+	/* Count affixes with empty replace string */
 	for (i = start; i < end; i++)
 		if (Conf->Affix[i].replen == 0)
 			cnt++;
 
+	/* There is not affixes with empty replace string */
 	if (cnt == 0)
 		return;
 
@@ -1453,18 +1738,31 @@ mkVoidAffix(IspellDict *Conf, bool issuffix, int startsuffix)
 		}
 }
 
+/*
+ * Checks if the affixflag is used by dictionary. Conf->AffixData does not
+ * contain affixflag if this flag is not used actually by the .dict file.
+ *
+ * Conf: current dictionary.
+ * affixflag: integer representation of the affix flag.
+ *
+ * Returns true if the Conf->AffixData array contains affixflag, otherwise
+ * returns false.
+ */
 static bool
-isAffixInUse(IspellDict *Conf, int flag)
+isAffixInUse(IspellDict *Conf, unsigned short affixflag)
 {
 	int			i;
 
 	for (i = 0; i < Conf->nAffixData; i++)
-		if (isAffixFlagInUse(Conf, i, flag))
+		if (IsAffixFlagInUse(Conf, i, affixflag))
 			return true;
 
 	return false;
 }
 
+/*
+ * Builds Conf->Prefix and Conf->Suffix trees from the imported affixes.
+ */
 void
 NISortAffixes(IspellDict *Conf)
 {
@@ -1476,6 +1774,7 @@ NISortAffixes(IspellDict *Conf)
 	if (Conf->naffixes == 0)
 		return;
 
+	/* Store compound affixes in the Conf->CompoundAffix array */
 	if (Conf->naffixes > 1)
 		qsort((void *) Conf->Affix, Conf->naffixes, sizeof(AFFIX), cmpaffix);
 	Conf->CompoundAffix = ptr = (CMPDAffix *) palloc(sizeof(CMPDAffix) * Conf->naffixes);
@@ -1499,7 +1798,7 @@ NISortAffixes(IspellDict *Conf)
 				/* leave only unique and minimals suffixes */
 				ptr->affix = Affix->repl;
 				ptr->len = Affix->replen;
-				ptr->issuffix = (Affix->type == FF_SUFFIX) ? true : false;
+				ptr->issuffix = (Affix->type == FF_SUFFIX);
 				ptr++;
 			}
 		}
@@ -1507,6 +1806,7 @@ NISortAffixes(IspellDict *Conf)
 	ptr->affix = NULL;
 	Conf->CompoundAffix = (CMPDAffix *) repalloc(Conf->CompoundAffix, sizeof(CMPDAffix) * (ptr - Conf->CompoundAffix + 1));
 
+	/* Start build a prefix tree */
 	Conf->Prefix = mkANode(Conf, 0, firstsuffix, 0, FF_PREFIX);
 	Conf->Suffix = mkANode(Conf, firstsuffix, Conf->naffixes, 0, FF_SUFFIX);
 	mkVoidAffix(Conf, true, firstsuffix);
