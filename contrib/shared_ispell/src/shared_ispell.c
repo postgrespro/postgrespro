@@ -179,13 +179,12 @@ ispell_shmem_startup()
 	segment = ShmemInitStruct(SEGMENT_NAME,
 							max_ispell_mem_size(),
 							&found);
+	segment_info = (SegmentInfo *) segment;
 
 	/* Was the shared memory segment already initialized? */
 	if (!found)
 	{
 		memset(segment, 0, max_ispell_mem_size());
-
-		segment_info = (SegmentInfo *) segment;
 
 		#if PG_VERSION_NUM >= 90600
 		segment_info->lock = &(GetNamedLWLockTranche("shared_ispell"))->lock;
