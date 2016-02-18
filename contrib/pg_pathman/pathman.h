@@ -82,16 +82,25 @@ typedef struct HashRelation
 typedef struct RangeEntry
 {
 	Oid		child_oid;
-	Datum	min;
-	Datum	max;
+	// Datum	min;
+	// Datum	max;
+	#ifdef HAVE_INT64_TIMESTAMP
+	int64		min;
+	int64		max;
+	#else
+	double		min;
+	double		max;
+	#endif
 } RangeEntry;
 
 typedef struct RangeRelation
 {
 	RelationKey	key;
+	bool        by_val;
 	DsmArray    ranges;
 } RangeRelation;
 
+#define PATHMAN_GET_DATUM(value, by_val) ( (by_val) ? (value) : PointerGetDatum(&value) )
 
 typedef int IndexRange;
 #define RANGE_INFINITY 0x7FFF
@@ -163,5 +172,7 @@ char *get_extension_schema(void);
 FmgrInfo *get_cmp_func(Oid type1, Oid type2);
 Oid create_partitions_bg_worker(Oid relid, Datum value, Oid value_type);
 Oid create_partitions(Oid relid, Datum value, Oid value_type);
+// Datum get_range_min(range, size_t idx, bool byVal);
+// Datum get_range_max(range, size_t idx, bool byVal);
 
 #endif   /* PATHMAN_H */

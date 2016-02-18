@@ -16,7 +16,6 @@
 
 HTAB   *relations = NULL;
 HTAB   *range_restrictions = NULL;
-// bool   *config_loaded = NULL;
 bool	initialization_needed = true;
 
 typedef struct ShmemConfig
@@ -26,6 +25,7 @@ typedef struct ShmemConfig
 ShmemConfig *shmem_cfg;
 
 static FmgrInfo *qsort_type_cmp_func;
+static bool globalByVal;
 
 static bool validate_range_constraint(Expr *, PartRelationInfo *, Datum *, Datum *);
 static bool validate_hash_constraint(Expr *expr, PartRelationInfo *prel, int *hash);
@@ -247,6 +247,7 @@ load_check_constraints(Oid parent_oid, Snapshot snapshot)
 
 		if (prel->parttype == PT_RANGE)
 		{
+			TypeCacheEntry	   *tce;
 			RelationKey key;
 			key.dbid = MyDatabaseId;
 			key.relid = parent_oid;
@@ -256,6 +257,9 @@ load_check_constraints(Oid parent_oid, Snapshot snapshot)
 
 			alloc_dsm_array(&rangerel->ranges, sizeof(RangeEntry), proc);
 			ranges = (RangeEntry *) dsm_array_get_pointer(&rangerel->ranges);
+
+			tce = lookup_type_cache(prel->atttype, 0);
+			rangerel->by_val = tce->typbyval;
 		}
 
 		for (i=0; i<proc; i++)
@@ -290,10 +294,19 @@ load_check_constraints(Oid parent_oid, Snapshot snapshot)
 						continue;
 					}
 
+					/* If datum is referenced by val then just assign */
+					if (rangerel->by_val)
+					{
+						re.min = min;
+						re.max = max;
+					}
+					/* else copy the memory by pointer */
+					else
+					{
+						memcpy(&re.min, DatumGetPointer(min), sizeof(re.min));
+						memcpy(&re.max, DatumGetPointer(max), sizeof(re.max));
+					}
 					re.child_oid = con->conrelid;
-					re.min = min;
-					re.max = max;
-
 					ranges[i] = re;
 					break;
 			
@@ -313,11 +326,13 @@ load_check_constraints(Oid parent_oid, Snapshot snapshot)
 		if (prel->parttype == PT_RANGE)
 		{
 			TypeCacheEntry	   *tce;
+			bool byVal = rangerel->by_val;
 
 			/* Sort ascending */
 			tce = lookup_type_cache(prel->atttype,
 				TYPECACHE_CMP_PROC | TYPECACHE_CMP_PROC_FINFO);
 			qsort_type_cmp_func = &tce->cmp_proc_finfo;
+			globalByVal = byVal;
 			qsort(ranges, proc, sizeof(RangeEntry), cmp_range_entries);
 
 			/* Copy oids to prel */
@@ -327,6 +342,10 @@ load_check_constraints(Oid parent_oid, Snapshot snapshot)
 			/* Check if some ranges overlap */
 			for(i=0; i < proc-1; i++)
 			{
+				Datum min = PATHMAN_GET_DATUM(ranges[i].max, byVal);
+				Datum max = PATHMAN_GET_DATUM(ranges[i+1].min, byVal);
+
+				// if (FunctionCall2(qsort_type_cmp_func, min, max) > 0)
 				if (ranges[i].max > ranges[i+1].min)
 				{
 					RelationKey key;
@@ -350,7 +369,10 @@ cmp_range_entries(const void *p1, const void *p2)
 	const RangeEntry	*v1 = (const RangeEntry *) p1;
 	const RangeEntry	*v2 = (const RangeEntry *) p2;
 
-	return FunctionCall2(qsort_type_cmp_func, v1->min, v2->min);
+	// return FunctionCall2(qsort_type_cmp_func, v1->min, v2->min);
+	return FunctionCall2(qsort_type_cmp_func,
+						 PATHMAN_GET_DATUM(v1->min, globalByVal),
+						 PATHMAN_GET_DATUM(v2->min, globalByVal));
 }
 
 /*
