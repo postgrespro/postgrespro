@@ -101,7 +101,7 @@ find_or_create_range_partition(PG_FUNCTION_ARGS)
 	prel = get_pathman_relation_info(relid, NULL);
 	rangerel = get_pathman_range_relation(relid, NULL);
 
-	if (!prel || !rangerel || rangerel->ranges.length == 0)
+	if (!prel || !rangerel)
 		PG_RETURN_NULL();
 
 	cmp_proc_oid = get_opfamily_proc(tce->btree_opf,
@@ -135,6 +135,7 @@ find_or_create_range_partition(PG_FUNCTION_ARGS)
 		pos = range_binary_search(rangerel, &cmp_func, value, &found);
 		if (found)
 		{
+			LWLockRelease(edit_partitions_lock);
 			LWLockRelease(load_config_lock);
 			PG_RETURN_OID(ranges[pos].child_oid);
 		}
