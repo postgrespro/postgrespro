@@ -6,6 +6,7 @@
 #include "storage/dsm.h"
 #include "access/xact.h"
 #include "utils/snapmgr.h"
+#include "utils/typcache.h"
 
 /*-------------------------------------------------------------------------
  *
@@ -26,11 +27,17 @@ static void bg_worker_main(Datum main_arg);
 
 typedef struct PartitionArgs
 {
-	Oid dbid;
-	Oid relid;
-	Datum value;
-	Oid value_type;
-	Oid result;
+	Oid	dbid;
+	Oid	relid;
+	#ifdef HAVE_INT64_TIMESTAMP
+	int64	value;
+	#else
+	double	value;
+	#endif
+	//Datum value;
+	Oid	value_type;
+	bool	by_val;
+	Oid	result;
 } PartitionArgs;
 
 /*
@@ -46,17 +53,25 @@ create_partitions_bg_worker(Oid relid, Datum value, Oid value_type)
 	dsm_segment	   *segment;
 	dsm_handle		segment_handle;
 	pid_t 			pid;
-	PartitionArgs  *args;
+	PartitionArgs	   *args;
 	Oid 			child_oid;
+	TypeCacheEntry	   *tce;
 
 	/* Create a dsm segment for the worker to pass arguments */
 	segment = dsm_create(sizeof(PartitionArgs), 0);
 	segment_handle = dsm_segment_handle(segment);
 
+	tce = lookup_type_cache(value_type, 0);
+
+	/* Fill arguments structure */
 	args = (PartitionArgs *) dsm_segment_address(segment);
 	args->dbid = MyDatabaseId;
 	args->relid = relid;
-	args->value = value;
+	if (tce->typbyval)
+		args->value = value;
+	else
+		memcpy(&args->value, DatumGetPointer(value), sizeof(args->value));
+	args->by_val = tce->typbyval;
 	args->value_type = value_type;
 	args->result = 0;
 
@@ -121,7 +136,7 @@ bg_worker_main(Datum main_arg)
 	PushActiveSnapshot(GetTransactionSnapshot());
 
 	/* Create partitions */
-	args->result = create_partitions(args->relid, args->value, args->value_type);
+	args->result = create_partitions(args->relid, PATHMAN_GET_DATUM(args->value, args->by_val), args->value_type);
 
 	/* Cleanup */
 	SPI_finish();
