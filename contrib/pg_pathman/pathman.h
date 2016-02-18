@@ -172,7 +172,5 @@ char *get_extension_schema(void);
 FmgrInfo *get_cmp_func(Oid type1, Oid type2);
 Oid create_partitions_bg_worker(Oid relid, Datum value, Oid value_type);
 Oid create_partitions(Oid relid, Datum value, Oid value_type);
-// Datum get_range_min(range, size_t idx, bool byVal);
-// Datum get_range_max(range, size_t idx, bool byVal);
 
 #endif   /* PATHMAN_H */

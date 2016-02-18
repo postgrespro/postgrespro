@@ -166,24 +166,6 @@ get_cmp_func(Oid type1, Oid type2)
 	return cmp_func;
 }
 
-// Datums
-// get_range_min(range, size_t idx, bool byVal)
-// {
-// 	if (byVal)
-// 		return (Datum)range[idx].min;
-// 	else
-// 		return PointerGetDatum(&range[idx].min);
-// }
-
-// Datum
-// get_range_max(range, size_t idx, bool byVal)
-// {
-// 	if (byVal)
-// 		return (Datum)range[idx].max;
-// 	else
-// 		return PointerGetDatum(&range[idx].max);
-// }
-
 /*
  * Planner hook. It disables inheritance for tables that have been partitioned
  * by pathman to prevent standart PostgreSQL partitioning mechanism from
@@ -731,8 +713,6 @@ handle_binary_opexpr(const PartRelationInfo *prel, WrapperNode *result,
 				else
 				{
 					/* Corner cases */
-					// cmp_min = FunctionCall2(&cmp_func, value, ranges[0].min),
-					// cmp_max = FunctionCall2(&cmp_func, value, ranges[rangerel->ranges.length - 1].max);
 					cmp_min = FunctionCall2(&cmp_func, value,
 											PATHMAN_GET_DATUM(ranges[0].min, byVal)),
 					cmp_max = FunctionCall2(&cmp_func, value,
@@ -776,8 +756,6 @@ handle_binary_opexpr(const PartRelationInfo *prel, WrapperNode *result,
 					i = startidx + (endidx - startidx) / 2;
 					Assert(i >= 0 && i < rangerel->ranges.length);
 					re = &ranges[i];
-					// cmp_min = FunctionCall2(&cmp_func, value, re->min);
-					// cmp_max = FunctionCall2(&cmp_func, value, re->max);
 					cmp_min = FunctionCall2(&cmp_func, value, PATHMAN_GET_DATUM(re->min, byVal));
 					cmp_max = FunctionCall2(&cmp_func, value, PATHMAN_GET_DATUM(re->max, byVal));
 
@@ -893,8 +871,6 @@ range_binary_search(const RangeRelation *rangerel, FmgrInfo *cmp_func, Datum val
 	*foundPtr = false;
 
 	/* Check boundaries */
-	// cmp_min = FunctionCall2(cmp_func, value, ranges[0].min),
-	// cmp_max = FunctionCall2(cmp_func, value, ranges[rangerel->ranges.length - 1].max);
 	cmp_min = FunctionCall2(cmp_func, value, PATHMAN_GET_DATUM(ranges[0].min, byVal)),
 	cmp_max = FunctionCall2(cmp_func, value, PATHMAN_GET_DATUM(ranges[rangerel->ranges.length - 1].max, byVal));
 
@@ -908,8 +884,6 @@ range_binary_search(const RangeRelation *rangerel, FmgrInfo *cmp_func, Datum val
 		i = startidx + (endidx - startidx) / 2;
 		Assert(i >= 0 && i < rangerel->ranges.length);
 		re = &ranges[i];
-		// cmp_min = FunctionCall2(cmp_func, value, re->min);
-		// cmp_max = FunctionCall2(cmp_func, value, re->max);
 		cmp_min = FunctionCall2(cmp_func, value, PATHMAN_GET_DATUM(re->min, byVal));
 		cmp_max = FunctionCall2(cmp_func, value, PATHMAN_GET_DATUM(re->max, byVal));
 

@@ -47,17 +47,6 @@ BEGIN
         END LOOP;
     END IF;
 
-    /* TODO: think about reusing code */
-    -- EXECUTE format('SELECT @extschema@.create_partitions_from_range(''%s'', ''%s'', ''%s'', ''%s''::%s, ''%s''::interval)'
-    --     , p_relation
-    --     , p_attribute
-    --     , p_start_value
-    --     , p_start_value + p_interval*p_count
-    --     , pg_typeof(p_start_value)
-    --     , p_interval);
-
-    -- RETURN p_count;
-
     /* Check boundaries */
     EXECUTE format('SELECT @extschema@.check_boundaries(''%s'', ''%s'', ''%s'', ''%s''::%s)'
                    , p_relation
@@ -778,8 +767,8 @@ BEGIN
 
     IF @extschema@.is_date(p_atttype::regtype) THEN
         v_part_name := @extschema@.create_single_range_partition(p_relation
-                                                                 , p_range[1]
-                                                                 , p_range[1] - p_interval::interval);
+                                                                 , p_range[1] - p_interval::interval
+                                                                 , p_range[1]);
     ELSE
         EXECUTE format('SELECT @extschema@.create_single_range_partition($1, $2, $2 - $3::%s)', p_atttype)
         USING p_relation, p_range[1], p_interval

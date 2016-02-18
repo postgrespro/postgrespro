@@ -23,7 +23,6 @@
 static dsm_segment *segment;
 
 static void bg_worker_main(Datum main_arg);
-// static Oid create_partitions(Oid relid, Datum value, Oid value_type);
 
 typedef struct PartitionArgs
 {
@@ -34,7 +33,6 @@ typedef struct PartitionArgs
 	#else
 	double	value;
 	#endif
-	//Datum value;
 	Oid	value_type;
 	bool	by_val;
 	Oid	result;

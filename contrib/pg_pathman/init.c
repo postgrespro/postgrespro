@@ -40,7 +40,6 @@ init_shmem_config()
 	shmem_cfg = (ShmemConfig *)
 		ShmemInitStruct("pathman shmem config", sizeof(ShmemConfig), &found);
 	shmem_cfg->config_loaded = false;
-	// *config_loaded = false;
 }
 
 /*
@@ -60,7 +59,6 @@ load_config(void)
 		LWLockAcquire(load_config_lock, LW_EXCLUSIVE);
 		load_relations_hashtable(new_segment_created);
 		LWLockRelease(load_config_lock);
-		// *config_loaded = true;
 		shmem_cfg->config_loaded = true;
 	}
 }
@@ -342,11 +340,12 @@ load_check_constraints(Oid parent_oid, Snapshot snapshot)
 			/* Check if some ranges overlap */
 			for(i=0; i < proc-1; i++)
 			{
-				Datum min = PATHMAN_GET_DATUM(ranges[i].max, byVal);
-				Datum max = PATHMAN_GET_DATUM(ranges[i+1].min, byVal);
+				Datum cur_upper = PATHMAN_GET_DATUM(ranges[i].max, byVal);
+				Datum next_lower = PATHMAN_GET_DATUM(ranges[i+1].min, byVal);
+				bool overlap = FunctionCall2(qsort_type_cmp_func, next_lower, cur_upper) > 0;
 
-				// if (FunctionCall2(qsort_type_cmp_func, min, max) > 0)
-				if (ranges[i].max > ranges[i+1].min)
+				if (overlap)
+				// if (ranges[i].max > ranges[i+1].min)
 				{
 					RelationKey key;
 					key.dbid = MyDatabaseId;
@@ -369,7 +368,6 @@ cmp_range_entries(const void *p1, const void *p2)
 	const RangeEntry	*v1 = (const RangeEntry *) p1;
 	const RangeEntry	*v2 = (const RangeEntry *) p2;
 
-	// return FunctionCall2(qsort_type_cmp_func, v1->min, v2->min);
 	return FunctionCall2(qsort_type_cmp_func,
 						 PATHMAN_GET_DATUM(v1->min, globalByVal),
 						 PATHMAN_GET_DATUM(v2->min, globalByVal));
