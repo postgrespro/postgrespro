@@ -53,7 +53,8 @@ SUBDIRS = \
 		tsm_system_time \
 		tsearch2	\
 		unaccent	\
-		vacuumlo
+		vacuumlo    \
+		pg_pathman
 
 ifeq ($(with_openssl),yes)
 SUBDIRS += sslinfo
