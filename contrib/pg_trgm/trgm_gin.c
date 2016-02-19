@@ -89,7 +89,7 @@ gin_extract_query_trgm(PG_FUNCTION_ARGS)
 	switch (strategy)
 	{
 		case SimilarityStrategyNumber:
-		case SubwordSimilarityStrategyNumber:
+		case WordSimilarityStrategyNumber:
 			trg = generate_trgm(VARDATA(val), VARSIZE(val) - VARHDRSZ);
 			break;
 		case ILikeStrategyNumber:
@@ -185,9 +185,9 @@ gin_trgm_consistent(PG_FUNCTION_ARGS)
 	switch (strategy)
 	{
 		case SimilarityStrategyNumber:
-		case SubwordSimilarityStrategyNumber:
+		case WordSimilarityStrategyNumber:
 			nlimit = (strategy == SimilarityStrategyNumber) ?
-				trgm_sml_limit : trgm_subword_limit;
+				similarity_threshold : word_similarity_threshold;
 
 			/* Count the matches */
 			ntrue = 0;
@@ -280,9 +280,9 @@ gin_trgm_triconsistent(PG_FUNCTION_ARGS)
 	switch (strategy)
 	{
 		case SimilarityStrategyNumber:
-		case SubwordSimilarityStrategyNumber:
+		case WordSimilarityStrategyNumber:
 			nlimit = (strategy == SimilarityStrategyNumber) ?
-				trgm_sml_limit : trgm_subword_limit;
+				similarity_threshold : word_similarity_threshold;
 
 			/* Count the matches */
 			ntrue = 0;
@@ -295,8 +295,9 @@ gin_trgm_triconsistent(PG_FUNCTION_ARGS)
 			/*
 			 * See comment in gin_trgm_consistent() about * upper bound formula
 			 */
-			res = (nkeys == 0) ? GIN_FALSE :
-				(((((float4) ntrue) / ((float4) nkeys)) >= nlimit) ? GIN_MAYBE : GIN_FALSE);
+			res = (nkeys == 0)
+				? GIN_FALSE : (((((float4) ntrue) / ((float4) nkeys)) >= nlimit)
+							? GIN_MAYBE : GIN_FALSE);
 			break;
 		case ILikeStrategyNumber:
 #ifndef IGNORECASE
