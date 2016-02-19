@@ -44,6 +44,7 @@ SUBDIRS = \
 		pgstattuple	\
 		postgres_fdw	\
 		seg		\
+		shared_ispell \
 		spi		\
 		sr_plan \
 		tablefunc	\

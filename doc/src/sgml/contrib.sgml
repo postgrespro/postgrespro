@@ -137,6 +137,7 @@ CREATE EXTENSION <replaceable>module_name</> FROM unpackaged;
  &postgres-fdw;
  &seg;
  &sepgsql;
+ &shared-ispell;
  &contrib-spi;
  &sr-plan;
  &sslinfo;
