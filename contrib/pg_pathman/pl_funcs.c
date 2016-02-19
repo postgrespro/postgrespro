@@ -19,6 +19,7 @@ PG_FUNCTION_INFO_V1( get_range_by_idx );
 PG_FUNCTION_INFO_V1( get_partition_range );
 PG_FUNCTION_INFO_V1( acquire_partitions_lock );
 PG_FUNCTION_INFO_V1( release_partitions_lock );
+PG_FUNCTION_INFO_V1( check_overlap );
 PG_FUNCTION_INFO_V1( get_min_range_value );
 PG_FUNCTION_INFO_V1( get_max_range_value );
 
@@ -118,6 +119,11 @@ find_or_create_range_partition(PG_FUNCTION_ARGS)
 	 */
 	if (found)
 		PG_RETURN_OID(ranges[pos].child_oid);
+	/*
+	 * If not found and value is between first and last partitions
+	*/
+	if (!found && pos >= 0)
+		PG_RETURN_NULL();
 	else
 	{
 		Oid child_oid;
@@ -290,8 +296,8 @@ get_max_range_value(PG_FUNCTION_ARGS)
 {
 	int parent_oid = DatumGetInt32(PG_GETARG_DATUM(0));
 	PartRelationInfo *prel;
-	RangeRelation	*rangerel;
-	RangeEntry		*ranges;
+	RangeRelation	 *rangerel;
+	RangeEntry		 *ranges;
 
 	prel = get_pathman_relation_info(parent_oid, NULL);
 	rangerel = get_pathman_range_relation(parent_oid, NULL);
@@ -301,6 +307,48 @@ get_max_range_value(PG_FUNCTION_ARGS)
 
 	ranges = dsm_array_get_pointer(&rangerel->ranges);
 	PG_RETURN_DATUM(PATHMAN_GET_DATUM(ranges[rangerel->ranges.length-1].max, rangerel->by_val));
+}
+
+/*
+ * Checks if range overlaps with existing partitions.
+ * Returns TRUE if overlaps and FALSE otherwise.
+ */
+Datum
+check_overlap(PG_FUNCTION_ARGS)
+{
+	int parent_oid = DatumGetInt32(PG_GETARG_DATUM(0));
+	Datum p1 = PG_GETARG_DATUM(1);
+	Oid	  p1_type = get_fn_expr_argtype(fcinfo->flinfo, 1);
+	Datum p2 = PG_GETARG_DATUM(2);
+	Oid	  p2_type = get_fn_expr_argtype(fcinfo->flinfo, 2);
+	PartRelationInfo *prel;
+	RangeRelation	 *rangerel;
+	RangeEntry		 *ranges;
+	FmgrInfo		  cmp_func_1;
+	FmgrInfo		  cmp_func_2;
+	int i;
+
+	prel = get_pathman_relation_info(parent_oid, NULL);
+	rangerel = get_pathman_range_relation(parent_oid, NULL);
+
+	if (!prel || !rangerel || prel->parttype != PT_RANGE)
+		PG_RETURN_NULL();
+
+	/* comparison functions */
+	cmp_func_1 = *get_cmp_func(p1_type, prel->atttype);
+	cmp_func_2 = *get_cmp_func(p2_type, prel->atttype);
+
+	ranges = (RangeEntry *) dsm_array_get_pointer(&rangerel->ranges);
+	for (i=0; i<rangerel->ranges.length; i++)
+	{
+		bool c1 = FunctionCall2(&cmp_func_1, p1, ranges[i].max);
+		bool c2 = FunctionCall2(&cmp_func_2, p2, ranges[i].min);
+
+		if (c1 < 0 && c2 > 0)
+			PG_RETURN_BOOL(true);
+	}
+
+	PG_RETURN_BOOL(false);
 }
 
 /*

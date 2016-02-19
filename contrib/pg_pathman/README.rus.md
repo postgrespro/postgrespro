@@ -154,54 +154,71 @@ disable_partitioning(relation TEXT)
 
 ## Примеры использования
 ### HASH
-Рассмотрим пример секционирования таблицы, используя HASH-стратегию на примере таблицы.
+Рассмотрим пример секционирования таблицы, используя HASH-стратегию на примере таблицы товаров.
 ```
-CREATE TABLE hash_rel (
-    id      SERIAL PRIMARY KEY,
-    value   INTEGER);
-INSERT INTO hash_rel (value) SELECT g FROM generate_series(1, 10000) as g;
+CREATE TABLE items (
+    id       SERIAL PRIMARY KEY,
+    name     TEXT,
+    code     BIGINT);
+
+INSERT INTO items (id, name, code)
+SELECT g, md5(g::text), random() * 100000
+FROM generate_series(1, 100000) as g;
 ```
 Если дочерние секции подразумевают наличие индексов, то стоит их создать в родительской таблице до разбиения. Тогда при разбиении pg_pathman автоматически создаст соответствующие индексы в дочерних.таблицах. Разобьем таблицу `hash_rel` на 100 секций по полю `value`:
 ```
-SELECT create_hash_partitions('hash_rel', 'value', 100);
+SELECT create_hash_partitions('items', 'id', 100);
 ```
 Пример построения плана для запроса с фильтрацией по ключевому полю:
 ```
-SELECT * FROM hash_rel WHERE value = 1234;
-  id  | value 
-------+-------
- 1234 |  1234
+SELECT * FROM items WHERE id = 1234;
+  id  |               name               | code 
+------+----------------------------------+------
+ 1234 | 81dc9bdb52d04dc20036dbd8313ed055 | 1855
+(1 row)
 
-EXPLAIN SELECT * FROM hash_rel WHERE value = 1234;
-                           QUERY PLAN                            
------------------------------------------------------------------
- Append  (cost=0.00..2.00 rows=0 width=0)
-   ->  Seq Scan on hash_rel_34  (cost=0.00..2.00 rows=0 width=0)
-         Filter: (value = 1234)
+EXPLAIN SELECT * FROM items WHERE id = 1234;
+                                     QUERY PLAN                                     
+------------------------------------------------------------------------------------
+ Append  (cost=0.28..8.29 rows=0 width=0)
+   ->  Index Scan using items_34_pkey on items_34  (cost=0.28..8.29 rows=0 width=0)
+         Index Cond: (id = 1234)
 ```
 Стоит отметить, что pg_pathman исключает из плана запроса родительскую таблицу, и чтобы получить данные из нее, следует использовать модификатор ONLY:
 ```
-EXPLAIN SELECT * FROM ONLY hash_rel;
-                       QUERY PLAN                       
---------------------------------------------------------
- Seq Scan on hash_rel  (cost=0.00..0.00 rows=1 width=8)
+EXPLAIN SELECT * FROM ONLY items;
+                      QUERY PLAN                      
+------------------------------------------------------
+ Seq Scan on items  (cost=0.00..0.00 rows=1 width=45)
 ```
 
 ### RANGE
-Пример секционирования таблицы с использованием стратегии RANGE.
+Рассмотрим пример разбиения таблицы по диапазону дат. Пусть у нас имеется таблица логов:
 ```
-CREATE TABLE range_rel (
-    id SERIAL PRIMARY KEY,
-    dt TIMESTAMP);
-INSERT INTO range_rel (dt) SELECT g FROM generate_series('2010-01-01'::date, '2014-12-31'::date, '1 day') as g;
+CREATE TABLE journal (
+    id      SERIAL PRIMARY KEY,
+    dt      TIMESTAMP NOT NULL,
+    level   INTEGER,
+    msg     TEXT
+);
+CREATE INDEX ON journal(dt);
+
+INSERT INTO journal (dt, level, msg)
+SELECT g, random()*6, md5(g::text)
+FROM generate_series('2015-01-01'::date, '2015-12-31'::date, '1 minute') as g;
 ```
-Разобьем таблицу на 60 секций так, чтобы каждая секция содержала данные за один месяц:
+Разобьем таблицу на 365 секций так, чтобы каждая секция содержала данные за один день:
 ```
-SELECT create_range_partitions('range_rel', 'dt', '2010-01-01'::date, '1 month'::interval, 60);
+SELECT create_range_partitions('journal', 'dt', '2015-01-01'::date, '1 day'::interval);
 ```
-Объединим секции первые две секции:
+Новые секции добавляются автоматически при вставке новых записей в непокрытую область. Однако есть возможность добавлять секции вручную. Для этого можно воспользоваться следующими функциями:
 ```
-SELECT merge_range_partitions('range_rel_1', 'range_rel_2');
+SELECT add_partition()
+```
+
+Объединим первые две секции:
+```
+SELECT merge_range_partitions('journal_1', 'journal_2');
 ```
 Разделим первую секцию на две по дате '2010-02-15':
 ```

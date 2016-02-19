@@ -59,6 +59,14 @@ CREATE OR REPLACE FUNCTION @extschema@.get_max_range_value(
 RETURNS ANYELEMENT AS 'pg_pathman', 'get_max_range_value' LANGUAGE C STRICT;
 
 /*
+ * Checks if range overlaps with existing partitions.
+ * Returns TRUE if overlaps and FALSE otherwise.
+ */
+CREATE OR REPLACE FUNCTION @extschema@.check_overlap(
+    parent_relid OID, range_min ANYELEMENT, range_max ANYELEMENT)
+RETURNS BOOLEAN AS 'pg_pathman', 'check_overlap' LANGUAGE C STRICT;
+
+/*
  * Copy rows to partitions
  */
 CREATE OR REPLACE FUNCTION @extschema@.partition_data(

@@ -777,7 +777,7 @@ handle_binary_opexpr(const PartRelationInfo *prel, WrapperNode *result,
 					}
 
 					/* If we still didn't find partition then it doesn't exist */
-					if (startidx == endidx)
+					if (startidx >= endidx)
 					{
 						result->rangeset = NIL;
 						return;
@@ -851,7 +851,8 @@ make_hash(const PartRelationInfo *prel, int value)
 /*
  * Search for range section. Returns position of the item in array.
  * If item wasn't found then function returns closest position and sets
- * foundPtr to false.
+ * foundPtr to false. If value is outside the range covered by partitions
+ * then returns -1.
  */
 int
 range_binary_search(const RangeRelation *rangerel, FmgrInfo *cmp_func, Datum value, bool *foundPtr)
@@ -874,9 +875,9 @@ range_binary_search(const RangeRelation *rangerel, FmgrInfo *cmp_func, Datum val
 	cmp_min = FunctionCall2(cmp_func, value, PATHMAN_GET_DATUM(ranges[0].min, byVal)),
 	cmp_max = FunctionCall2(cmp_func, value, PATHMAN_GET_DATUM(ranges[rangerel->ranges.length - 1].max, byVal));
 
-	if (cmp_min < 0 || cmp_max >0)
+	if (cmp_min < 0 || cmp_max >= 0)
 	{
-		return i;
+		return -1;
 	}
 
 	while (true)
@@ -893,7 +894,7 @@ range_binary_search(const RangeRelation *rangerel, FmgrInfo *cmp_func, Datum val
 			break;
 		}
 
-		if (startidx == endidx)
+		if (startidx >= endidx)
 			return i;
 
 		if (cmp_min < 0)

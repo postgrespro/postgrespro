@@ -498,6 +498,8 @@ EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt BETWEEN '2014-12-15' A
          Index Cond: (dt <= 'Thu Jan 15 00:00:00 2015'::timestamp without time zone)
 (3 rows)
 
+SELECT pathman.add_range_partition('test.range_rel', '2014-12-01'::DATE, '2015-01-02'::DATE);
+ERROR:  Specified range overlaps with existing partitions P0001
 SELECT pathman.add_range_partition('test.range_rel', '2014-12-01'::DATE, '2015-01-01'::DATE);
 NOTICE:  Done!
  add_range_partition 
@@ -516,6 +518,8 @@ EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt BETWEEN '2014-12-15' A
 (5 rows)
 
 CREATE TABLE test.range_rel_archive (LIKE test.range_rel INCLUDING ALL);
+SELECT pathman.attach_range_partition('test.range_rel', 'test.range_rel_archive', '2014-01-01'::DATE, '2015-01-01'::DATE);
+ERROR:  Specified range overlaps with existing partitions P0001
 SELECT pathman.attach_range_partition('test.range_rel', 'test.range_rel_archive', '2014-01-01'::DATE, '2014-12-01'::DATE);
  attach_range_partition 
 ------------------------
@@ -655,6 +659,59 @@ SELECT * FROM pathman.pathman_config;
  id | relname | attname | parttype | range_interval 
 ----+---------+---------+----------+----------------
 (0 rows)
+
+/* Check overlaps */
+CREATE TABLE test.num_range_rel (
+    id SERIAL PRIMARY KEY,
+    txt TEXT);
+SELECT pathman.create_range_partitions('test.num_range_rel', 'id', 1000, 1000, 4);
+NOTICE:  Copying data to partitions...
+ create_range_partitions 
+-------------------------
+                       4
+(1 row)
+
+SELECT pathman.check_overlap('test.num_range_rel'::regclass::oid, 4001, 5000);
+ check_overlap 
+---------------
+ t
+(1 row)
+
+SELECT pathman.check_overlap('test.num_range_rel'::regclass::oid, 4000, 5000);
+ check_overlap 
+---------------
+ t
+(1 row)
+
+SELECT pathman.check_overlap('test.num_range_rel'::regclass::oid, 3999, 5000);
+ check_overlap 
+---------------
+ t
+(1 row)
+
+SELECT pathman.check_overlap('test.num_range_rel'::regclass::oid, 3000, 3500);
+ check_overlap 
+---------------
+ t
+(1 row)
+
+SELECT pathman.check_overlap('test.num_range_rel'::regclass::oid, 0, 999);
+ check_overlap 
+---------------
+ f
+(1 row)
+
+SELECT pathman.check_overlap('test.num_range_rel'::regclass::oid, 0, 1000);
+ check_overlap 
+---------------
+ f
+(1 row)
+
+SELECT pathman.check_overlap('test.num_range_rel'::regclass::oid, 0, 1001);
+ check_overlap 
+---------------
+ t
+(1 row)
 
 DROP EXTENSION pg_pathman;
 /* Test that everithing works fine without schemas */

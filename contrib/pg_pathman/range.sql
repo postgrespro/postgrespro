@@ -798,7 +798,10 @@ BEGIN
 
     p_relation := @extschema@.validate_relname(p_relation);
 
-    /* TODO: check range overlap */
+    /* check range overlap */
+    IF @extschema@.check_overlap(p_relation::regclass::oid, p_start_value, p_end_value) != FALSE THEN
+        RAISE EXCEPTION 'Specified range overlaps with existing partitions';
+    END IF;
 
     IF p_start_value >= p_end_value THEN
         RAISE EXCEPTION 'Failed to create partition: p_start_value is greater than p_end_value';
@@ -880,6 +883,10 @@ BEGIN
     PERFORM @extschema@.acquire_partitions_lock();
 
     p_relation := @extschema@.validate_relname(p_relation);
+
+    IF @extschema@.check_overlap(p_relation::regclass::oid, p_start_value, p_end_value) != FALSE THEN
+        RAISE EXCEPTION 'Specified range overlaps with existing partitions';
+    END IF;
 
     /* Set inheritance */
     EXECUTE format('ALTER TABLE %s INHERIT %s'

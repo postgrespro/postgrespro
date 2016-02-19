@@ -114,9 +114,11 @@ SELECT pathman.prepend_range_partition('test.range_rel');
 EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt BETWEEN '2014-12-15' AND '2015-01-15';
 SELECT pathman.drop_range_partition('test.range_rel_7');
 EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt BETWEEN '2014-12-15' AND '2015-01-15';
+SELECT pathman.add_range_partition('test.range_rel', '2014-12-01'::DATE, '2015-01-02'::DATE);
 SELECT pathman.add_range_partition('test.range_rel', '2014-12-01'::DATE, '2015-01-01'::DATE);
 EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt BETWEEN '2014-12-15' AND '2015-01-15';
 CREATE TABLE test.range_rel_archive (LIKE test.range_rel INCLUDING ALL);
+SELECT pathman.attach_range_partition('test.range_rel', 'test.range_rel_archive', '2014-01-01'::DATE, '2015-01-01'::DATE);
 SELECT pathman.attach_range_partition('test.range_rel', 'test.range_rel_archive', '2014-01-01'::DATE, '2014-12-01'::DATE);
 EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt BETWEEN '2014-11-15' AND '2015-01-15';
 SELECT pathman.detach_range_partition('test.range_rel_archive');
@@ -155,6 +157,19 @@ SELECT * FROM test.range_rel WHERE dt = '2015-03-15';
 
 DROP TABLE test.range_rel CASCADE;
 SELECT * FROM pathman.pathman_config;
+
+/* Check overlaps */
+CREATE TABLE test.num_range_rel (
+    id SERIAL PRIMARY KEY,
+    txt TEXT);
+SELECT pathman.create_range_partitions('test.num_range_rel', 'id', 1000, 1000, 4);
+SELECT pathman.check_overlap('test.num_range_rel'::regclass::oid, 4001, 5000);
+SELECT pathman.check_overlap('test.num_range_rel'::regclass::oid, 4000, 5000);
+SELECT pathman.check_overlap('test.num_range_rel'::regclass::oid, 3999, 5000);
+SELECT pathman.check_overlap('test.num_range_rel'::regclass::oid, 3000, 3500);
+SELECT pathman.check_overlap('test.num_range_rel'::regclass::oid, 0, 999);
+SELECT pathman.check_overlap('test.num_range_rel'::regclass::oid, 0, 1000);
+SELECT pathman.check_overlap('test.num_range_rel'::regclass::oid, 0, 1001);
 
 DROP EXTENSION pg_pathman;
 
