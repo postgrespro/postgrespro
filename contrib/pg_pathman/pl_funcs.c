@@ -327,6 +327,7 @@ check_overlap(PG_FUNCTION_ARGS)
 	FmgrInfo		  cmp_func_1;
 	FmgrInfo		  cmp_func_2;
 	int i;
+	bool byVal;
 
 	prel = get_pathman_relation_info(parent_oid, NULL);
 	rangerel = get_pathman_range_relation(parent_oid, NULL);
@@ -338,11 +339,14 @@ check_overlap(PG_FUNCTION_ARGS)
 	cmp_func_1 = *get_cmp_func(p1_type, prel->atttype);
 	cmp_func_2 = *get_cmp_func(p2_type, prel->atttype);
 
+	byVal = rangerel->by_val;
 	ranges = (RangeEntry *) dsm_array_get_pointer(&rangerel->ranges);
 	for (i=0; i<rangerel->ranges.length; i++)
 	{
-		bool c1 = FunctionCall2(&cmp_func_1, p1, ranges[i].max);
-		bool c2 = FunctionCall2(&cmp_func_2, p2, ranges[i].min);
+		bool c1 = FunctionCall2(&cmp_func_1, p1,
+								PATHMAN_GET_DATUM(ranges[i].max, byVal));
+		bool c2 = FunctionCall2(&cmp_func_2, p2,
+								PATHMAN_GET_DATUM(ranges[i].min, byVal));
 
 		if (c1 < 0 && c2 > 0)
 			PG_RETURN_BOOL(true);
