@@ -204,9 +204,11 @@ get_partition_range(PG_FUNCTION_ARGS)
 
 	if (found)
 	{
+		bool byVal = rangerel->by_val;
+
 		elems = palloc(nelems * sizeof(Datum));
-		elems[0] = ranges[i].min;
-		elems[1] = ranges[i].max;
+		elems[0] = PATHMAN_GET_DATUM(ranges[i].min, byVal);
+		elems[1] = PATHMAN_GET_DATUM(ranges[i].max, byVal);
 
 		arr = construct_array(elems, nelems, prel->atttype,
 							  tce->typlen, tce->typbyval, tce->typalign);
@@ -251,8 +253,8 @@ get_range_by_idx(PG_FUNCTION_ARGS)
 		re = &ranges[rangerel->ranges.length - 1];
 
 	elems = palloc(2 * sizeof(Datum));
-	elems[0] = re->min;
-	elems[1] = re->max;
+	elems[0] = PATHMAN_GET_DATUM(re->min, rangerel->by_val);
+	elems[1] = PATHMAN_GET_DATUM(re->max, rangerel->by_val);
 
 	PG_RETURN_ARRAYTYPE_P(
 		construct_array(elems, 2, prel->atttype,
@@ -277,7 +279,7 @@ get_min_range_value(PG_FUNCTION_ARGS)
 		PG_RETURN_NULL();
 
 	ranges = dsm_array_get_pointer(&rangerel->ranges);
-	PG_RETURN_DATUM(ranges[0].min);
+	PG_RETURN_DATUM(PATHMAN_GET_DATUM(ranges[0].min, rangerel->by_val));
 }
 
 /*
@@ -298,7 +300,7 @@ get_max_range_value(PG_FUNCTION_ARGS)
 		PG_RETURN_NULL();
 
 	ranges = dsm_array_get_pointer(&rangerel->ranges);
-	PG_RETURN_DATUM(ranges[rangerel->ranges.length-1].max);
+	PG_RETURN_DATUM(PATHMAN_GET_DATUM(ranges[rangerel->ranges.length-1].max, rangerel->by_val));
 }
 
 /*

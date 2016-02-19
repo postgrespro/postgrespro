@@ -82,16 +82,25 @@ typedef struct HashRelation
 typedef struct RangeEntry
 {
 	Oid		child_oid;
-	Datum	min;
-	Datum	max;
+	// Datum	min;
+	// Datum	max;
+	#ifdef HAVE_INT64_TIMESTAMP
+	int64		min;
+	int64		max;
+	#else
+	double		min;
+	double		max;
+	#endif
 } RangeEntry;
 
 typedef struct RangeRelation
 {
 	RelationKey	key;
+	bool        by_val;
 	DsmArray    ranges;
 } RangeRelation;
 
+#define PATHMAN_GET_DATUM(value, by_val) ( (by_val) ? (value) : PointerGetDatum(&value) )
 
 typedef int IndexRange;
 #define RANGE_INFINITY 0x7FFF

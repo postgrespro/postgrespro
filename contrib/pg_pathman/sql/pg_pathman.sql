@@ -182,11 +182,6 @@ SELECT prepend_range_partition('range_rel');
 EXPLAIN (COSTS OFF) SELECT * FROM range_rel WHERE dt < '2010-03-01';
 EXPLAIN (COSTS OFF) SELECT * FROM range_rel WHERE dt > '2010-12-15';
 
-/* Manual partitions creation */
-CREATE TABLE range_rel_archive (CHECK (dt >= '2000-01-01' AND dt < '2005-01-01')) INHERITS (range_rel);
-SELECT on_update_partitions('range_rel'::regclass::oid);
-EXPLAIN (COSTS OFF) SELECT * FROM range_rel WHERE dt < '2010-03-01';
-
 /* Create range partitions from whole range */
 SELECT drop_range_partitions('range_rel');
 SELECT create_partitions_from_range('range_rel', 'id', 1, 1000, 100);
