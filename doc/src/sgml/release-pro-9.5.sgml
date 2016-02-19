@@ -1,20 +1,51 @@
 <!-- doc/src/sgml/release-pro-9.5.sgml -->
 <!-- See header comment in release.sgml about typical markup -->
+ <sect1 id="release-pro-9-5-1-2">
+ <title>Postgres Pro 9.5.1.1</title>
+ <note>
+  <title>Release Date</title>
+  <simpara>2016-02-26</simpara>
+  <simpara>Current as of 2016-02-19</simpara>
+ </note>
+  <sect2>
+   <title>Overview</title>
 
- <sect1 id="release-pro-9-5">
-  <title>Postgres Pro 9.5</title>
+   <para>
+    Major enhancements in <productname>Postgres Pro</> 9.5.1.2 over
+    <productname>PostgrePro</> 9.5.1.1 include:
+   </para>
+
+   <!-- This list duplicates items below, but without authors or details-->
+
+   <itemizedlist>
+
+    <listitem>
+     <para>
+     Improvement of substring simularity search (pg_trgm module).
+     </para>
+    </listitem>
+    <listitem>
+     <para>
+     Support of loading of the ispell dictionaries into shared memory. 
+     </para>
+    </listitem>
+   </itemizedlist>
+   </sect2>
+ </sect1>
+ <sect1 id="release-pro-9-5-0-1">
+  <title>Postgres Pro 9.5.0.1</title>
 
   <note>
    <title>Release Date</title>
    <simpara>2016-02-01</simpara>
-   <simpara>Current as of 2016-01-28</simpara>
   </note>
 
   <sect2>
    <title>Overview</title>
 
    <para>
-    Major enhancements in <productname>Postgres Pro</> 9.5 include:
+    Major enhancements in <productname>Postgres Pro</> 9.5 over
+    <productname>PostgreSQL</> 9.5 include:
    </para>
 
    <!-- This list duplicates items below, but without authors or details-->
