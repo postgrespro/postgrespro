@@ -76,10 +76,10 @@ create_partitions_bg_worker(Oid relid, Datum value, Oid value_type)
 	}
 
 	status = WaitForBackgroundWorkerStartup(worker_handle, &pid);
-	if (status != BGWH_STARTED)
+	if (status == BGWH_POSTMASTER_DIED)
 	{
 		ereport(WARNING,
-                (errmsg("Could not start dynamic pg_pathman background process"),
+                (errmsg("Postmaster died during the pg_pathman background worker process"),
                  errhint("More details may be available in the server log.")));
 	}
 
