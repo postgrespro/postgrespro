@@ -11,6 +11,8 @@ INSERT INTO test.hash_rel VALUES (1, 1);
 INSERT INTO test.hash_rel VALUES (2, 2);
 INSERT INTO test.hash_rel VALUES (3, 3);
 SELECT pathman.create_hash_partitions('test.hash_rel', 'value', 3);
+ALTER TABLE test.hash_rel ALTER COLUMN value SET NOT NULL;
+SELECT pathman.create_hash_partitions('test.hash_rel', 'value', 3);
 SELECT COUNT(*) FROM test.hash_rel;
 SELECT COUNT(*) FROM ONLY test.hash_rel;
 INSERT INTO test.hash_rel VALUES (4, 4);
@@ -26,6 +28,8 @@ CREATE TABLE test.range_rel (
 CREATE INDEX ON test.range_rel (dt);
 INSERT INTO test.range_rel (dt, txt)
 SELECT g, md5(g::TEXT) FROM generate_series('2015-01-01', '2015-04-30', '1 day'::interval) as g;
+SELECT pathman.create_range_partitions('test.range_rel', 'dt', '2015-01-01'::DATE, '1 month'::INTERVAL, 2);
+ALTER TABLE test.range_rel ALTER COLUMN dt SET NOT NULL;
 SELECT pathman.create_range_partitions('test.range_rel', 'dt', '2015-01-01'::DATE, '1 month'::INTERVAL, 2);
 SELECT pathman.create_range_partitions('test.range_rel', 'dt', '2015-01-01'::DATE, '1 month'::INTERVAL);
 SELECT COUNT(*) FROM test.range_rel;
@@ -142,7 +146,7 @@ DROP TABLE test.range_rel CASCADE;
 /* Test automatic partition creation */
 CREATE TABLE test.range_rel (
     id SERIAL PRIMARY KEY,
-    dt TIMESTAMP);
+    dt TIMESTAMP NOT NULL);
 SELECT pathman.create_range_partitions('test.range_rel', 'dt', '2015-01-01'::DATE, '10 days'::INTERVAL, 1);
 INSERT INTO test.range_rel (dt)
 SELECT generate_series('2015-01-01', '2015-04-30', '1 day'::interval);
@@ -179,7 +183,7 @@ CREATE EXTENSION pg_pathman;
 /* Hash */
 CREATE TABLE hash_rel (
     id      SERIAL PRIMARY KEY,
-    value   INTEGER);
+    value   INTEGER NOT NULL);
 INSERT INTO hash_rel (value) SELECT g FROM generate_series(1, 10000) as g;
 SELECT create_hash_partitions('hash_rel', 'value', 3);
 EXPLAIN (COSTS OFF) SELECT * FROM hash_rel WHERE id = 1234;
@@ -187,7 +191,7 @@ EXPLAIN (COSTS OFF) SELECT * FROM hash_rel WHERE id = 1234;
 /* Range */
 CREATE TABLE range_rel (
     id SERIAL PRIMARY KEY,
-    dt TIMESTAMP);
+    dt TIMESTAMP NOT NULL);
 INSERT INTO range_rel (dt) SELECT g FROM generate_series('2010-01-01'::date, '2010-12-31'::date, '1 day') as g;
 SELECT create_range_partitions('range_rel', 'dt', '2010-01-01'::date, '1 month'::interval, 12);
 SELECT merge_range_partitions('range_rel_1', 'range_rel_2');

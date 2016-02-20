@@ -17,12 +17,12 @@ DECLARE
 BEGIN
     p_relation := @extschema@.validate_relname(p_relation);
 
-    -- IF p_count <= 0 THEN
-    --     RAISE EXCEPTION 'Partitions count must be greater than zero';
-    -- END IF;
-
     IF EXISTS (SELECT * FROM @extschema@.pathman_config WHERE relname = p_relation) THEN
         RAISE EXCEPTION 'Relation "%" has already been partitioned', p_relation;
+    END IF;
+
+    IF @extschema@.is_attribute_nullable(p_relation, p_attribute) THEN
+        RAISE EXCEPTION 'Partitioning key ''%'' must be NOT NULL', p_attribute;
     END IF;
 
     /* Try to determine partitions count if not set */
@@ -116,6 +116,10 @@ BEGIN
         RAISE EXCEPTION 'Relation "%" has already been partitioned', p_relation;
     END IF;
 
+    IF @extschema@.is_attribute_nullable(p_relation, p_attribute) THEN
+        RAISE EXCEPTION 'Partitioning key ''%'' must be NOT NULL', p_attribute;
+    END IF;
+
     /* Try to determine partitions count if not set */
     IF p_count IS NULL THEN
         EXECUTE format('SELECT count(*), max(%s) FROM %s'
@@ -204,6 +208,10 @@ BEGIN
         RAISE EXCEPTION 'Relation "%" has already been partitioned', p_relation;
     END IF;
 
+    IF @extschema@.is_attribute_nullable(p_relation, p_attribute) THEN
+        RAISE EXCEPTION 'Partitioning key ''%'' must be NOT NULL', p_attribute;
+    END IF;
+
     EXECUTE format('DROP SEQUENCE IF EXISTS %s_seq', p_relation);
     EXECUTE format('CREATE SEQUENCE %s_seq START 1', p_relation);
 
@@ -264,6 +272,10 @@ BEGIN
 
     IF EXISTS (SELECT * FROM @extschema@.pathman_config WHERE relname = p_relation) THEN
         RAISE EXCEPTION 'Relation "%" has already been partitioned', p_relation;
+    END IF;
+
+    IF @extschema@.is_attribute_nullable(p_relation, p_attribute) THEN
+        RAISE EXCEPTION 'Partitioning key ''%'' must be NOT NULL', p_attribute;
     END IF;
 
     EXECUTE format('DROP SEQUENCE IF EXISTS %s_seq', p_relation);
@@ -975,7 +987,10 @@ DECLARE
             v_part_relid OID;
         BEGIN
             IF TG_OP = ''INSERT'' THEN
-                v_part_relid := @extschema@.find_or_create_range_partition(TG_RELID, NEW.%s);
+                IF NEW.%2$s IS NULL THEN
+                    RAISE EXCEPTION ''ERROR: NULL value in partitioning key'';
+                END IF;
+                v_part_relid := @extschema@.find_or_create_range_partition(TG_RELID, NEW.%2$s);
                 IF NOT v_part_relid IS NULL THEN
                     EXECUTE format(''INSERT INTO %%s SELECT $1.*'', v_part_relid::regclass)
                     USING NEW;

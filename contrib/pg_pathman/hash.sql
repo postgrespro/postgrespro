@@ -21,6 +21,10 @@ BEGIN
         RAISE EXCEPTION 'Attribute type must be INTEGER';
     END IF;
 
+    IF @extschema@.is_attribute_nullable(relation, attribute) THEN
+        RAISE EXCEPTION 'Partitioning key ''%'' must be NOT NULL', attribute;
+    END IF;
+
     /* Create partitions and update pg_pathman configuration */
     FOR partnum IN 0..partitions_count-1
     LOOP

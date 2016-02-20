@@ -141,6 +141,24 @@ LANGUAGE plpgsql;
 
 
 /*
+ * Checks if attribute is nullable
+ */
+CREATE OR REPLACE FUNCTION @extschema@.is_attribute_nullable(
+    p_relation TEXT
+    , p_attname TEXT
+    , OUT p_nullable BOOLEAN)
+RETURNS BOOLEAN AS
+$$
+BEGIN
+    SELECT NOT attnotnull INTO p_nullable
+    FROM pg_type JOIN pg_attribute on atttypid = "oid"
+    WHERE attrelid = p_relation::regclass::oid and attname = lower(p_attname);
+END
+$$
+LANGUAGE plpgsql;
+
+
+/*
  * Validates relation name. It must be schema qualified
  */
 CREATE OR REPLACE FUNCTION @extschema@.validate_relname(relname TEXT)
