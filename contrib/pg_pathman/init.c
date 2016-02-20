@@ -342,10 +342,9 @@ load_check_constraints(Oid parent_oid, Snapshot snapshot)
 			{
 				Datum cur_upper = PATHMAN_GET_DATUM(ranges[i].max, byVal);
 				Datum next_lower = PATHMAN_GET_DATUM(ranges[i+1].min, byVal);
-				bool overlap = FunctionCall2(qsort_type_cmp_func, next_lower, cur_upper) < 0;
+				bool overlap = DatumGetInt32(FunctionCall2(qsort_type_cmp_func, next_lower, cur_upper)) < 0;
 
 				if (overlap)
-				// if (ranges[i].max > ranges[i+1].min)
 				{
 					RelationKey key;
 					key.dbid = MyDatabaseId;
