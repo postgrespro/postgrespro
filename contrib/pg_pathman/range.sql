@@ -644,9 +644,8 @@ BEGIN
     INTO v_part_name
     USING p_relation, v_atttype, v_interval;
 
-    /* Tell backend to reload configuration */
-    PERFORM @extschema@.on_create_partitions(p_relation::regclass::oid);
-    -- PERFORM @extschema@.on_update_partitions(p_relation::regclass::oid);
+    /* Invalidate cache */
+    PERFORM @extschema@.on_update_partitions(p_relation::regclass::oid);
 
     /* Release lock */
     PERFORM @extschema@.release_partitions_lock();
@@ -715,9 +714,8 @@ BEGIN
     INTO v_part_name
     USING p_relation, v_atttype, v_interval;
 
-    /* Tell backend to reload configuration */
-    PERFORM @extschema@.on_create_partitions(p_relation::regclass::oid);
-    -- PERFORM @extschema@.on_update_partitions(p_relation::regclass::oid);
+    /* Invalidate cache */
+    PERFORM @extschema@.on_update_partitions(p_relation::regclass::oid);
 
     /* Release lock */
     PERFORM @extschema@.release_partitions_lock();

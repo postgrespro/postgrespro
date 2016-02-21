@@ -196,7 +196,7 @@ EXPLAIN SELECT * FROM ONLY items;
 Рассмотрим пример разбиения таблицы по диапазону дат. Пусть у нас имеется таблица логов:
 ```
 CREATE TABLE journal (
-    id      SERIAL PRIMARY KEY,
+    id      SERIAL,
     dt      TIMESTAMP NOT NULL,
     level   INTEGER,
     msg     TEXT
@@ -213,74 +213,60 @@ SELECT create_range_partitions('journal', 'dt', '2015-01-01'::date, '1 day'::int
 ```
 Новые секции добавляются автоматически при вставке новых записей в непокрытую область. Однако есть возможность добавлять секции вручную. Для этого можно воспользоваться следующими функциями:
 ```
-SELECT add_partition()
+SELECT add_range_partition('journal', '2016-01-01'::date, '2016-01-07'::date);
+SELECT append_range_partition('journal');
+```
+Первая создает новую секцию с заданным диапазоном. Вторая создает новую секцию с интервалом, заданным при первоначальном разбиении, и добавляет ее в конец списка секций. Также можно присоеднинить существующую таблицу в качестве секции. Например, это может быть таблица с архивными данными, расположенная на другом сервере и подключенная с помощью fdw:
+
+```
+CREATE FOREIGN TABLE journal_archive (
+    id      INTEGER NOT NULL,
+    dt      TIMESTAMP NOT NULL,
+    level   INTEGER,
+    msg     TEXT
+) SERVER archive_server;
+```
+> Важно: структура подключаемой таблицы должна полностью совпадать с родительской.
+Подключим ее к имеющемуся разбиению:
+```
+SELECT attach_range_partition('journal', 'journal_archive', '2014-01-01'::date, '2015-01-01'::date);
+```
+Устаревшие секции можно сливать с архивной:
+```
+SELECT merge_range_partitions('journal_archive', 'journal_1');
+```
+Разделить ранее созданную секцию на две можно с помощью следующей функции, указав точку деления:
+```
+SELECT split_range_partition('journal_366', '2016-01-03'::date);
+```
+Чтобы отсоединить ранее созданную или присоединенную секцию воспользуйтесь функцией:
+```
+SELECT detach_range_partition('journal_archive');
 ```
 
-Объединим первые две секции:
-```
-SELECT merge_range_partitions('journal_1', 'journal_2');
-```
-Разделим первую секцию на две по дате '2010-02-15':
-```
-SELECT split_range_partition('range_rel_1', '2010-02-15'::date);
-```
-Добавим новую секцию в конец списка секций:
-```
-SELECT append_partition('range_rel');
-```
 Пример построения плана для запроса с фильтрацией по ключевому полю:
 ```
-SELECT * FROM range_rel WHERE dt >= '2012-04-30' AND dt <= '2012-05-01';
- id  |         dt          
------+---------------------
- 851 | 2012-04-30 00:00:00
- 852 | 2012-05-01 00:00:00
+SELECT * FROM journal WHERE dt >= '2015-06-01' AND dt < '2015-06-03';
+   id   |         dt          | level |               msg
+--------+---------------------+-------+----------------------------------
+ 217441 | 2015-06-01 00:00:00 |     2 | 15053892d993ce19f580a128f87e3dbf
+ 217442 | 2015-06-01 00:01:00 |     1 | 3a7c46f18a952d62ce5418ac2056010c
+ 217443 | 2015-06-01 00:02:00 |     0 | 92c8de8f82faf0b139a3d99f2792311d
+ ...
+(2880 rows)
 
-EXPLAIN SELECT * FROM range_rel WHERE dt >= '2012-04-30' AND dt <= '2012-05-01';
-                                 QUERY PLAN                                 
-----------------------------------------------------------------------------
- Append  (cost=0.00..60.80 rows=0 width=0)
-   ->  Seq Scan on range_rel_28  (cost=0.00..30.40 rows=0 width=0)
-         Filter: (dt >= '2012-04-30 00:00:00'::timestamp without time zone)
-   ->  Seq Scan on range_rel_29  (cost=0.00..30.40 rows=0 width=0)
-         Filter: (dt <= '2012-05-01 00:00:00'::timestamp without time zone)
+EXPLAIN SELECT * FROM journal WHERE dt >= '2015-06-01' AND dt < '2015-06-03';
+                            QUERY PLAN
+------------------------------------------------------------------
+ Append  (cost=0.00..58.80 rows=0 width=0)
+   ->  Seq Scan on journal_152  (cost=0.00..29.40 rows=0 width=0)
+   ->  Seq Scan on journal_153  (cost=0.00..29.40 rows=0 width=0)
+(3 rows)
 ```
 
-### Деакцивация pathman
-Деактивировать pathman для некоторой ранее разделенной таблицы можно следующей командой disable_partitioning():
+### Деакцивация pg_pathman
+Деактивировать механизм pg_pathman для некоторой ранее разделенной таблицы можно следующей командой disable_partitioning():
 ```
-SELECT disable_partitioning('range_rel');
+SELECT disable_partitioning('journal');
 ```
 Все созданные секции и данные останутся по прежнему доступны и будут обрабатываться стандартным планировщиком PostgreSQL.
-### Ручное управление секциями
-Когда набора функций pg_pathman недостаточно для управления секциями, предусмотрено ручное управление. Можно создавать или удалять дочерние таблицы вручную, но после этого необходимо вызывать функцию:
-```
-on_update_partitions(oid),
-```
-которая обновит внутреннее представление структуры секций в памяти pg_pathman. Например, добавим новую секцию к ранее созданной range_rel:
-```
-CREATE TABLE range_rel_archive (CHECK (dt >= '2000-01-01' AND dt < '2010-01-01')) INHERITS (range_rel);
-SELECT on_update_partitions('range_rel'::regclass::oid);
-```
-CHECK CONSTRAINT должен иметь строго определенный формат:
-* (VARIABLE >= CONST AND VARIABLE < CONST) для RANGE секционированных таблиц;
-* (VARIABLE % CONST = CONST) для HASH секционированных таблиц.
-
-Также можно добавить секцию, расположенную на удаленном сервере:
-```
-CREATE FOREIGN TABLE range_rel_archive (
-    id INTEGER NOT NULL,
-    dt TIMESTAMP)
-SERVER archive_server;
-ALTER TABLE range_rel_archive INHERIT range_rel;
-ALTER TABLE range_rel_archive ADD CHECK (dt >= '2000-01-01' AND dt < '2010-01-01');
-SELECT on_update_partitions('range_rel'::regclass::oid);
-```
-Структура таблицы должна полностью совпадать с родительской.
-
-В случае, если родительская таблица была удалена вручную с использованием инструкции DROP TABLE, необходимо удалить соответствующую строку из таблицы pathman_config и вызывать on_remove_partitions():
-```
-SELECT on_remove_partitions('range_rel'::regclass::oid);
-DROP TABLE range_rel CASCADE;
-DELETE FROM pathman_config WHERE relname = 'public.range_rel';
-```
