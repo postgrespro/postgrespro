@@ -159,6 +159,44 @@ LANGUAGE plpgsql;
 
 
 /*
+ * Aggregates several common relation checks before partitioning. Suitable for every partitioning type.
+ */
+CREATE OR REPLACE FUNCTION @extschema@.common_relation_checks(
+    p_relation TEXT
+    , p_attribute TEXT)
+RETURNS BOOLEAN AS
+$$
+DECLARE
+    v_rec RECORD;
+    is_referenced BOOLEAN;
+BEGIN
+    IF EXISTS (SELECT * FROM @extschema@.pathman_config WHERE relname = p_relation) THEN
+        RAISE EXCEPTION 'Relation "%" has already been partitioned', p_relation;
+    END IF;
+
+    IF @extschema@.is_attribute_nullable(p_relation, p_attribute) THEN
+        RAISE EXCEPTION 'Partitioning key ''%'' must be NOT NULL', p_attribute;
+    END IF;
+
+    /* Check if there are foreign keys reference to the relation */
+    FOR v_rec IN (SELECT *
+                  FROM pg_constraint WHERE confrelid = p_relation::regclass::oid)
+    LOOP
+        is_referenced := TRUE;
+        RAISE WARNING 'Foreign key ''%'' references to the relation ''%''', v_rec.conname, p_relation;
+    END LOOP;
+
+    IF is_referenced THEN
+        RAISE EXCEPTION 'Relation ''%'' is referenced from other relations', p_relation;
+    END IF;
+
+    RETURN TRUE;
+END
+$$
+LANGUAGE plpgsql;
+
+
+/*
  * Validates relation name. It must be schema qualified
  */
 CREATE OR REPLACE FUNCTION @extschema@.validate_relname(relname TEXT)

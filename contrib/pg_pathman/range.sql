@@ -16,14 +16,7 @@ DECLARE
     i INTEGER;
 BEGIN
     p_relation := @extschema@.validate_relname(p_relation);
-
-    IF EXISTS (SELECT * FROM @extschema@.pathman_config WHERE relname = p_relation) THEN
-        RAISE EXCEPTION 'Relation "%" has already been partitioned', p_relation;
-    END IF;
-
-    IF @extschema@.is_attribute_nullable(p_relation, p_attribute) THEN
-        RAISE EXCEPTION 'Partitioning key ''%'' must be NOT NULL', p_attribute;
-    END IF;
+    PERFORM @extschema@.common_relation_checks(p_relation, p_attribute);
 
     /* Try to determine partitions count if not set */
     IF p_count IS NULL THEN
@@ -107,17 +100,10 @@ DECLARE
     i INTEGER;
 BEGIN
     p_relation := @extschema@.validate_relname(p_relation);
+    PERFORM @extschema@.common_relation_checks(p_relation, p_attribute);
 
     IF p_count <= 0 THEN
         RAISE EXCEPTION 'Partitions count must be greater than zero';
-    END IF;
-
-    IF EXISTS (SELECT * FROM @extschema@.pathman_config WHERE relname = p_relation) THEN
-        RAISE EXCEPTION 'Relation "%" has already been partitioned', p_relation;
-    END IF;
-
-    IF @extschema@.is_attribute_nullable(p_relation, p_attribute) THEN
-        RAISE EXCEPTION 'Partitioning key ''%'' must be NOT NULL', p_attribute;
     END IF;
 
     /* Try to determine partitions count if not set */
@@ -199,17 +185,10 @@ DECLARE
     i INTEGER := 0;
 BEGIN
     p_relation := @extschema@.validate_relname(p_relation);
+    PERFORM @extschema@.common_relation_checks(p_relation, p_attribute);
 
     IF p_interval <= 0 THEN
         RAISE EXCEPTION 'Interval must be positive';
-    END IF;
-
-    IF EXISTS (SELECT * FROM @extschema@.pathman_config WHERE relname = p_relation) THEN
-        RAISE EXCEPTION 'Relation "%" has already been partitioned', p_relation;
-    END IF;
-
-    IF @extschema@.is_attribute_nullable(p_relation, p_attribute) THEN
-        RAISE EXCEPTION 'Partitioning key ''%'' must be NOT NULL', p_attribute;
     END IF;
 
     EXECUTE format('DROP SEQUENCE IF EXISTS %s_seq', p_relation);
@@ -269,14 +248,7 @@ DECLARE
     i INTEGER := 0;
 BEGIN
     p_relation := @extschema@.validate_relname(p_relation);
-
-    IF EXISTS (SELECT * FROM @extschema@.pathman_config WHERE relname = p_relation) THEN
-        RAISE EXCEPTION 'Relation "%" has already been partitioned', p_relation;
-    END IF;
-
-    IF @extschema@.is_attribute_nullable(p_relation, p_attribute) THEN
-        RAISE EXCEPTION 'Partitioning key ''%'' must be NOT NULL', p_attribute;
-    END IF;
+    PERFORM @extschema@.common_relation_checks(p_relation, p_attribute);
 
     EXECUTE format('DROP SEQUENCE IF EXISTS %s_seq', p_relation);
     EXECUTE format('CREATE SEQUENCE %s_seq START 1', p_relation);

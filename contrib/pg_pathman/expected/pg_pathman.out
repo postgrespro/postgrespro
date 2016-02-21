@@ -862,19 +862,28 @@ EXPLAIN (COSTS OFF) SELECT * FROM range_rel WHERE dt = '2015-12-15';
          Filter: (dt = 'Tue Dec 15 00:00:00 2015'::timestamp without time zone)
 (3 rows)
 
-/* Test exception handling on partitioning */
 CREATE TABLE messages(id SERIAL PRIMARY KEY, msg TEXT);
 CREATE TABLE replies(id SERIAL PRIMARY KEY, message_id INTEGER REFERENCES messages(id),  msg TEXT);
 INSERT INTO messages SELECT g, md5(g::text) FROM generate_series(1, 10) as g;
 INSERT INTO replies SELECT g, g, md5(g::text) FROM generate_series(1, 10) as g;
 SELECT create_range_partitions('messages', 'id', 1, 100, 2);
+WARNING:  Foreign key 'replies_message_id_fkey' references to the relation 'public.messages'
+ERROR:  Relation 'public.messages' is referenced from other relations P0001
+ALTER TABLE replies DROP CONSTRAINT replies_message_id_fkey;
+SELECT create_range_partitions('messages', 'id', 1, 100, 2);
 NOTICE:  sequence "messages_seq" does not exist, skipping
 NOTICE:  Copying data to partitions...
-ERROR:  update or delete on table "messages" violates foreign key constraint "replies_message_id_fkey" on table "replies" 23503
-EXPLAIN (COSTS OFF) SELECT * FROM messages;
-      QUERY PLAN      
-----------------------
- Seq Scan on messages
+ create_range_partitions 
+-------------------------
+                       2
 (1 row)
+
+EXPLAIN (COSTS OFF) SELECT * FROM messages;
+          QUERY PLAN          
+------------------------------
+ Append
+   ->  Seq Scan on messages_1
+   ->  Seq Scan on messages_2
+(3 rows)
 
 DROP EXTENSION pg_pathman;

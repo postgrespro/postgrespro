@@ -208,11 +208,12 @@ SELECT drop_range_partitions('range_rel', TRUE);
 SELECT create_partitions_from_range('range_rel', 'dt', '2015-01-01'::date, '2015-12-01'::date, '1 month'::interval);
 EXPLAIN (COSTS OFF) SELECT * FROM range_rel WHERE dt = '2015-12-15';
 
-/* Test exception handling on partitioning */
 CREATE TABLE messages(id SERIAL PRIMARY KEY, msg TEXT);
 CREATE TABLE replies(id SERIAL PRIMARY KEY, message_id INTEGER REFERENCES messages(id),  msg TEXT);
 INSERT INTO messages SELECT g, md5(g::text) FROM generate_series(1, 10) as g;
 INSERT INTO replies SELECT g, g, md5(g::text) FROM generate_series(1, 10) as g;
+SELECT create_range_partitions('messages', 'id', 1, 100, 2);
+ALTER TABLE replies DROP CONSTRAINT replies_message_id_fkey;
 SELECT create_range_partitions('messages', 'id', 1, 100, 2);
 EXPLAIN (COSTS OFF) SELECT * FROM messages;
 

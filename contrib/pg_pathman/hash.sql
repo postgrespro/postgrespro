@@ -11,18 +11,11 @@ DECLARE
     v_type TEXT;
 BEGIN
     relation := @extschema@.validate_relname(relation);
+    PERFORM @extschema@.common_relation_checks(relation, attribute);
+
     v_type := @extschema@.get_attribute_type_name(relation, attribute);
-
-    IF EXISTS (SELECT * FROM @extschema@.pathman_config WHERE relname = relation) THEN
-        RAISE EXCEPTION 'Relation "%" has already been partitioned', relation;
-    END IF;
-
     IF v_type::regtype != 'integer'::regtype THEN
         RAISE EXCEPTION 'Attribute type must be INTEGER';
-    END IF;
-
-    IF @extschema@.is_attribute_nullable(relation, attribute) THEN
-        RAISE EXCEPTION 'Partitioning key ''%'' must be NOT NULL', attribute;
     END IF;
 
     /* Create partitions and update pg_pathman configuration */
