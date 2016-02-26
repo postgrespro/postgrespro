@@ -3,6 +3,7 @@
  * tsquery_op.c
  *	  Various operations with tsquery
  *
+ * Portions Copyright (c) 2015-2016, Postgres Professional
  * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
  *
  *

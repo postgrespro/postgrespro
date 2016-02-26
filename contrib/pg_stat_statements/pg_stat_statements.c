@@ -49,6 +49,7 @@
  *
  *
  * Copyright (c) 2008-2015, PostgreSQL Global Development Group
+ * Copyright (c) 2015-2016, Postgres Professional
  *
  * IDENTIFICATION
  *	  contrib/pg_stat_statements/pg_stat_statements.c

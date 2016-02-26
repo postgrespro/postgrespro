@@ -10,6 +10,7 @@
  *
  * contrib/dblink/dblink.c
  * Copyright (c) 2001-2015, PostgreSQL Global Development Group
+ * Copyright (c) 2015-2016, Postgres Professional
  * ALL RIGHTS RESERVED;
  *
  * Permission to use, copy, modify, and distribute this software and its

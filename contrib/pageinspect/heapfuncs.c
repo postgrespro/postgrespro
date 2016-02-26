@@ -16,6 +16,7 @@
  * anyway.
  *
  * Copyright (c) 2007-2015, PostgreSQL Global Development Group
+ * Copyright (c) 2015-2016, Postgres Professional
  *
  * IDENTIFICATION
  *	  contrib/pageinspect/heapfuncs.c
