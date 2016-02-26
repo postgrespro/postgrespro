@@ -123,6 +123,7 @@
 <!ENTITY intagg          SYSTEM "intagg.sgml">
 <!ENTITY intarray        SYSTEM "intarray.sgml">
 <!ENTITY isn             SYSTEM "isn.sgml">
+<!ENTITY jsquery         SYSTEM "jsquery.sgml">
 <!ENTITY lo              SYSTEM "lo.sgml">
 <!ENTITY ltree           SYSTEM "ltree.sgml">
 <!ENTITY oid2name        SYSTEM "oid2name.sgml">

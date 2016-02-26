@@ -28,6 +28,7 @@ SUBDIRS = \
 		intagg		\
 		intarray	\
 		isn		\
+		jsquery \
 		lo		\
 		ltree		\
 		oid2name	\
