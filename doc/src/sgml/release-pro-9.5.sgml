@@ -18,7 +18,10 @@
    <!-- This list duplicates items below, but without authors or details-->
 
    <itemizedlist>
-
+    <listitem><para>
+    Include jsquery module (query language for jsonb fields.
+    </para>
+    </listitem>
     <listitem>
      <para>
      Improvement of substring simularity search (pg_trgm module).
@@ -30,6 +33,38 @@
      </para>
     </listitem>
    </itemizedlist>
+   </sect2>
+   <sect2>
+   <title>Changes</title>
+   <para>
+    Below you will find a detailed account of the changes between
+    <productname>PostgrePro</productname> 9.5.12 and the previous minor
+    release.
+   </para>
+   <sect3><title>Additional modules</title>
+   <itemizedlist>
+   <listitem>
+   <para>
+   <literal>jsquery</literal> module - query operators for jsonb structures. Support GIN
+   inexes. Authors Teodor Sigaev, Alexander Korotkov, Oleg Bartunov.
+   </para>
+   </listitem>
+   <listitem>
+   <para>
+   Improvements of <literal>pg_trgm</literal> module. Substring simularity search improved
+   (Artur Zakirov)
+   </para>
+   </listitem>
+   <listitem>
+   <para>
+   <literal>shared_ispell</literal> module
+   Support for loading fulltext-search dictionaries into shared memory.
+   Improves speed, because there is now no need to load huspell
+   dictionary into each session again and again. (Artur Zakirov)
+   </para>
+   </listitem>
+   </itemizedlist>
+   </sect3>
    </sect2>
  </sect1>
  <sect1 id="release-pro-9-5-0-1">
