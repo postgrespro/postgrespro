@@ -133,3 +133,20 @@ use this prepared data).
     db=# SELECT shared_ispell_reset();
 
 That's all for now ...
+
+Changes from original version
+-----------------------------
+The original version of this module located in the Tomas Vondra's
+[GitHub](https://github.com/tvondra/shared_ispell). That version does not handle
+affixes that require full regular expressions (regex_t, implemented in regex.h).
+
+This version of the module can handle that affixes with full regular
+exressions. To handle it the module loads and stores affix files in each
+sessions. The affix list is tiny and takes a little time and memory to parse.
+Actually this is Tomas
+[idea](http://www.postgresql.org/message-id/56A5F3D5.9030702@2ndquadrant.com),
+but there is not related code in the GitHub.
+
+Author
+------
+Tomas Vondra [GitHub](https://github.com/tvondra)
