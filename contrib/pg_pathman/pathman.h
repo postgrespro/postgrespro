@@ -82,8 +82,6 @@ typedef struct HashRelation
 typedef struct RangeEntry
 {
 	Oid		child_oid;
-	// Datum	min;
-	// Datum	max;
 	#ifdef HAVE_INT64_TIMESTAMP
 	int64		min;
 	int64		max;
