@@ -13,6 +13,8 @@
 #include "utils/bytea.h"
 #include "utils/snapmgr.h"
 
+#include "miscadmin.h"
+
 
 HTAB   *relations = NULL;
 HTAB   *range_restrictions = NULL;
@@ -28,6 +30,31 @@ static int cmp_range_entries(const void *p1, const void *p2);
 void
 init_shmem_config()
 {
+	bool found;
+
+	/* Check if module was initialized in postmaster */
+	pmstate = ShmemInitStruct("pathman state", sizeof(PathmanState), &found);
+	if (!found)
+	{
+		/*
+		 * Initialize locks in postmaster
+		 */
+		if (!IsUnderPostmaster)
+		{
+			/* Initialize locks */
+			pmstate->load_config_lock = LWLockAssign();
+			pmstate->dsm_init_lock    = LWLockAssign();
+			pmstate->edit_partitions_lock = LWLockAssign();
+		}
+		else
+		{
+			elog(ERROR, "Pathman module must be initialized in postmaster. "
+						"Put the following line to configuration file: "
+						"shared_preload_libraries='pg_pathman'");
+			initialization_needed = false;
+		}
+	}
+
 	create_relations_hashtable();
 	create_range_restrictions_hashtable();
 }
@@ -46,9 +73,9 @@ load_config(void)
 	/* if config is not loaded */
 	if (new_segment_created)
 	{
-		LWLockAcquire(load_config_lock, LW_EXCLUSIVE);
+		LWLockAcquire(pmstate->load_config_lock, LW_EXCLUSIVE);
 		load_relations_hashtable(new_segment_created);
-		LWLockRelease(load_config_lock);
+		LWLockRelease(pmstate->load_config_lock);
 	}
 }
 

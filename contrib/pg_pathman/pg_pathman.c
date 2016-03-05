@@ -103,6 +103,8 @@ static void set_pathkeys(PlannerInfo *root, RelOptInfo *childrel, Path *path);
 void
 _PG_init(void)
 {
+	/*
+	elog(WARNING, "Pathman initialization. IsUnderPostmaster: %d", IsUnderPostmaster);
 	if (IsUnderPostmaster)
 	{
 		elog(ERROR, "Pathman module must be initialized in postmaster. "
@@ -110,6 +112,7 @@ _PG_init(void)
 					"shared_preload_libraries='pg_pathman'");
 		initialization_needed = false;
 	}
+	*/
 
 	set_rel_pathlist_hook_original = set_rel_pathlist_hook;
 	set_rel_pathlist_hook = pathman_set_rel_pathlist_hook;
@@ -246,16 +249,11 @@ pathman_shmem_startup(void)
 {
 	/* Initialize locks */
 	RequestAddinLWLocks(3);
-	load_config_lock = LWLockAssign();
-	dsm_init_lock    = LWLockAssign();
-	edit_partitions_lock = LWLockAssign();
-
-	LWLockAcquire(AddinShmemInitLock, LW_EXCLUSIVE);
 
 	/* Allocate shared memory objects */
+	LWLockAcquire(AddinShmemInitLock, LW_EXCLUSIVE);
 	init_dsm_config();
 	init_shmem_config();
-
 	LWLockRelease(AddinShmemInitLock);
 
 	/* Invoke original hook if needed */

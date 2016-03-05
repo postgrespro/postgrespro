@@ -98,6 +98,13 @@ typedef struct RangeRelation
 	DsmArray    ranges;
 } RangeRelation;
 
+typedef struct PathmanState
+{
+	LWLock   *load_config_lock;
+	LWLock   *dsm_init_lock;
+	LWLock   *edit_partitions_lock;
+} PathmanState;
+
 #define PATHMAN_GET_DATUM(value, by_val) ( (by_val) ? (value) : PointerGetDatum(&value) )
 
 typedef int IndexRange;
@@ -133,10 +140,10 @@ int irange_list_length(List *rangeset);
 bool irange_list_find(List *rangeset, int index, bool *lossy);
 
 
-LWLock *load_config_lock;
-LWLock *dsm_init_lock;
-LWLock *edit_partitions_lock;
-
+// LWLock *load_config_lock;
+// LWLock *dsm_init_lock;
+// LWLock *edit_partitions_lock;
+PathmanState *pmstate;
 
 /* Dynamic shared memory functions */
 void init_dsm_config(void);

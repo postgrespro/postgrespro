@@ -69,7 +69,7 @@ init_dsm_segment(size_t blocks_count, size_t block_size)
 	bool ret;
 
 	/* lock here */
-	LWLockAcquire(dsm_init_lock, LW_EXCLUSIVE);
+	LWLockAcquire(pmstate->load_config_lock, LW_EXCLUSIVE);
 
 	/* if there is already an existing segment then attach to it */
 	if (dsm_cfg->segment_handle != 0)
@@ -99,9 +99,8 @@ init_dsm_segment(size_t blocks_count, size_t block_size)
 	 * destroyed by the end of transaction
 	 */
 	dsm_pin_mapping(segment);
-
 	/* unlock here */
-	LWLockRelease(dsm_init_lock);
+	LWLockRelease(pmstate->load_config_lock);
 
 	return ret;
 }
