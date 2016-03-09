@@ -105,6 +105,8 @@ typedef struct PathmanState
 	LWLock   *edit_partitions_lock;
 } PathmanState;
 
+PathmanState *pmstate;
+
 #define PATHMAN_GET_DATUM(value, by_val) ( (by_val) ? (value) : PointerGetDatum(&value) )
 
 typedef int IndexRange;
@@ -138,12 +140,6 @@ List *irange_list_union(List *a, List *b);
 List *irange_list_intersect(List *a, List *b);
 int irange_list_length(List *rangeset);
 bool irange_list_find(List *rangeset, int index, bool *lossy);
-
-
-// LWLock *load_config_lock;
-// LWLock *dsm_init_lock;
-// LWLock *edit_partitions_lock;
-PathmanState *pmstate;
 
 /* Dynamic shared memory functions */
 void init_dsm_config(void);

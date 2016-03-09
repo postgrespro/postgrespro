@@ -13,8 +13,6 @@
 #include "utils/bytea.h"
 #include "utils/snapmgr.h"
 
-#include "miscadmin.h"
-
 
 HTAB   *relations = NULL;
 HTAB   *range_restrictions = NULL;

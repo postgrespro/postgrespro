@@ -361,8 +361,6 @@ check_overlap(PG_FUNCTION_ARGS)
 Datum
 acquire_partitions_lock(PG_FUNCTION_ARGS)
 {
-	// int relid = DatumGetInt32(PG_GETARG_DATUM(0));
-	// LockRelationOid(relid, AccessExclusiveLock);
 	LWLockAcquire(pmstate->edit_partitions_lock, LW_EXCLUSIVE);
 	PG_RETURN_NULL();
 }
@@ -370,8 +368,6 @@ acquire_partitions_lock(PG_FUNCTION_ARGS)
 Datum
 release_partitions_lock(PG_FUNCTION_ARGS)
 {
-	// int relid = DatumGetInt32(PG_GETARG_DATUM(0));
-	// UnlockRelationOid(relid, AccessExclusiveLock);
 	LWLockRelease(pmstate->edit_partitions_lock);
 	PG_RETURN_NULL();
 }
