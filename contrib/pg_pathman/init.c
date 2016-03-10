@@ -1,3 +1,12 @@
+/* ------------------------------------------------------------------------
+ *
+ * init.c
+ *		Initialization functions
+ *
+ * Copyright (c) 2015-2016, Postgres Professional
+ *
+ * ------------------------------------------------------------------------
+ */
 #include "pathman.h"
 #include "miscadmin.h"
 #include "executor/spi.h"

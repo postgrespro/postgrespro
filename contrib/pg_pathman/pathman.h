@@ -1,3 +1,12 @@
+/* ------------------------------------------------------------------------
+ *
+ * pathman.h
+ *		structures and prototypes for pathman functions
+ *
+ * Copyright (c) 2015-2016, Postgres Professional
+ *
+ * ------------------------------------------------------------------------
+ */
 #ifndef PATHMAN_H
 #define PATHMAN_H
 

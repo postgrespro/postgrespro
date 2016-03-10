@@ -1,3 +1,13 @@
+/* ------------------------------------------------------------------------
+ *
+ * pg_pathman.c
+ *		This module sets planner hooks, handles SELECT queries and produces
+ *		paths for partitioned tables
+ *
+ * Copyright (c) 2015-2016, Postgres Professional
+ *
+ * ------------------------------------------------------------------------
+ */
 #include "pathman.h"
 #include "postgres.h"
 #include "fmgr.h"

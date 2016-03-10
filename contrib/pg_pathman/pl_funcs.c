@@ -1,3 +1,12 @@
+/* ------------------------------------------------------------------------
+ *
+ * pl_funcs.c
+ *		Utility C functions for stored procedures
+ *
+ * Copyright (c) 2015-2016, Postgres Professional
+ *
+ * ------------------------------------------------------------------------
+ */
 #include "pathman.h"
 #include "utils/lsyscache.h"
 #include "utils/typcache.h"

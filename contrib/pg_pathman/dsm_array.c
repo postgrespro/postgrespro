@@ -1,3 +1,14 @@
+/* ------------------------------------------------------------------------
+ *
+ * init.c
+ *		This module allocates large DSM segment to store arrays,
+ *		initializes it with block structure and provides functions to
+ *		allocate and free arrays
+ *
+ * Copyright (c) 2015-2016, Postgres Professional
+ *
+ * ------------------------------------------------------------------------
+ */
 #include "pathman.h"
 #include "storage/shmem.h"
 #include "storage/dsm.h"

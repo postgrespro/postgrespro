@@ -1,3 +1,12 @@
+/* ------------------------------------------------------------------------
+ *
+ * rangeset.c
+ *		Index range functions
+ *
+ * Copyright (c) 2015-2016, Postgres Professional
+ *
+ * ------------------------------------------------------------------------
+ */
 #include "pathman.h"
 
 /* Check if two ranges are intersecting */
