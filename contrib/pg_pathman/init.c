@@ -44,6 +44,7 @@ init_shmem_config()
 			pmstate->dsm_init_lock    = LWLockAssign();
 			pmstate->edit_partitions_lock = LWLockAssign();
 		}
+#ifdef WIN32
 		else
 		{
 			elog(ERROR, "Pathman module must be initialized in postmaster. "
@@ -51,6 +52,7 @@ init_shmem_config()
 						"shared_preload_libraries='pg_pathman'");
 			initialization_needed = false;
 		}
+#endif
 	}
 
 	create_relations_hashtable();
