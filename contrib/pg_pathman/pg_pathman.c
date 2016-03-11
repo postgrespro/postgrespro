@@ -89,6 +89,8 @@ static void set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, Index rt
 static List *accumulate_append_subpath(List *subpaths, Path *path);
 static void set_pathkeys(PlannerInfo *root, RelOptInfo *childrel, Path *path);
 
+static void handle_delete_query(Query *parse);
+
 /*
  * Compare two Datums with the given comarison function
  *
@@ -194,7 +196,20 @@ pathman_planner_hook(Query *parse, int cursorOptions, ParamListInfo boundParams)
 	}
 
 	inheritance_disabled = false;
-	disable_inheritance(parse);
+
+	// if (parse->commandType != CMD_SELECT)
+
+	switch(parse->commandType)
+	{
+		case CMD_SELECT:
+			disable_inheritance(parse);
+			break;
+		case CMD_DELETE:
+			handle_delete_query(parse);
+			break;
+		default:
+			break;
+	}
 
 	/* Invoke original hook */
 	if (planner_hook_original)
@@ -216,9 +231,6 @@ disable_inheritance(Query *parse)
 	ListCell	  *lc;
 	PartRelationInfo *prel;
 	bool found;
-
-	if (parse->commandType != CMD_SELECT)
-		return;
 
 	foreach(lc, parse->rtable)
 	{
@@ -251,6 +263,54 @@ disable_inheritance(Query *parse)
 				break;
 		}
 	}
+}
+
+/*
+ * Checks if query is affects only one partition. If true then substitute
+ */
+static void
+handle_delete_query(Query *parse)
+{
+	PartRelationInfo *prel;
+	List	   *ranges,
+			   *wrappers = NIL;
+	// ListCell   *lc;
+	RangeTblEntry *rte;
+	WrapperNode *wrap;
+	bool found;
+
+	if (list_length(parse->rtable) != 1)
+		return;
+
+	rte = (RangeTblEntry *) linitial(parse->rtable);
+	prel = get_pathman_relation_info(rte->relid, &found);
+
+	// foreach(lc, parse->jointree->quals)
+	// {
+		// WrapperNode *wrap;
+		// Expr *expr = (Expr *) lfirst(lc);
+
+		// wrap = walk_expr_tree(expr, prel);
+	ranges = list_make1_int(make_irange(0, prel->children_count - 1, false));
+	wrap = walk_expr_tree( (Expr *) parse->jointree->quals, prel);
+	wrappers = lappend(wrappers, wrap);
+	ranges = irange_list_intersect(ranges, wrap->rangeset);
+	// }
+
+	/* If only one partition is affected then substitute parent table with partition */
+	if (irange_list_length(ranges))
+	{
+		IndexRange irange = (IndexRange) linitial_oid(ranges);
+		elog(WARNING, "lower: %d, upper: %d, lossy: %d", irange_lower(irange), irange_upper(irange), irange_is_lossy(irange));
+		if (irange_lower(irange) == irange_upper(irange))
+		{
+			Oid *children = (Oid *) dsm_array_get_pointer(&prel->children);
+			rte->relid = children[irange_lower(irange)];
+			rte->inh = false;
+		}
+	}
+
+	return;
 }
 
 /*
