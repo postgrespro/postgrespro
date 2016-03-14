@@ -5,8 +5,8 @@ CREATE EXTENSION pg_pathman SCHEMA pathman;
 CREATE SCHEMA test;
 
 CREATE TABLE test.hash_rel (
-    id      SERIAL PRIMARY KEY,
-    value   INTEGER);
+	id		SERIAL PRIMARY KEY,
+	value	INTEGER);
 INSERT INTO test.hash_rel VALUES (1, 1);
 INSERT INTO test.hash_rel VALUES (2, 2);
 INSERT INTO test.hash_rel VALUES (3, 3);
@@ -22,9 +22,9 @@ SELECT COUNT(*) FROM test.hash_rel;
 SELECT COUNT(*) FROM ONLY test.hash_rel;
 
 CREATE TABLE test.range_rel (
-    id SERIAL PRIMARY KEY,
-    dt TIMESTAMP,
-    txt TEXT);
+	id	SERIAL PRIMARY KEY,
+	dt	TIMESTAMP,
+	txt	TEXT);
 CREATE INDEX ON test.range_rel (dt);
 INSERT INTO test.range_rel (dt, txt)
 SELECT g, md5(g::TEXT) FROM generate_series('2015-01-01', '2015-04-30', '1 day'::interval) as g;
@@ -36,13 +36,13 @@ SELECT COUNT(*) FROM test.range_rel;
 SELECT COUNT(*) FROM ONLY test.range_rel;
 
 CREATE TABLE test.num_range_rel (
-    id SERIAL PRIMARY KEY,
-    txt TEXT);
+	id	SERIAL PRIMARY KEY,
+	txt	TEXT);
 SELECT pathman.create_range_partitions('test.num_range_rel', 'id', 0, 1000, 4);
 SELECT COUNT(*) FROM test.num_range_rel;
 SELECT COUNT(*) FROM ONLY test.num_range_rel;
 INSERT INTO test.num_range_rel
-    SELECT g, md5(g::TEXT) FROM generate_series(1, 3000) as g;
+	SELECT g, md5(g::TEXT) FROM generate_series(1, 3000) as g;
 SELECT COUNT(*) FROM test.num_range_rel;
 SELECT COUNT(*) FROM ONLY test.num_range_rel;
 
@@ -145,8 +145,8 @@ DROP TABLE test.range_rel CASCADE;
 
 /* Test automatic partition creation */
 CREATE TABLE test.range_rel (
-    id SERIAL PRIMARY KEY,
-    dt TIMESTAMP NOT NULL);
+	id	SERIAL PRIMARY KEY,
+	dt	TIMESTAMP NOT NULL);
 SELECT pathman.create_range_partitions('test.range_rel', 'dt', '2015-01-01'::DATE, '10 days'::INTERVAL, 1);
 INSERT INTO test.range_rel (dt)
 SELECT generate_series('2015-01-01', '2015-04-30', '1 day'::interval);
@@ -164,8 +164,8 @@ SELECT * FROM pathman.pathman_config;
 
 /* Check overlaps */
 CREATE TABLE test.num_range_rel (
-    id SERIAL PRIMARY KEY,
-    txt TEXT);
+	id	SERIAL PRIMARY KEY,
+	txt	TEXT);
 SELECT pathman.create_range_partitions('test.num_range_rel', 'id', 1000, 1000, 4);
 SELECT pathman.check_overlap('test.num_range_rel'::regclass::oid, 4001, 5000);
 SELECT pathman.check_overlap('test.num_range_rel'::regclass::oid, 4000, 5000);
@@ -182,17 +182,17 @@ CREATE EXTENSION pg_pathman;
 
 /* Hash */
 CREATE TABLE hash_rel (
-    id      SERIAL PRIMARY KEY,
-    value   INTEGER NOT NULL);
+	id		SERIAL PRIMARY KEY,
+	value	INTEGER NOT NULL);
 INSERT INTO hash_rel (value) SELECT g FROM generate_series(1, 10000) as g;
 SELECT create_hash_partitions('hash_rel', 'value', 3);
 EXPLAIN (COSTS OFF) SELECT * FROM hash_rel WHERE id = 1234;
 
 /* Range */
 CREATE TABLE range_rel (
-    id SERIAL PRIMARY KEY,
-    dt TIMESTAMP NOT NULL,
-    value INTEGER);
+	id		SERIAL PRIMARY KEY,
+	dt		TIMESTAMP NOT NULL,
+	value	INTEGER);
 INSERT INTO range_rel (dt, value) SELECT g, extract(day from g) FROM generate_series('2010-01-01'::date, '2010-12-31'::date, '1 day') as g;
 SELECT create_range_partitions('range_rel', 'dt', '2010-01-01'::date, '1 month'::interval, 12);
 SELECT merge_range_partitions('range_rel_1', 'range_rel_2');
