@@ -295,7 +295,6 @@ handle_modification_query(Query *parse)
 	if (irange_list_length(ranges) == 1)
 	{
 		IndexRange irange = (IndexRange) linitial_oid(ranges);
-		// elog(WARNING, "lower: %d, upper: %d, lossy: %d", irange_lower(irange), irange_upper(irange), irange_is_lossy(irange));
 		if (irange_lower(irange) == irange_upper(irange))
 		{
 			Oid *children = (Oid *) dsm_array_get_pointer(&prel->children);

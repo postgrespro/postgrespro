@@ -149,7 +149,6 @@ List *irange_list_union(List *a, List *b);
 List *irange_list_intersect(List *a, List *b);
 int irange_list_length(List *rangeset);
 bool irange_list_find(List *rangeset, int index, bool *lossy);
-void print_irange(IndexRange ir);
 
 /* Dynamic shared memory functions */
 void init_dsm_config(void);
