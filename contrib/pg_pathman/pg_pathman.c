@@ -196,9 +196,6 @@ pathman_planner_hook(Query *parse, int cursorOptions, ParamListInfo boundParams)
 	}
 
 	inheritance_disabled = false;
-
-	// if (parse->commandType != CMD_SELECT)
-
 	switch(parse->commandType)
 	{
 		case CMD_SELECT:
@@ -275,7 +272,6 @@ handle_modification_query(Query *parse)
 	PartRelationInfo *prel;
 	List	   *ranges,
 			   *wrappers = NIL;
-	// ListCell   *lc;
 	RangeTblEntry *rte;
 	WrapperNode *wrap;
 	bool found;
@@ -286,23 +282,20 @@ handle_modification_query(Query *parse)
 	rte = (RangeTblEntry *) linitial(parse->rtable);
 	prel = get_pathman_relation_info(rte->relid, &found);
 
-	// foreach(lc, parse->jointree->quals)
-	// {
-		// WrapperNode *wrap;
-		// Expr *expr = (Expr *) lfirst(lc);
+	if (!found)
+		return;
 
-		// wrap = walk_expr_tree(expr, prel);
+	/* Parse syntax tree and extract partition ranges */
 	ranges = list_make1_int(make_irange(0, prel->children_count - 1, false));
 	wrap = walk_expr_tree( (Expr *) parse->jointree->quals, prel);
 	wrappers = lappend(wrappers, wrap);
 	ranges = irange_list_intersect(ranges, wrap->rangeset);
-	// }
 
 	/* If only one partition is affected then substitute parent table with partition */
 	if (irange_list_length(ranges) == 1)
 	{
 		IndexRange irange = (IndexRange) linitial_oid(ranges);
-		elog(WARNING, "lower: %d, upper: %d, lossy: %d", irange_lower(irange), irange_upper(irange), irange_is_lossy(irange));
+		// elog(WARNING, "lower: %d, upper: %d, lossy: %d", irange_lower(irange), irange_upper(irange), irange_is_lossy(irange));
 		if (irange_lower(irange) == irange_upper(irange))
 		{
 			Oid *children = (Oid *) dsm_array_get_pointer(&prel->children);

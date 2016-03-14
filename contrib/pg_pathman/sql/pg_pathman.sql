@@ -191,8 +191,9 @@ EXPLAIN (COSTS OFF) SELECT * FROM hash_rel WHERE id = 1234;
 /* Range */
 CREATE TABLE range_rel (
     id SERIAL PRIMARY KEY,
-    dt TIMESTAMP NOT NULL);
-INSERT INTO range_rel (dt) SELECT g FROM generate_series('2010-01-01'::date, '2010-12-31'::date, '1 day') as g;
+    dt TIMESTAMP NOT NULL,
+    value INTEGER);
+INSERT INTO range_rel (dt, value) SELECT g, extract(day from g) FROM generate_series('2010-01-01'::date, '2010-12-31'::date, '1 day') as g;
 SELECT create_range_partitions('range_rel', 'dt', '2010-01-01'::date, '1 month'::interval, 12);
 SELECT merge_range_partitions('range_rel_1', 'range_rel_2');
 SELECT split_range_partition('range_rel_1', '2010-02-15'::date);
@@ -200,6 +201,14 @@ SELECT append_range_partition('range_rel');
 SELECT prepend_range_partition('range_rel');
 EXPLAIN (COSTS OFF) SELECT * FROM range_rel WHERE dt < '2010-03-01';
 EXPLAIN (COSTS OFF) SELECT * FROM range_rel WHERE dt > '2010-12-15';
+
+/* Test UPDATE and DELETE */
+EXPLAIN (COSTS OFF) UPDATE range_rel SET value = 111 WHERE dt = '2010-06-15';
+UPDATE range_rel SET value = 111 WHERE dt = '2010-06-15';
+SELECT * FROM range_rel WHERE dt = '2010-06-15';
+EXPLAIN (COSTS OFF) DELETE FROM range_rel WHERE dt = '2010-06-15';
+DELETE FROM range_rel WHERE dt = '2010-06-15';
+SELECT * FROM range_rel WHERE dt = '2010-06-15';
 
 /* Create range partitions from whole range */
 SELECT drop_range_partitions('range_rel');
