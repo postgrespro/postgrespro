@@ -66,6 +66,7 @@ static void pathman_set_rel_pathlist_hook(PlannerInfo *root, RelOptInfo *rel, In
 static PlannedStmt * pathman_planner_hook(Query *parse, int cursorOptions, ParamListInfo boundParams);
 
 /* Utility functions */
+static void handle_modification_query(Query *parse);
 static void append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti,
 				RangeTblEntry *rte, int index, Oid childOID, List *wrappers);
 static Node *wrapper_make_expression(WrapperNode *wrap, int index, bool *alwaysTrue);
@@ -89,7 +90,6 @@ static void set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, Index rt
 static List *accumulate_append_subpath(List *subpaths, Path *path);
 static void set_pathkeys(PlannerInfo *root, RelOptInfo *childrel, Path *path);
 
-static void handle_delete_query(Query *parse);
 
 /*
  * Compare two Datums with the given comarison function
@@ -204,8 +204,9 @@ pathman_planner_hook(Query *parse, int cursorOptions, ParamListInfo boundParams)
 		case CMD_SELECT:
 			disable_inheritance(parse);
 			break;
+		case CMD_UPDATE:
 		case CMD_DELETE:
-			handle_delete_query(parse);
+			handle_modification_query(parse);
 			break;
 		default:
 			break;
@@ -269,7 +270,7 @@ disable_inheritance(Query *parse)
  * Checks if query is affects only one partition. If true then substitute
  */
 static void
-handle_delete_query(Query *parse)
+handle_modification_query(Query *parse)
 {
 	PartRelationInfo *prel;
 	List	   *ranges,
@@ -298,7 +299,7 @@ handle_delete_query(Query *parse)
 	// }
 
 	/* If only one partition is affected then substitute parent table with partition */
-	if (irange_list_length(ranges))
+	if (irange_list_length(ranges) == 1)
 	{
 		IndexRange irange = (IndexRange) linitial_oid(ranges);
 		elog(WARNING, "lower: %d, upper: %d, lossy: %d", irange_lower(irange), irange_upper(irange), irange_is_lossy(irange));

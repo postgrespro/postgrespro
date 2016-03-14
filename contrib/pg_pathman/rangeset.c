@@ -65,6 +65,12 @@ print_irange(List *l)
 }
 #endif
 
+void
+print_irange(IndexRange ir)
+{
+	elog(WARNING, "[%d, %d], lossy: %d", irange_lower(ir), irange_upper(ir), irange_is_lossy(ir));
+}
+
 /*
  * Make union of two index rage lists.
  */
