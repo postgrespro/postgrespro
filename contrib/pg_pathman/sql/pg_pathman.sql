@@ -202,6 +202,10 @@ SELECT prepend_range_partition('range_rel');
 EXPLAIN (COSTS OFF) SELECT * FROM range_rel WHERE dt < '2010-03-01';
 EXPLAIN (COSTS OFF) SELECT * FROM range_rel WHERE dt > '2010-12-15';
 
+/* Temporary table for JOINs */
+CREATE TABLE tmp (id INTEGER NOT NULL, value INTEGER NOT NULL);
+INSERT INTO tmp VALUES (1, 1), (2, 2);
+
 /* Test UPDATE and DELETE */
 EXPLAIN (COSTS OFF) UPDATE range_rel SET value = 111 WHERE dt = '2010-06-15';
 UPDATE range_rel SET value = 111 WHERE dt = '2010-06-15';
@@ -209,6 +213,10 @@ SELECT * FROM range_rel WHERE dt = '2010-06-15';
 EXPLAIN (COSTS OFF) DELETE FROM range_rel WHERE dt = '2010-06-15';
 DELETE FROM range_rel WHERE dt = '2010-06-15';
 SELECT * FROM range_rel WHERE dt = '2010-06-15';
+EXPLAIN (COSTS OFF) UPDATE range_rel r SET value = t.value FROM tmp t WHERE r.dt = '2010-01-01' AND r.id = t.id;
+UPDATE range_rel r SET value = t.value FROM tmp t WHERE r.dt = '2010-01-01' AND r.id = t.id;
+EXPLAIN (COSTS OFF) DELETE FROM range_rel r USING tmp t WHERE r.dt = '2010-01-02' AND r.id = t.id;
+DELETE FROM range_rel r USING tmp t WHERE r.dt = '2010-01-02' AND r.id = t.id;
 
 /* Create range partitions from whole range */
 SELECT drop_range_partitions('range_rel');

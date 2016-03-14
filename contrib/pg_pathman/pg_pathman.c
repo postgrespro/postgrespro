@@ -21,6 +21,7 @@
 #include "optimizer/planner.h"
 #include "optimizer/restrictinfo.h"
 #include "optimizer/cost.h"
+#include "parser/parsetree.h"
 #include "utils/hsearch.h"
 #include "utils/tqual.h"
 #include "utils/rel.h"
@@ -276,10 +277,11 @@ handle_modification_query(Query *parse)
 	WrapperNode *wrap;
 	bool found;
 
-	if (list_length(parse->rtable) != 1)
-		return;
+	Assert(parse->commandType == CMD_UPDATE ||
+		   parse->commandType == CMD_DELETE);
+	Assert(parse->resultRelation > 0);
 
-	rte = (RangeTblEntry *) linitial(parse->rtable);
+	rte = rt_fetch(parse->resultRelation, parse->rtable);
 	prel = get_pathman_relation_info(rte->relid, &found);
 
 	if (!found)
