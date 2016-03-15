@@ -381,6 +381,34 @@ EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE (dt >= '2015-01-15' AND d
 (8 rows)
 
 /*
+ * Test CTE query
+ */
+EXPLAIN (COSTS OFF)
+    WITH ttt AS (SELECT * FROM test.range_rel WHERE dt >= '2015-02-01' AND dt < '2015-03-15')
+SELECT * FROM ttt;
+                                         QUERY PLAN                                         
+--------------------------------------------------------------------------------------------
+ CTE Scan on ttt
+   CTE ttt
+     ->  Append
+           ->  Seq Scan on range_rel_2
+           ->  Index Scan using range_rel_3_dt_idx on range_rel_3
+                 Index Cond: (dt < 'Sun Mar 15 00:00:00 2015'::timestamp without time zone)
+(6 rows)
+
+EXPLAIN (COSTS OFF)
+    WITH ttt AS (SELECT * FROM test.hash_rel WHERE value = 2)
+SELECT * FROM ttt;
+              QUERY PLAN              
+--------------------------------------
+ CTE Scan on ttt
+   CTE ttt
+     ->  Append
+           ->  Seq Scan on hash_rel_2
+                 Filter: (value = 2)
+(5 rows)
+
+/*
  * Test split and merge
  */
 /* Split first partition in half */

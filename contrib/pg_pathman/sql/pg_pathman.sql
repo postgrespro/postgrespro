@@ -93,6 +93,17 @@ EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt >= '2015-02-15' AND dt
 EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE (dt >= '2015-01-15' AND dt < '2015-02-15') OR (dt > '2015-03-15');
 
 /*
+ * Test CTE query
+ */
+EXPLAIN (COSTS OFF)
+    WITH ttt AS (SELECT * FROM test.range_rel WHERE dt >= '2015-02-01' AND dt < '2015-03-15')
+SELECT * FROM ttt;
+
+EXPLAIN (COSTS OFF)
+    WITH ttt AS (SELECT * FROM test.hash_rel WHERE value = 2)
+SELECT * FROM ttt;
+
+/*
  * Test split and merge
  */
 
