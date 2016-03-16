@@ -102,6 +102,19 @@ pg_stop_backup(PG_FUNCTION_ARGS)
 	PG_RETURN_LSN(stoppoint);
 }
 
+Datum
+pg_ptrack_clear(PG_FUNCTION_ARGS)
+{
+	if (!superuser() && !has_rolreplication(GetUserId()))
+		ereport(ERROR,
+				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+		 (errmsg("must be superuser or replication role to clear ptrack files"))));
+
+	ptrack_clear();
+
+	PG_RETURN_VOID();
+}
+
 /*
  * pg_switch_xlog: switch to next xlog file
  */
