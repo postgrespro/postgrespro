@@ -103,7 +103,9 @@
 #undef	vfprintf
 #undef	fprintf
 #undef	printf
-
+#ifdef HAVE_WIN32_LIBEDIT
+#undef fputs
+#endif
 /* Info about where the formatted output is going */
 typedef struct
 {
@@ -262,11 +264,31 @@ flushbuffer(PrintfTarget *target)
 	if (!target->failed && nc > 0)
 	{
 		size_t		written;
-
+#ifdef HAVE_WIN32_LIBEDIT
+		/*With Win32 libedit we use WriteW API to write to
+		 * console instead of fwrite*/
+		if (isatty(fileno(target->stream))) 
+		{
+			/* Convert message from buffer (expected as utf8)
+			   to widechar */
+			HANDLE consoleHandle = _get_osf_handle(_fileno(target->stream));
+			DWORD actuallyWritten;
+			wchar_t *widebuf= (wchar_t *)malloc(nc*sizeof(wchar_t));
+			written = MultiByteToWideChar(CP_UTF8,0,target->bufstart,nc,widebuf,nc);
+			WriteConsoleW(consoleHandle,widebuf,written,&actuallyWritten,NULL);
+			if (actuallyWritten == written) 
+				target->nchars += nc;
+			else	
+				target->failed = true;
+		} else {
+#endif		
 		written = fwrite(target->bufstart, 1, nc, target->stream);
 		target->nchars += written;
 		if (written != nc)
 			target->failed = true;
+#ifdef HAVE_WIN32_LIBEDIT
+		}
+#endif		
 	}
 	target->bufptr = target->bufstart;
 }
@@ -1139,3 +1161,22 @@ trailing_pad(int *padlen, PrintfTarget *target)
 		++(*padlen);
 	}
 }
+
+#ifdef HAVE_WIN32_LIBEDIT
+/* replacement to fputs function which uses flushBuffer */
+int pg_fputs(const char *s, FILE *stream)
+{
+	PrintfTarget target;
+	if (stream == NULL)
+	{
+		errno = EINVAL;
+		return -1;
+	}
+	target.bufstart = target.bufptr = s;
+	target.nchars = strlen(s);
+	target.bufend=NULL;
+	target.failed=false;
+	flushbuffer(&target);
+	return target.failed ? -1 : target.nchars;
+}
+#endif

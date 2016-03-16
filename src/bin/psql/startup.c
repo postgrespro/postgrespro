@@ -149,9 +149,8 @@ main(int argc, char *argv[])
 	pset.popt.topt.env_columns = getenv("COLUMNS") ? atoi(getenv("COLUMNS")) : 0;
 
 	pset.notty = (!isatty(fileno(stdin)) || !isatty(fileno(stdout)));
-#ifdef HAVE_WIN_32_LIBEDIT
+#ifdef HAVE_WIN32_LIBEDIT
 	if (!pset.notty && pset.encoding == PG_SQL_ASCII) {
-		_setmode(_fileno(stdout),_O_U8TEXT);
 		pset.encoding = PG_UTF8;
 	}
 #endif
@@ -904,3 +903,4 @@ EstablishVariableSpace(void)
 	SetVariableAssignHook(pset.vars, "PROMPT3", prompt3_hook);
 	SetVariableAssignHook(pset.vars, "VERBOSITY", verbosity_hook);
 }
+
