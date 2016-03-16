@@ -16,6 +16,7 @@
 #include "nodes/pg_list.h"
 #include "nodes/relation.h"
 #include "nodes/primnodes.h"
+#include "optimizer/clauses.h"
 #include "optimizer/paths.h"
 #include "optimizer/pathnode.h"
 #include "optimizer/planner.h"
@@ -299,7 +300,7 @@ handle_modification_query(Query *parse)
 
 	/* Parse syntax tree and extract partition ranges */
 	ranges = list_make1_int(make_irange(0, prel->children_count - 1, false));
-	wrap = walk_expr_tree( (Expr *) parse->jointree->quals, prel);
+	wrap = walk_expr_tree((Expr *) eval_const_expressions(NULL, parse->jointree->quals), prel);
 	wrappers = lappend(wrappers, wrap);
 	ranges = irange_list_intersect(ranges, wrap->rangeset);
 
