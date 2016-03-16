@@ -3,6 +3,7 @@
  * tsvector.c
  *	  I/O functions for tsvector
  *
+ * Portions Copyright (c) 2015-2016, Postgres Professional
  * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
  *
  *
@@ -28,7 +29,7 @@ typedef struct
 
 
 /* Compare two WordEntryPos values for qsort */
-static int
+int
 comparePos(const void *a, const void *b)
 {
 	int			apos = WEP_GETPOS(*(const WordEntryPos *) a);

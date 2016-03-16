@@ -3,6 +3,7 @@
  * genam.c
  *	  general index access method routines
  *
+ * Portions Copyright (c) 2015-2016, Postgres Professional
  * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
@@ -175,6 +176,7 @@ BuildIndexValueDescription(Relation indexRelation,
 	Form_pg_index idxrec;
 	HeapTuple	ht_idx;
 	int			natts = indexRelation->rd_rel->relnatts;
+	int			nkeyatts;
 	int			i;
 	int			keyno;
 	Oid			indexrelid = RelationGetRelid(indexRelation);
@@ -244,6 +246,7 @@ BuildIndexValueDescription(Relation indexRelation,
 	appendStringInfo(&buf, "(%s)=(",
 					 pg_get_indexdef_columns(indexrelid, true));
 
+	nkeyatts = IndexRelationGetNumberOfKeyAttributes(indexRelation);
 	for (i = 0; i < natts; i++)
 	{
 		char	   *val;
@@ -254,20 +257,31 @@ BuildIndexValueDescription(Relation indexRelation,
 		{
 			Oid			foutoid;
 			bool		typisvarlena;
-
+			TupleDesc	tupdesc = RelationGetDescr(indexRelation);
 			/*
-			 * The provided data is not necessarily of the type stored in the
-			 * index; rather it is of the index opclass's input type. So look
-			 * at rd_opcintype not the index tupdesc.
+			 * For key attributes the provided data is not necessarily of the
+			 * type stored in the index; rather it is of the index opclass's
+			 * input type. So look at rd_opcintype not the index tupdesc.
 			 *
 			 * Note: this is a bit shaky for opclasses that have pseudotype
 			 * input types such as ANYARRAY or RECORD.  Currently, the
 			 * typoutput functions associated with the pseudotypes will work
 			 * okay, but we might have to try harder in future.
+			 *
+			 * For included attributes just use info stored in the index
+			 * tupdesc.
 			 */
-			getTypeOutputInfo(indexRelation->rd_opcintype[i],
-							  &foutoid, &typisvarlena);
-			val = OidOutputFunctionCall(foutoid, values[i]);
+			if (i < nkeyatts)
+			{
+				getTypeOutputInfo(indexRelation->rd_opcintype[i],
+								&foutoid, &typisvarlena);
+				val = OidOutputFunctionCall(foutoid, values[i]);
+			}
+			else
+			{
+				getTypeOutputInfo(tupdesc->attrs[i]->atttypid, &foutoid, &typisvarlena);
+				val = OidOutputFunctionCall(foutoid, values[i]);
+			}
 		}
 
 		if (i > 0)

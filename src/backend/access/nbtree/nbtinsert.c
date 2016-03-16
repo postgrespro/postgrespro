@@ -3,6 +3,7 @@
  * nbtinsert.c
  *	  Item insertion in Lehman and Yao btrees for Postgres.
  *
+ * Portions Copyright (c) 2015-2016, Postgres Professional
  * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
@@ -108,18 +109,22 @@ _bt_doinsert(Relation rel, IndexTuple itup,
 			 IndexUniqueCheck checkUnique, Relation heapRel)
 {
 	bool		is_unique = false;
-	int			natts = rel->rd_rel->relnatts;
+	int			nkeyatts;
 	ScanKey		itup_scankey;
 	BTStack		stack;
 	Buffer		buf;
 	OffsetNumber offset;
+
+	Assert(rel->rd_index->indnatts != 0);
+	Assert(rel->rd_index->indnkeyatts != 0);
+	nkeyatts = IndexRelationGetNumberOfKeyAttributes(rel);
 
 	/* we need an insertion scan key to do our search, so build one */
 	itup_scankey = _bt_mkscankey(rel, itup);
 
 top:
 	/* find the first page containing this key */
-	stack = _bt_search(rel, natts, itup_scankey, false, &buf, BT_WRITE);
+	stack = _bt_search(rel, nkeyatts, itup_scankey, false, &buf, BT_WRITE);
 
 	offset = InvalidOffsetNumber;
 
@@ -134,7 +139,7 @@ top:
 	 * move right in the tree.  See Lehman and Yao for an excruciatingly
 	 * precise description.
 	 */
-	buf = _bt_moveright(rel, buf, natts, itup_scankey, false,
+	buf = _bt_moveright(rel, buf, nkeyatts, itup_scankey, false,
 						true, stack, BT_WRITE);
 
 	/*
@@ -163,7 +168,7 @@ top:
 		TransactionId xwait;
 		uint32		speculativeToken;
 
-		offset = _bt_binsrch(rel, buf, natts, itup_scankey, false);
+		offset = _bt_binsrch(rel, buf, nkeyatts, itup_scankey, false);
 		xwait = _bt_check_unique(rel, itup, heapRel, buf, offset, itup_scankey,
 								 checkUnique, &is_unique, &speculativeToken);
 
@@ -199,7 +204,7 @@ top:
 		 */
 		CheckForSerializableConflictIn(rel, NULL, buf);
 		/* do the insertion */
-		_bt_findinsertloc(rel, &buf, &offset, natts, itup_scankey, itup,
+		_bt_findinsertloc(rel, &buf, &offset, nkeyatts, itup_scankey, itup,
 						  stack, heapRel);
 		_bt_insertonpg(rel, buf, InvalidBuffer, stack, itup, offset, false);
 	}
@@ -242,7 +247,7 @@ _bt_check_unique(Relation rel, IndexTuple itup, Relation heapRel,
 				 uint32 *speculativeToken)
 {
 	TupleDesc	itupdesc = RelationGetDescr(rel);
-	int			natts = rel->rd_rel->relnatts;
+	int			nkeyatts = rel->rd_index->indnkeyatts;
 	SnapshotData SnapshotDirty;
 	OffsetNumber maxoff;
 	Page		page;
@@ -301,7 +306,7 @@ _bt_check_unique(Relation rel, IndexTuple itup, Relation heapRel,
 				 * in real comparison, but only for ordering/finding items on
 				 * pages. - vadim 03/24/97
 				 */
-				if (!_bt_isequal(itupdesc, page, offset, natts, itup_scankey))
+				if (!_bt_isequal(itupdesc, page, offset, nkeyatts, itup_scankey))
 					break;		/* we're past all the equal tuples */
 
 				/* okay, we gotta fetch the heap tuple ... */
@@ -457,7 +462,7 @@ _bt_check_unique(Relation rel, IndexTuple itup, Relation heapRel,
 			if (P_RIGHTMOST(opaque))
 				break;
 			if (!_bt_isequal(itupdesc, page, P_HIKEY,
-							 natts, itup_scankey))
+							 nkeyatts, itup_scankey))
 				break;
 			/* Advance to next non-dead page --- there must be one */
 			for (;;)
@@ -744,6 +749,14 @@ _bt_insertonpg(Relation rel,
 	if (P_INCOMPLETE_SPLIT(lpageop))
 		elog(ERROR, "cannot insert to incompletely split page %u",
 			 BufferGetBlockNumber(buf));
+
+	/* Truncate nonkey attributes when inserting on nonleaf pages. */
+	if (rel->rd_index->indnatts != rel->rd_index->indnkeyatts
+		&& !P_ISLEAF(lpageop))
+	{
+			itup = index_reform_tuple(rel, itup,
+				rel->rd_index->indnatts, rel->rd_index->indnkeyatts);
+	}
 
 	itemsz = IndexTupleDSize(*itup);
 	itemsz = MAXALIGN(itemsz);	/* be safe, PageAddItem will do this but we
@@ -1961,7 +1974,11 @@ _bt_newroot(Relation rel, Buffer lbuf, Buffer rbuf)
 	itemid = PageGetItemId(lpage, P_HIKEY);
 	right_item_sz = ItemIdGetLength(itemid);
 	item = (IndexTuple) PageGetItem(lpage, itemid);
-	right_item = CopyIndexTuple(item);
+
+	if (rel->rd_index->indnatts != rel->rd_index->indnkeyatts)
+		right_item = index_reform_tuple(rel, item, rel->rd_index->indnatts, rel->rd_index->indnkeyatts);
+	else
+		right_item = CopyIndexTuple(item);
 	ItemPointerSet(&(right_item->t_tid), rbkno, P_HIKEY);
 
 	/* NO EREPORT(ERROR) from here till newroot op is logged */

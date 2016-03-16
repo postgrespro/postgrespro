@@ -4,6 +4,7 @@
  *	  POSTGRES index tuple definitions.
  *
  *
+ * Portions Copyright (c) 2015-2016, Postgres Professional
  * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
@@ -18,6 +19,7 @@
 #include "access/tupmacs.h"
 #include "storage/bufpage.h"
 #include "storage/itemptr.h"
+#include "utils/rel.h"
 
 /*
  * Index tuple header structure
@@ -147,5 +149,7 @@ extern Datum nocache_index_getattr(IndexTuple tup, int attnum,
 extern void index_deform_tuple(IndexTuple tup, TupleDesc tupleDescriptor,
 				   Datum *values, bool *isnull);
 extern IndexTuple CopyIndexTuple(IndexTuple source);
+extern IndexTuple index_reform_tuple(Relation idxrel, IndexTuple tup,
+									 int natts, int nkeyatts);
 
 #endif   /* ITUP_H */

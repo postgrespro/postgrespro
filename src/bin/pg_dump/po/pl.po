@@ -2,13 +2,13 @@
 # Copyright (C) 2011 PostgreSQL Global Development Group
 # This file is distributed under the same license as the PostgreSQL package.
 # Begina Felicysym <begina.felicysym@wp.eu>, 2011, 2012, 2013.
-# grzegorz <begina.felicysym@wp.eu>, 2014, 2015.
+# grzegorz <begina.felicysym@wp.eu>, 2014, 2015, 2016.
 msgid ""
 msgstr ""
 "Project-Id-Version: pg_dump (PostgreSQL 9.5)\n"
 "Report-Msgid-Bugs-To: pgsql-bugs@postgresql.org\n"
-"POT-Creation-Date: 2015-12-24 17:13+0000\n"
-"PO-Revision-Date: 2015-12-26 17:09+0200\n"
+"POT-Creation-Date: 2016-01-05 23:13+0000\n"
+"PO-Revision-Date: 2016-01-06 09:12+0200\n"
 "Last-Translator: grzegorz <begina.felicysym@wp.eu>\n"
 "Language-Team: begina.felicysym@wp.eu\n"
 "Language: pl\n"
@@ -585,7 +585,7 @@ msgstr "odtwarzanie dużego obiektu z OID %u\n"
 msgid "could not create large object %u: %s"
 msgstr "nie można utworzyć dużego obiektu %u: %s"
 
-#: pg_backup_archiver.c:1214 pg_dump.c:2774
+#: pg_backup_archiver.c:1214 pg_dump.c:2777
 #, c-format
 msgid "could not open large object %u: %s"
 msgstr "nie można otworzyć dużego obiektu %u: %s"
@@ -1280,7 +1280,6 @@ msgstr[2] "znaleziono niepełny nagłówek tar (%lu bajtów)\n"
 
 #: pg_backup_tar.c:1271
 #, c-format
-#| msgid "TOC Entry %s at %s (length %lu, checksum %d)\n"
 msgid "TOC Entry %s at %s (length %s, checksum %d)\n"
 msgstr "Wpis TOC %s na %s (długość %s, suma kontrolna %d)\n"
 
@@ -1294,7 +1293,7 @@ msgstr "znaleziono uszkodzony nagłówek tar w %s (oczekiwano %d, wyliczono %d) 
 msgid "%s: unrecognized section name: \"%s\"\n"
 msgstr "%s: nierozpoznana nazwa sekcji: \"%s\"\n"
 
-#: pg_backup_utils.c:56 pg_dump.c:521 pg_dump.c:538 pg_dumpall.c:300
+#: pg_backup_utils.c:56 pg_dump.c:524 pg_dump.c:541 pg_dumpall.c:300
 #: pg_dumpall.c:310 pg_dumpall.c:320 pg_dumpall.c:329 pg_dumpall.c:345
 #: pg_dumpall.c:403 pg_restore.c:277 pg_restore.c:293 pg_restore.c:305
 #, c-format
@@ -1306,57 +1305,57 @@ msgstr "Spróbuj \"%s --help\" aby uzyskać więcej informacji.\n"
 msgid "out of on_exit_nicely slots\n"
 msgstr "zabrakło gniazd on_exit_nicely\n"
 
-#: pg_dump.c:491
+#: pg_dump.c:494
 #, c-format
 msgid "compression level must be in range 0..9\n"
 msgstr "poziom kompresji musi być z zakresu 0..9\n"
 
-#: pg_dump.c:536 pg_dumpall.c:308 pg_restore.c:291
+#: pg_dump.c:539 pg_dumpall.c:308 pg_restore.c:291
 #, c-format
 msgid "%s: too many command-line arguments (first is \"%s\")\n"
 msgstr "%s: za duża ilość parametrów (pierwszy to \"%s\")\n"
 
-#: pg_dump.c:549
+#: pg_dump.c:552
 #, c-format
 msgid "options -s/--schema-only and -a/--data-only cannot be used together\n"
 msgstr "opcje -s/--schema-only i -a/--data-only nie mogą być używane razem\n"
 
-#: pg_dump.c:555
+#: pg_dump.c:558
 #, c-format
 msgid "options -c/--clean and -a/--data-only cannot be used together\n"
 msgstr "opcje -c/--clean i -a/--data-only nie mogą być używane razem\n"
 
-#: pg_dump.c:561
+#: pg_dump.c:564
 #, c-format
 msgid "options --inserts/--column-inserts and -o/--oids cannot be used together\n"
 msgstr "opcje --inserts/--column-inserts i -o/--oids nie mogą być używane razem\n"
 
-#: pg_dump.c:562
+#: pg_dump.c:565
 #, c-format
 msgid "(The INSERT command cannot set OIDs.)\n"
 msgstr "(Polecenie INSERT nie może ustawiać OIDów.)\n"
 
-#: pg_dump.c:567
+#: pg_dump.c:570
 #, c-format
 msgid "option --if-exists requires option -c/--clean\n"
 msgstr "opcja --if-exists wymaga opcji -c/--clean\n"
 
-#: pg_dump.c:595
+#: pg_dump.c:598
 #, c-format
 msgid "%s: invalid number of parallel jobs\n"
 msgstr "%s: nieprawidłowa liczba zadań współbieżnych\n"
 
-#: pg_dump.c:599
+#: pg_dump.c:602
 #, c-format
 msgid "parallel backup only supported by the directory format\n"
 msgstr "współbieżne tworzenie kopii zapasowej nie jest obsługiwane w tym formacie archiwum\n"
 
-#: pg_dump.c:609
+#: pg_dump.c:612
 #, c-format
 msgid "could not open output file \"%s\" for writing\n"
 msgstr "nie można otworzyć pliku wyjścia \"%s\" do zapisu\n"
 
-#: pg_dump.c:668
+#: pg_dump.c:671
 #, c-format
 msgid ""
 "Synchronized snapshots are not supported by this server version.\n"
@@ -1367,27 +1366,27 @@ msgstr ""
 "Można uruchomić z --no-synchronized-snapshots jeśli nie są potrzebne\n"
 "migawki synchronizowane.\n"
 
-#: pg_dump.c:675
+#: pg_dump.c:678
 #, c-format
 msgid "Exported snapshots are not supported by this server version.\n"
 msgstr "Eksportowane migawki nie są obsługiwane przez tą wersję serwera.\n"
 
-#: pg_dump.c:686
+#: pg_dump.c:689
 #, c-format
 msgid "last built-in OID is %u\n"
 msgstr "ostatni wbudowany OID to %u\n"
 
-#: pg_dump.c:695
+#: pg_dump.c:698
 #, c-format
 msgid "No matching schemas were found\n"
 msgstr "Nie znaleziono pasujących schematów\n"
 
-#: pg_dump.c:707
+#: pg_dump.c:710
 #, c-format
 msgid "No matching tables were found\n"
 msgstr "Nie znaleziono pasujących tabel\n"
 
-#: pg_dump.c:861
+#: pg_dump.c:864
 #, c-format
 msgid ""
 "%s dumps a database as a text file or to other formats.\n"
@@ -1396,17 +1395,17 @@ msgstr ""
 "%s zrzuca bazę danych jako plik tekstowy lub do innych formatów.\n"
 "\n"
 
-#: pg_dump.c:862 pg_dumpall.c:548 pg_restore.c:432
+#: pg_dump.c:865 pg_dumpall.c:548 pg_restore.c:432
 #, c-format
 msgid "Usage:\n"
 msgstr "Składnia:\n"
 
-#: pg_dump.c:863
+#: pg_dump.c:866
 #, c-format
 msgid "  %s [OPTION]... [DBNAME]\n"
 msgstr "  %s [OPCJA]... [NAZWADB]\n"
 
-#: pg_dump.c:865 pg_dumpall.c:551 pg_restore.c:435
+#: pg_dump.c:868 pg_dumpall.c:551 pg_restore.c:435
 #, c-format
 msgid ""
 "\n"
@@ -1415,12 +1414,12 @@ msgstr ""
 "\n"
 "Opcje ogólne:\n"
 
-#: pg_dump.c:866
+#: pg_dump.c:869
 #, c-format
 msgid "  -f, --file=FILENAME          output file or directory name\n"
 msgstr "  -f, --file=NAZWAPLIKU        nazwa pliku lub folderu wyjścia\n"
 
-#: pg_dump.c:867
+#: pg_dump.c:870
 #, c-format
 msgid ""
 "  -F, --format=c|d|t|p         output file format (custom, directory, tar,\n"
@@ -1429,39 +1428,39 @@ msgstr ""
 "  -F, --format=c|d|t|p         format pliku wyjścia (c-użytkownika, d-folder, \n"
 "                               t-tar, p-tekstowy (domyślny))\n"
 
-#: pg_dump.c:869
+#: pg_dump.c:872
 #, c-format
 msgid "  -j, --jobs=NUM               use this many parallel jobs to dump\n"
 msgstr "  -j, --jobs=NUM               użycie tylu równoległych zadań przy zrzucie\n"
 
-#: pg_dump.c:870
+#: pg_dump.c:873
 #, c-format
 msgid "  -v, --verbose                verbose mode\n"
 msgstr "  -v, --verbose                tryb informacji szczegółowych\n"
 
-#: pg_dump.c:871 pg_dumpall.c:553
+#: pg_dump.c:874 pg_dumpall.c:553
 #, c-format
 msgid "  -V, --version                output version information, then exit\n"
 msgstr "  -V, --version                pokaż informacje o wersji i zakończ\n"
 
-#: pg_dump.c:872
+#: pg_dump.c:875
 #, c-format
 msgid "  -Z, --compress=0-9           compression level for compressed formats\n"
 msgstr "  -Z, --compress=0-9           poziom kompresji dla formatów kompresujących\n"
 
-#: pg_dump.c:873 pg_dumpall.c:554
+#: pg_dump.c:876 pg_dumpall.c:554
 #, c-format
 msgid "  --lock-wait-timeout=TIMEOUT  fail after waiting TIMEOUT for a table lock\n"
 msgstr ""
 "  --lock-wait-timeout=LIMITCZASU\n"
 "                               niepowodzenie blokowania tabeli po LIMITCZASU\n"
 
-#: pg_dump.c:874 pg_dumpall.c:555
+#: pg_dump.c:877 pg_dumpall.c:555
 #, c-format
 msgid "  -?, --help                   show this help, then exit\n"
 msgstr "  -?, --help                   pokaż tą pomoc i zakończ działanie\n"
 
-#: pg_dump.c:876 pg_dumpall.c:556
+#: pg_dump.c:879 pg_dumpall.c:556
 #, c-format
 msgid ""
 "\n"
@@ -1470,49 +1469,49 @@ msgstr ""
 "\n"
 "Opcje kontrolujące zawartość wyjścia:\n"
 
-#: pg_dump.c:877 pg_dumpall.c:557
+#: pg_dump.c:880 pg_dumpall.c:557
 #, c-format
 msgid "  -a, --data-only              dump only the data, not the schema\n"
 msgstr "  -a, --data-only              zrzuca tylko dane, bez schematu\n"
 
-#: pg_dump.c:878
+#: pg_dump.c:881
 #, c-format
 msgid "  -b, --blobs                  include large objects in dump\n"
 msgstr "  -b, --blobs                  dodaje duże obiekty do zrzutu\n"
 
-#: pg_dump.c:879 pg_restore.c:446
+#: pg_dump.c:882 pg_restore.c:446
 #, c-format
 msgid "  -c, --clean                  clean (drop) database objects before recreating\n"
 msgstr "  -c, --clean                  czyszczenie (kasowanie) obiektów baz danych przed odtworzeniem\n"
 
-#: pg_dump.c:880
+#: pg_dump.c:883
 #, c-format
 msgid "  -C, --create                 include commands to create database in dump\n"
 msgstr "  -C, --create                 dodaje polecenia tworzenia bazy danych w zrzucie\n"
 
-#: pg_dump.c:881
+#: pg_dump.c:884
 #, c-format
 msgid "  -E, --encoding=ENCODING      dump the data in encoding ENCODING\n"
 msgstr "  -E, --encoding=KODOWANIE     zrzuca dane w kodowaniu KODOWANIE\n"
 
-#: pg_dump.c:882
+#: pg_dump.c:885
 #, c-format
 msgid "  -n, --schema=SCHEMA          dump the named schema(s) only\n"
 msgstr "  -n, --schema=SCHEMAT         zrzuca tylko nazwany schemat(y)\n"
 
-#: pg_dump.c:883
+#: pg_dump.c:886
 #, c-format
 msgid "  -N, --exclude-schema=SCHEMA  do NOT dump the named schema(s)\n"
 msgstr ""
 "  -N, --exclude-schema=SCHEMAT\n"
 "                               NIE zrzuca nazwanych schematów\n"
 
-#: pg_dump.c:884 pg_dumpall.c:560
+#: pg_dump.c:887 pg_dumpall.c:560
 #, c-format
 msgid "  -o, --oids                   include OIDs in dump\n"
 msgstr "  -o, --oids                   dodaje OIDy do zrzutu\n"
 
-#: pg_dump.c:885
+#: pg_dump.c:888
 #, c-format
 msgid ""
 "  -O, --no-owner               skip restoration of object ownership in\n"
@@ -1521,52 +1520,52 @@ msgstr ""
 "  -O, --no-owner               pomija odtworzenie wskazania właściciela obiektu\n"
 "                               w formacie tekstowym\n"
 
-#: pg_dump.c:887 pg_dumpall.c:563
+#: pg_dump.c:890 pg_dumpall.c:563
 #, c-format
 msgid "  -s, --schema-only            dump only the schema, no data\n"
 msgstr "  -s, --schema-only            zrzuca tylko schemat, bez danych\n"
 
-#: pg_dump.c:888
+#: pg_dump.c:891
 #, c-format
 msgid "  -S, --superuser=NAME         superuser user name to use in plain-text format\n"
 msgstr "  -S, --superuser=NAZWA        nazwa superużytkownika używana w formacie tekstowym\n"
 
-#: pg_dump.c:889
+#: pg_dump.c:892
 #, c-format
 msgid "  -t, --table=TABLE            dump the named table(s) only\n"
 msgstr "  -t, --table=TABELA           zrzuca tylko tabelę wedle nazwy\n"
 
-#: pg_dump.c:890
+#: pg_dump.c:893
 #, c-format
 msgid "  -T, --exclude-table=TABLE    do NOT dump the named table(s)\n"
 msgstr "  -T, --exclude-table=TABELA   NIE zrzuca tabeli o tej nazwie\n"
 
-#: pg_dump.c:891 pg_dumpall.c:566
+#: pg_dump.c:894 pg_dumpall.c:566
 #, c-format
 msgid "  -x, --no-privileges          do not dump privileges (grant/revoke)\n"
 msgstr "  -x, --no-privileges          nie zrzuca przywilejów (grant/revoke)\n"
 
-#: pg_dump.c:892 pg_dumpall.c:567
+#: pg_dump.c:895 pg_dumpall.c:567
 #, c-format
 msgid "  --binary-upgrade             for use by upgrade utilities only\n"
 msgstr "  --binary-upgrade             używane tylko przez narzędzia aktualizacji\n"
 
-#: pg_dump.c:893 pg_dumpall.c:568
+#: pg_dump.c:896 pg_dumpall.c:568
 #, c-format
 msgid "  --column-inserts             dump data as INSERT commands with column names\n"
 msgstr "  --column-inserts             zrzuca dane jako polecenia INSERT z nazwami kolumn\n"
 
-#: pg_dump.c:894 pg_dumpall.c:569
+#: pg_dump.c:897 pg_dumpall.c:569
 #, c-format
 msgid "  --disable-dollar-quoting     disable dollar quoting, use SQL standard quoting\n"
 msgstr "  --disable-dollar-quoting     blokuje cytowanie dolarem, używa standardowego cytowania SQL\n"
 
-#: pg_dump.c:895 pg_dumpall.c:570 pg_restore.c:462
+#: pg_dump.c:898 pg_dumpall.c:570 pg_restore.c:462
 #, c-format
 msgid "  --disable-triggers           disable triggers during data-only restore\n"
 msgstr "  --disable-triggers           wyłącza wyzwalacze podczas odtwarzania wyłącznie danych\n"
 
-#: pg_dump.c:896
+#: pg_dump.c:899
 #, c-format
 msgid ""
 "  --enable-row-security        enable row security (dump only content user has\n"
@@ -1575,66 +1574,66 @@ msgstr ""
 "  --enable-row-security        włącz bezpieczeństwo wierszy (zrzucaj tylko to\n"
 "                               do czego użytkownik ma dostęp)\n"
 
-#: pg_dump.c:898
+#: pg_dump.c:901
 #, c-format
 msgid "  --exclude-table-data=TABLE   do NOT dump data for the named table(s)\n"
 msgstr "  ---exclude-table-data=TABELA  NIE zrzuca danych tabeli o tej nazwie\n"
 
-#: pg_dump.c:899 pg_dumpall.c:571 pg_restore.c:464
+#: pg_dump.c:902 pg_dumpall.c:571 pg_restore.c:464
 #, c-format
 msgid "  --if-exists                  use IF EXISTS when dropping objects\n"
 msgstr "  --if-exists                  używa IF EXISTS podczas kasowania obiektów\n"
 
-#: pg_dump.c:900 pg_dumpall.c:572
+#: pg_dump.c:903 pg_dumpall.c:572
 #, c-format
 msgid "  --inserts                    dump data as INSERT commands, rather than COPY\n"
 msgstr "  --inserts                    zrzuca dane jako polecenia INSERT zamiast COPY\n"
 
-#: pg_dump.c:901 pg_dumpall.c:573
+#: pg_dump.c:904 pg_dumpall.c:573
 #, c-format
 msgid "  --no-security-labels         do not dump security label assignments\n"
 msgstr "  --no-security-labels         nie zrzuca przypisań etykiet bezpieczeństwa\n"
 
-#: pg_dump.c:902
+#: pg_dump.c:905
 #, c-format
 msgid "  --no-synchronized-snapshots  do not use synchronized snapshots in parallel jobs\n"
 msgstr "  --no-synchronized-snapshots  nie używaj migawek synchronizowanych w zadaniach współbieżnych\n"
 
-#: pg_dump.c:903 pg_dumpall.c:574
+#: pg_dump.c:906 pg_dumpall.c:574
 #, c-format
 msgid "  --no-tablespaces             do not dump tablespace assignments\n"
 msgstr "  --no-tablespaces             nie zrzuca przypisań do przestrzeni tabel\n"
 
-#: pg_dump.c:904 pg_dumpall.c:575
+#: pg_dump.c:907 pg_dumpall.c:575
 #, c-format
 msgid "  --no-unlogged-table-data     do not dump unlogged table data\n"
 msgstr "  --no-unlogged-table-data     nie zrzuca niezalogowanych danych tabeli\n"
 
-#: pg_dump.c:905 pg_dumpall.c:576
+#: pg_dump.c:908 pg_dumpall.c:576
 #, c-format
 msgid "  --quote-all-identifiers      quote all identifiers, even if not key words\n"
 msgstr ""
 "  --quote-all-identifiers      cytuje wszystkie identyfikatory, jeśli tylko\n"
 "                               nie są to słowa kluczowe\n"
 
-#: pg_dump.c:906
+#: pg_dump.c:909
 #, c-format
 msgid "  --section=SECTION            dump named section (pre-data, data, or post-data)\n"
 msgstr "  --section=SECTION            zrzuca nazwaną sekcję (pre-dane, dane, lub post-dane)\n"
 
-#: pg_dump.c:907
+#: pg_dump.c:910
 #, c-format
 msgid "  --serializable-deferrable    wait until the dump can run without anomalies\n"
 msgstr ""
 "  --serializable-deferrable    czeka póki zrzut wykonuje się \n"
 "                               bez  nieprawidłowości\n"
 
-#: pg_dump.c:908
+#: pg_dump.c:911
 #, c-format
 msgid "  --snapshot=SNAPSHOT          use given snapshot for the dump\n"
 msgstr "  --snapshot=MIGAWKA           używa wskazanej migawki do zrzutu\n"
 
-#: pg_dump.c:909 pg_dumpall.c:577 pg_restore.c:470
+#: pg_dump.c:912 pg_dumpall.c:577 pg_restore.c:470
 #, c-format
 msgid ""
 "  --use-set-session-authorization\n"
@@ -1645,7 +1644,7 @@ msgstr ""
 "                               używa poleceń SET SESSION AUTHORIZATION zamiast\n"
 "                               poleceń ALTER OWNER by ustawić właściciela\n"
 
-#: pg_dump.c:913 pg_dumpall.c:581 pg_restore.c:474
+#: pg_dump.c:916 pg_dumpall.c:581 pg_restore.c:474
 #, c-format
 msgid ""
 "\n"
@@ -1654,42 +1653,42 @@ msgstr ""
 "\n"
 "Opcje połączenia:\n"
 
-#: pg_dump.c:914
+#: pg_dump.c:917
 #, c-format
 msgid "  -d, --dbname=DBNAME      database to dump\n"
 msgstr "  -d, --dbname=NAZWADB      baza danych do utworzenia kopii\n"
 
-#: pg_dump.c:915 pg_dumpall.c:583 pg_restore.c:475
+#: pg_dump.c:918 pg_dumpall.c:583 pg_restore.c:475
 #, c-format
 msgid "  -h, --host=HOSTNAME      database server host or socket directory\n"
 msgstr "  -h, --host=NAZWAHOSTA    host serwera bazy danych lub katalog gniazda\n"
 
-#: pg_dump.c:916 pg_dumpall.c:585 pg_restore.c:476
+#: pg_dump.c:919 pg_dumpall.c:585 pg_restore.c:476
 #, c-format
 msgid "  -p, --port=PORT          database server port number\n"
 msgstr "  -p, --port=PORT          numer portu na serwera bazy dnaych\n"
 
-#: pg_dump.c:917 pg_dumpall.c:586 pg_restore.c:477
+#: pg_dump.c:920 pg_dumpall.c:586 pg_restore.c:477
 #, c-format
 msgid "  -U, --username=NAME      connect as specified database user\n"
 msgstr "  -U, --username=NAZWA     połączenie jako wskazany użytkownik bazy\n"
 
-#: pg_dump.c:918 pg_dumpall.c:587 pg_restore.c:478
+#: pg_dump.c:921 pg_dumpall.c:587 pg_restore.c:478
 #, c-format
 msgid "  -w, --no-password        never prompt for password\n"
 msgstr "  -w, --no-password        nie pytaj nigdy o hasło\n"
 
-#: pg_dump.c:919 pg_dumpall.c:588 pg_restore.c:479
+#: pg_dump.c:922 pg_dumpall.c:588 pg_restore.c:479
 #, c-format
 msgid "  -W, --password           force password prompt (should happen automatically)\n"
 msgstr "  -W, --password           wymuś pytanie o hasło (powinno nastąpić automatycznie)\n"
 
-#: pg_dump.c:920 pg_dumpall.c:589
+#: pg_dump.c:923 pg_dumpall.c:589
 #, c-format
 msgid "  --role=ROLENAME          do SET ROLE before dump\n"
 msgstr "  --role=NAZWAROLI         wykonuje SET ROLE przed odtworzeniem\n"
 
-#: pg_dump.c:922
+#: pg_dump.c:925
 #, c-format
 msgid ""
 "\n"
@@ -1702,197 +1701,197 @@ msgstr ""
 "środowiskowa PGDATABASE.\n"
 "\n"
 
-#: pg_dump.c:924 pg_dumpall.c:593 pg_restore.c:486
+#: pg_dump.c:927 pg_dumpall.c:593 pg_restore.c:486
 #, c-format
 msgid "Report bugs to <pgsql-bugs@postgresql.org>.\n"
 msgstr "Błędy proszę przesyłać na adres <pgsql-bugs@postgresql.org>.\n"
 
-#: pg_dump.c:943
+#: pg_dump.c:946
 #, c-format
 msgid "invalid client encoding \"%s\" specified\n"
 msgstr "wskazano niepoprawne kodowanie klienta \"%s\"\n"
 
-#: pg_dump.c:1128
+#: pg_dump.c:1131
 #, c-format
 msgid "invalid output format \"%s\" specified\n"
 msgstr "wskazano niepoprawny format wyjścia \"%s\"\n"
 
-#: pg_dump.c:1150
+#: pg_dump.c:1153
 #, c-format
 msgid "server version must be at least 7.3 to use schema selection switches\n"
 msgstr "serwer musi być w wersji co najmniej 7.3 by użyć przełączników wyboru schematu\n"
 
-#: pg_dump.c:1439
+#: pg_dump.c:1442
 #, c-format
 msgid "dumping contents of table \"%s.%s\"\n"
 msgstr "zrzut zawartości tabeli \"%s.%s\"\n"
 
-#: pg_dump.c:1563
+#: pg_dump.c:1566
 #, c-format
 msgid "Dumping the contents of table \"%s\" failed: PQgetCopyData() failed.\n"
 msgstr "Nie powiódł się zrzut zawartości tabeli \"%s\": niepowodzenie PQgetCopyData().\n"
 
-#: pg_dump.c:1564 pg_dump.c:1574
+#: pg_dump.c:1567 pg_dump.c:1577
 #, c-format
 msgid "Error message from server: %s"
 msgstr "Komunikat błędu z serwera: %s"
 
-#: pg_dump.c:1565 pg_dump.c:1575
+#: pg_dump.c:1568 pg_dump.c:1578
 #, c-format
 msgid "The command was: %s\n"
 msgstr "Treść polecenia: %s\n"
 
-#: pg_dump.c:1573
+#: pg_dump.c:1576
 #, c-format
 msgid "Dumping the contents of table \"%s\" failed: PQgetResult() failed.\n"
 msgstr "Nie powiódł się zrzut zawartości tabeli \"%s\": niepowodzenie PQgetResult().\n"
 
-#: pg_dump.c:2212
+#: pg_dump.c:2215
 #, c-format
 msgid "saving database definition\n"
 msgstr "zapis definicji bazy danych\n"
 
-#: pg_dump.c:2545
+#: pg_dump.c:2548
 #, c-format
 msgid "saving encoding = %s\n"
 msgstr "zapis kodowania = %s\n"
 
-#: pg_dump.c:2572
+#: pg_dump.c:2575
 #, c-format
 msgid "saving standard_conforming_strings = %s\n"
 msgstr "zapis standard_conforming_strings = %s\n"
 
-#: pg_dump.c:2605
+#: pg_dump.c:2608
 #, c-format
 msgid "reading large objects\n"
 msgstr "odczyt dużych obiektów\n"
 
-#: pg_dump.c:2737
+#: pg_dump.c:2740
 #, c-format
 msgid "saving large objects\n"
 msgstr "zapis dużych obiektów\n"
 
-#: pg_dump.c:2784
+#: pg_dump.c:2787
 #, c-format
 msgid "error reading large object %u: %s"
 msgstr "błąd odczytu dużego obiektu %u: %s"
 
-#: pg_dump.c:2836
+#: pg_dump.c:2839
 #, c-format
 msgid "reading row security enabled for table \"%s.%s\"\n"
 msgstr "odczyt włączonych zabezpieczeń wiersza dla tabeli \"%s.%s\"\n"
 
-#: pg_dump.c:2867
+#: pg_dump.c:2870
 #, c-format
 msgid "reading policies for table \"%s.%s\"\n"
 msgstr "odczyt polityk dla tabeli \"%s.%s\"\n"
 
-#: pg_dump.c:2997
+#: pg_dump.c:3000
 #, c-format
 msgid "unexpected policy command type: \"%s\"\n"
 msgstr "nieoczekiwany typ polecenia polityki \"%s\"\n"
 
-#: pg_dump.c:3212
+#: pg_dump.c:3215
 #, c-format
 msgid "could not find parent extension for %s\n"
 msgstr "nie można odnaleźć rozszerzenia nadrzędnego dla %s\n"
 
-#: pg_dump.c:3315
+#: pg_dump.c:3318
 #, c-format
 msgid "WARNING: owner of schema \"%s\" appears to be invalid\n"
 msgstr "OSTRZEŻENIE: właściciel schematu \"%s\" wydaje się być niepoprawny\n"
 
-#: pg_dump.c:3358
+#: pg_dump.c:3361
 #, c-format
 msgid "schema with OID %u does not exist\n"
 msgstr "schemat z OID %u nie istnieje\n"
 
-#: pg_dump.c:3708
+#: pg_dump.c:3711
 #, c-format
 msgid "WARNING: owner of data type \"%s\" appears to be invalid\n"
 msgstr "OSTRZEŻENIE: właściciel typu danych \"%s\" wydaje się być niepoprawny\n"
 
-#: pg_dump.c:3819
+#: pg_dump.c:3822
 #, c-format
 msgid "WARNING: owner of operator \"%s\" appears to be invalid\n"
 msgstr "OSTRZEŻENIE: właściciel operatora \"%s\" wydaje się być niepoprawny\n"
 
-#: pg_dump.c:4078
+#: pg_dump.c:4081
 #, c-format
 msgid "WARNING: owner of operator class \"%s\" appears to be invalid\n"
 msgstr "OSTRZEŻENIE: właściciel klasy operatora \"%s\" wydaje się być niepoprawny\n"
 
-#: pg_dump.c:4166
+#: pg_dump.c:4169
 #, c-format
 msgid "WARNING: owner of operator family \"%s\" appears to be invalid\n"
 msgstr "OSTRZEŻENIE: właściciel rodziny operatora \"%s\" wydaje się być niepoprawny\n"
 
-#: pg_dump.c:4304
+#: pg_dump.c:4307
 #, c-format
 msgid "WARNING: owner of aggregate function \"%s\" appears to be invalid\n"
 msgstr "OSTRZEŻENIE: właściciel funkcji agregującej \"%s\" wydaje się być niepoprawny\n"
 
-#: pg_dump.c:4486
+#: pg_dump.c:4489
 #, c-format
 msgid "WARNING: owner of function \"%s\" appears to be invalid\n"
 msgstr "OSTRZEŻENIE: właściciel funkcji \"%s\" wydaje się być niepoprawny\n"
 
-#: pg_dump.c:5173
+#: pg_dump.c:5176
 #, c-format
 msgid "WARNING: owner of table \"%s\" appears to be invalid\n"
 msgstr "OSTRZEŻENIE: właściciel tabeli \"%s\" wydaje się być niepoprawny\n"
 
-#: pg_dump.c:5325
+#: pg_dump.c:5328
 #, c-format
 msgid "reading indexes for table \"%s.%s\"\n"
 msgstr "odczyt indeksów dla tabeli \"%s.%s\"\n"
 
-#: pg_dump.c:5692
+#: pg_dump.c:5695
 #, c-format
 msgid "reading foreign key constraints for table \"%s.%s\"\n"
 msgstr "odczyt ograniczeń kluczy obcych dla tabeli \"%s.%s\"\n"
 
-#: pg_dump.c:5938
+#: pg_dump.c:5941
 #, c-format
 msgid "failed sanity check, parent table OID %u of pg_rewrite entry OID %u not found\n"
 msgstr "sprawdzenia nie powiodły się, nie odnaleziono tabeli nadrzędnej o OID %u dla wpisu pg_rewrite o OID %u\n"
 
-#: pg_dump.c:6031
+#: pg_dump.c:6034
 #, c-format
 msgid "reading triggers for table \"%s.%s\"\n"
 msgstr "odczyt wyzwalaczy dla tabeli \"%s.%s\"\n"
 
-#: pg_dump.c:6193
+#: pg_dump.c:6196
 #, c-format
 msgid "query produced null referenced table name for foreign key trigger \"%s\" on table \"%s\" (OID of table: %u)\n"
 msgstr "zapytanie dało w wyniku puste wskazanie nazwy tabeli dla wyzwalacza klucza obcego \"%s\" dla tabeli \"%s\" (UID tabeli: %u)\n"
 
-#: pg_dump.c:6765
+#: pg_dump.c:6768
 #, c-format
 msgid "finding the columns and types of table \"%s.%s\"\n"
 msgstr "wyszukiwanie kolumn i typów dla tabeli \"%s.%s\"\n"
 
-#: pg_dump.c:6944
+#: pg_dump.c:6947
 #, c-format
 msgid "invalid column numbering in table \"%s\"\n"
 msgstr "niepoprawna numeracja kolumn dla tabeli \"%s\"\n"
 
-#: pg_dump.c:6978
+#: pg_dump.c:6981
 #, c-format
 msgid "finding default expressions of table \"%s.%s\"\n"
 msgstr "wyszukiwanie wyrażeń domyślnych dla tabeli \"%s.%s\"\n"
 
-#: pg_dump.c:7031
+#: pg_dump.c:7034
 #, c-format
 msgid "invalid adnum value %d for table \"%s\"\n"
 msgstr "niepoprawna wartość adnum %d dla tabeli \"%s\"\n"
 
-#: pg_dump.c:7103
+#: pg_dump.c:7106
 #, c-format
 msgid "finding check constraints for table \"%s.%s\"\n"
 msgstr "odczyt ograniczeń sprawdzających dla tabeli \"%s.%s\"\n"
 
-#: pg_dump.c:7199
+#: pg_dump.c:7202
 #, c-format
 msgid "expected %d check constraint on table \"%s\" but found %d\n"
 msgid_plural "expected %d check constraints on table \"%s\" but found %d\n"
@@ -1900,127 +1899,127 @@ msgstr[0] "oczekiwano %d-go ograniczenia sprawdzające na tabeli \"%s\" ale znal
 msgstr[1] "oczekiwano %d-ch ograniczeń sprawdzających na tabeli \"%s\" ale znaleziono %d\n"
 msgstr[2] "oczekiwano %d ograniczeń sprawdzających na tabeli \"%s\" ale znaleziono %d\n"
 
-#: pg_dump.c:7203
+#: pg_dump.c:7206
 #, c-format
 msgid "(The system catalogs might be corrupted.)\n"
 msgstr "(Foldery systemowe mogą być uszkodzone.)\n"
 
-#: pg_dump.c:8580
+#: pg_dump.c:8583
 #, c-format
 msgid "WARNING: typtype of data type \"%s\" appears to be invalid\n"
 msgstr "OSTRZEŻENIE: typtype typu danych \"%s\" wydaje się być niepoprawny\n"
 
-#: pg_dump.c:10106
+#: pg_dump.c:10109
 #, c-format
 msgid "WARNING: bogus value in proargmodes array\n"
 msgstr "OSTRZEŻENIE: błędna wartość w tablicy proargmodes\n"
 
-#: pg_dump.c:10457
+#: pg_dump.c:10460
 #, c-format
 msgid "WARNING: could not parse proallargtypes array\n"
 msgstr "OSTRZEŻENIE: nie można przeanalizować tablicy proallargtypes\n"
 
-#: pg_dump.c:10473
+#: pg_dump.c:10476
 #, c-format
 msgid "WARNING: could not parse proargmodes array\n"
 msgstr "OSTRZEŻENIE: nie można przeanalizować tablicy proargmodes\n"
 
-#: pg_dump.c:10487
+#: pg_dump.c:10490
 #, c-format
 msgid "WARNING: could not parse proargnames array\n"
 msgstr "OSTRZEŻENIE: nie można przeanalizować tablicy proargnames\n"
 
-#: pg_dump.c:10498
+#: pg_dump.c:10501
 #, c-format
 msgid "WARNING: could not parse proconfig array\n"
 msgstr "OSTRZEŻENIE: nie można przeanalizować tablicy proconfig\n"
 
-#: pg_dump.c:10569
+#: pg_dump.c:10572
 #, c-format
 msgid "unrecognized provolatile value for function \"%s\"\n"
 msgstr "nierozpoznana wartość provolatile dla funkcji \"%s\"\n"
 
-#: pg_dump.c:10745
+#: pg_dump.c:10748
 #, c-format
 msgid "WARNING: bogus value in pg_cast.castfunc or pg_cast.castmethod field\n"
 msgstr "OSTRZEŻENIE: błędna wartość w pg_cast.castfunc lub nie udało się wykonać pg_cast.castmethod\n"
 
-#: pg_dump.c:10748
+#: pg_dump.c:10751
 #, c-format
 msgid "WARNING: bogus value in pg_cast.castmethod field\n"
 msgstr "OSTRZEŻENIE: błędna wartość pola pg_cast.castmethod\n"
 
-#: pg_dump.c:10831
+#: pg_dump.c:10834
 #, c-format
 msgid "WARNING: bogus transform definition, at least one of trffromsql and trftosql should be nonzero\n"
 msgstr "OSTRZEŻENIE: błędna definicja transformacji, co najmniej jedna z trffromsql i trftosql powinna być niezerowa\n"
 
-#: pg_dump.c:10848
+#: pg_dump.c:10851
 #, c-format
 msgid "WARNING: bogus value in pg_transform.trffromsql field\n"
 msgstr "OSTRZEŻENIE: błędna wartość pola pg_transform.trffromsql\n"
 
-#: pg_dump.c:10869
+#: pg_dump.c:10872
 #, c-format
 msgid "WARNING: bogus value in pg_transform.trftosql field\n"
 msgstr "OSTRZEŻENIE: błędna wartość pola pg_transform.trftosql\n"
 
-#: pg_dump.c:11255
+#: pg_dump.c:11258
 #, c-format
 msgid "WARNING: could not find operator with OID %s\n"
 msgstr "OSTRZEŻENIE: nie udało się odnaleźć operatora o OID %s\n"
 
-#: pg_dump.c:12430
+#: pg_dump.c:12433
 #, c-format
 msgid "WARNING: aggregate function %s could not be dumped correctly for this database version; ignored\n"
 msgstr "OSTRZEŻENIE: funkcja agregująca %s nie może być poprawnie zrzucona dla tej wersji bazy danych; zignorowano\n"
 
-#: pg_dump.c:13255
+#: pg_dump.c:13258
 #, c-format
 msgid "unrecognized object type in default privileges: %d\n"
 msgstr "nieznany typ obiektu w uprawnieniach domyślnych: %d\n"
 
-#: pg_dump.c:13270
+#: pg_dump.c:13273
 #, c-format
 msgid "could not parse default ACL list (%s)\n"
 msgstr "nie można przetworzyć domyślnej listy ACL (%s)\n"
 
-#: pg_dump.c:13325
+#: pg_dump.c:13328
 #, c-format
 msgid "could not parse ACL list (%s) for object \"%s\" (%s)\n"
 msgstr "nie udało się przetworzyć listy ACL (%s) dla obiektu \"%s\" (%s)\n"
 
-#: pg_dump.c:13742
+#: pg_dump.c:13745
 #, c-format
 msgid "query to obtain definition of view \"%s\" returned no data\n"
 msgstr "zapytanie o definicję widoku \"%s\" nie zwróciło danych\n"
 
-#: pg_dump.c:13745
+#: pg_dump.c:13748
 #, c-format
 msgid "query to obtain definition of view \"%s\" returned more than one definition\n"
 msgstr "zapytanie o definicję widoku \"%s\" nie zwróciło więcej niż jedna definicję\n"
 
-#: pg_dump.c:13752
+#: pg_dump.c:13755
 #, c-format
 msgid "definition of view \"%s\" appears to be empty (length zero)\n"
 msgstr "definicja widoku \"%s\" wydaje się pusta (długość zero)\n"
 
-#: pg_dump.c:14493
+#: pg_dump.c:14501
 #, c-format
 msgid "invalid column number %d for table \"%s\"\n"
 msgstr "niepoprawny numer kolumny %d dla tabeli \"%s\"\n"
 
-#: pg_dump.c:14617
+#: pg_dump.c:14625
 #, c-format
 msgid "missing index for constraint \"%s\"\n"
 msgstr "brak indeksu dla ograniczenia \"%s\"\n"
 
-#: pg_dump.c:14804
+#: pg_dump.c:14816
 #, c-format
 msgid "unrecognized constraint type: %c\n"
 msgstr "nierozpoznany typ ograniczenia: %c\n"
 
-#: pg_dump.c:14953 pg_dump.c:15117
+#: pg_dump.c:14965 pg_dump.c:15129
 #, c-format
 msgid "query to get data of sequence \"%s\" returned %d row (expected 1)\n"
 msgid_plural "query to get data of sequence \"%s\" returned %d rows (expected 1)\n"
@@ -2028,32 +2027,38 @@ msgstr[0] "zapytanie o dane sekwencji \"%s\" zwróciło %d wiersz (oczekiwano 1)
 msgstr[1] "zapytanie o dane sekwencji \"%s\" zwróciło %d wiersze (oczekiwano 1)\n"
 msgstr[2] "zapytanie o dane sekwencji \"%s\" zwróciło %d wierszy (oczekiwano 1)\n"
 
-#: pg_dump.c:14964
+#: pg_dump.c:14976
 #, c-format
 msgid "query to get data of sequence \"%s\" returned name \"%s\"\n"
 msgstr "pytanie o dane sekwencji \"%s\" zwróciło nazwę \"%s\"\n"
 
-#: pg_dump.c:15212
+#: pg_dump.c:15224
 #, c-format
 msgid "unexpected tgtype value: %d\n"
 msgstr "nieoczekiwana wartość tgtype: %d\n"
 
-#: pg_dump.c:15294
+#: pg_dump.c:15306
 #, c-format
 msgid "invalid argument string (%s) for trigger \"%s\" on table \"%s\"\n"
 msgstr "niepoprawny ciąg argumentu (%s) dla wyzwalacza \"%s\" tabeli \"%s\"\n"
 
-#: pg_dump.c:15481
+#: pg_dump.c:15493
 #, c-format
 msgid "query to get rule \"%s\" for table \"%s\" failed: wrong number of rows returned\n"
 msgstr "zapytanie o regułę \"%s\" dla tabeli \"%s\" nie powiodło się: zwróciło złą liczbę wierszy\n"
 
-#: pg_dump.c:15860
+#: pg_dump.c:15873
 #, c-format
 msgid "reading dependency data\n"
 msgstr "odczyt informacji o zależnościach\n"
 
-#: pg_dump.c:16407
+#: pg_dump.c:16433
+#, c-format
+#| msgid "WARNING: could not parse proconfig array\n"
+msgid "WARNING: could not parse reloptions array\n"
+msgstr "OSTRZEŻENIE: nie można przeanalizować tablicy reloptions\n"
+
+#: pg_dump.c:16497
 #, c-format
 msgid "query returned %d row instead of one: %s\n"
 msgid_plural "query returned %d rows instead of one: %s\n"

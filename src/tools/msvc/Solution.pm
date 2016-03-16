@@ -234,6 +234,10 @@ s{PG_VERSION_STR "[^"]+"}{__STRINGIFY(x) #x\n#define __STRINGIFY2(z) __STRINGIFY
 			print O "#define DEF_PGPORT $port\n";
 			print O "#define DEF_PGPORT_STR \"$port\"\n";
 		}
+		if ($self->{options}->{icu}) 
+		{
+			print O "#define USE_ICU\n";
+		}
 		print O "#define VAL_CONFIGURE \""
 		  . $self->GetFakeConfigure() . "\"\n";
 		print O "#endif /* IGNORE_CONFIGURED_SETTINGS */\n";
@@ -283,6 +287,14 @@ s{PG_VERSION_STR "[^"]+"}{__STRINGIFY(x) #x\n#define __STRINGIFY2(z) __STRINGIFY
 	{
 		copyFile('src/backend/utils/fmgroids.h',
 			'src/include/utils/fmgroids.h');
+	}
+
+	if (IsNewer(
+			'src/include/dynloader.h',
+			'src/backend/port/dynloader/win32.h'))
+	{
+		copyFile('src/backend/port/dynloader/win32.h',
+			'src/include/dynloader.h');
 	}
 
 	if (IsNewer('src/include/utils/probes.h', 'src/backend/utils/probes.d'))
@@ -520,6 +532,14 @@ sub AddProject
 		$proj->AddIncludeDir($self->{options}->{xslt} . '\include');
 		$proj->AddLibrary($self->{options}->{xslt} . '\lib\libxslt.lib');
 	}
+	if ($self->{options}->{icu})
+	{
+		my $libdir = $self->{options}->{icu}.'\lib';
+		$libdir .= '\lib64' if $self->{platform} eq 'x64';
+		$proj->AddIncludeDir($self->{options}->{icu} . '\include');
+		$proj->AddLibrary($libdir.'\icuin.lib');
+		$proj->AddLibrary($libdir.'\icuuc.lib');
+	}	
 	return $proj;
 }
 
@@ -619,6 +639,7 @@ sub GetFakeConfigure
 	$cfg .= ' --enable-integer-datetimes'
 	  if ($self->{options}->{integer_datetimes});
 	$cfg .= ' --enable-nls' if ($self->{options}->{nls});
+	$cfg .= ' --enable-tap-tests' if ($self->{options}->{tap_tests});
 	$cfg .= ' --with-ldap'  if ($self->{options}->{ldap});
 	$cfg .= ' --without-zlib' unless ($self->{options}->{zlib});
 	$cfg .= ' --with-extra-version' if ($self->{options}->{extraver});
@@ -630,7 +651,7 @@ sub GetFakeConfigure
 	$cfg .= ' --with-tcl'           if ($self->{options}->{tcl});
 	$cfg .= ' --with-perl'          if ($self->{options}->{perl});
 	$cfg .= ' --with-python'        if ($self->{options}->{python});
-
+	$cfg .=' --with-icu'			if ($self->{options}->{icu});
 	return $cfg;
 }
 

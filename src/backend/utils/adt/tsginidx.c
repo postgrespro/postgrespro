@@ -3,6 +3,7 @@
  * tsginidx.c
  *	 GIN support functions for tsvector_ops
  *
+ * Portions Copyright (c) 2015-2016, Postgres Professional
  * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
  *
  *
@@ -179,13 +180,16 @@ typedef struct
 } GinChkVal;
 
 static GinTernaryValue
-checkcondition_gin(void *checkval, QueryOperand *val)
+checkcondition_gin(void *checkval, QueryOperand *val, ExecPhraseData *data)
 {
 	GinChkVal  *gcv = (GinChkVal *) checkval;
 	int			j;
 
-	/* if any val requiring a weight is used, set recheck flag */
-	if (val->weight != 0)
+	/*
+	 * if any val requiring a weight is used or caller
+	 * needs position information then set recheck flag
+	 */
+	if (val->weight != 0 || data != NULL)
 		*(gcv->need_recheck) = true;
 
 	/* convert item's number to corresponding entry's (operand's) number */
@@ -204,7 +208,7 @@ checkcondition_gin(void *checkval, QueryOperand *val)
  */
 static GinTernaryValue
 TS_execute_ternary(QueryItem *curitem, void *checkval,
-			  GinTernaryValue (*chkcond) (void *checkval, QueryOperand *val))
+			  GinTernaryValue (*chkcond) (void*, QueryOperand*, ExecPhraseData*))
 {
 	GinTernaryValue val1,
 				val2,
@@ -214,7 +218,8 @@ TS_execute_ternary(QueryItem *curitem, void *checkval,
 	check_stack_depth();
 
 	if (curitem->type == QI_VAL)
-		return chkcond(checkval, (QueryOperand *) curitem);
+		return chkcond(checkval, (QueryOperand *) curitem,
+					   NULL /* we don't need a position infos */);
 
 	switch (curitem->qoperator.oper)
 	{
@@ -223,6 +228,13 @@ TS_execute_ternary(QueryItem *curitem, void *checkval,
 			if (result == GIN_MAYBE)
 				return result;
 			return !result;
+
+		case OP_PHRASE:
+			/*
+			 * GIN doesn't contain any information about postions,
+			 * treat OP_PHRASE as OP_AND with recheck requirement
+			 */
+			*((GinChkVal*)checkval)->need_recheck = true;
 
 		case OP_AND:
 			val1 = TS_execute_ternary(curitem + curitem->qoperator.left,

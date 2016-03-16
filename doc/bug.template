@@ -21,9 +21,9 @@ System Configuration:
 ---------------------
   Architecture (example: Intel Pentium)		:
 
-  Operating System (example: Linux 2.4.18)	:
+  Operating System (example: Ubuntu Linux 16.04)	:
 
-  PostgreSQL version (example: PostgresPro 9.5.0.1):  PostgresPro 9.5.0.1
+  PostgreSQL version (example: PostgresPro 9.5.1.3):  PostgresPro 9.5.1.3
 
   Compiler used (example: gcc 3.3.5)		:
 

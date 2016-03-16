@@ -4,6 +4,7 @@
  *	  definitions for executor state nodes
  *
  *
+ * Portions Copyright (c) 2015-2016, Postgres Professional
  * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
@@ -33,9 +34,11 @@
  *		entries for a particular index.  Used for both index_build and
  *		retail creation of index entries.
  *
- *		NumIndexAttrs		number of columns in this index
+ *		NumIndexAttrs		total number of columns in this index
+ *		NumIndexKeyAttrs	number of key columns in index
  *		KeyAttrNumbers		underlying-rel attribute numbers used as keys
- *							(zeroes indicate expressions)
+ *							(zeroes indicate expressions). It also contains
+ * 							info about included columns.
  *		Expressions			expr trees for expression entries, or NIL if none
  *		ExpressionsState	exec state for expressions, or NIL if none
  *		Predicate			partial-index predicate, or NIL if none
@@ -58,7 +61,8 @@
 typedef struct IndexInfo
 {
 	NodeTag		type;
-	int			ii_NumIndexAttrs;
+	int			ii_NumIndexAttrs; /* total number of columns in index */
+	int			ii_NumIndexKeyAttrs; /* number of key columns in index */
 	AttrNumber	ii_KeyAttrNumbers[INDEX_MAX_KEYS];
 	List	   *ii_Expressions; /* list of Expr */
 	List	   *ii_ExpressionsState;	/* list of ExprState */

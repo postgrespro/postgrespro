@@ -340,8 +340,8 @@ mydb=&gt;
 mydb=#
 </screen>
     That would mean you are a database superuser, which is most likely
-    the case if you installed <productname>&productname;</productname>
-    yourself.  Being a superuser means that you are not subject to
+    the case if you installed the <productname>&productname;</productname>
+    instance yourself.  Being a superuser means that you are not subject to
     access controls.  For the purposes of this tutorial that is not
     important.
    </para>

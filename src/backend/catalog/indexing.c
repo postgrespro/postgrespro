@@ -4,6 +4,7 @@
  *	  This file contains routines to support indexes defined on system
  *	  catalogs.
  *
+ * Portions Copyright (c) 2015-2016, Postgres Professional
  * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
@@ -119,6 +120,7 @@ CatalogIndexInsert(CatalogIndexState indstate, HeapTuple heapTuple)
 		Assert(indexInfo->ii_Predicate == NIL);
 		Assert(indexInfo->ii_ExclusionOps == NULL);
 		Assert(relationDescs[i]->rd_index->indimmediate);
+		Assert(indexInfo->ii_NumIndexKeyAttrs != 0);
 
 		/*
 		 * FormIndexDatum fills in its values and isnull parameters with the

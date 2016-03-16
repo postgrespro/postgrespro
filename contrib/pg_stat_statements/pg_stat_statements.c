@@ -49,6 +49,7 @@
  *
  *
  * Copyright (c) 2008-2015, PostgreSQL Global Development Group
+ * Copyright (c) 2015-2016, Postgres Professional
  *
  * IDENTIFICATION
  *	  contrib/pg_stat_statements/pg_stat_statements.c
@@ -741,11 +742,7 @@ pgss_shmem_shutdown(int code, Datum arg)
 	/*
 	 * Rename file into place, so we atomically replace any old one.
 	 */
-	if (rename(PGSS_DUMP_FILE ".tmp", PGSS_DUMP_FILE) != 0)
-		ereport(LOG,
-				(errcode_for_file_access(),
-				 errmsg("could not rename pg_stat_statement file \"%s\": %m",
-						PGSS_DUMP_FILE ".tmp")));
+	(void) durable_rename(PGSS_DUMP_FILE ".tmp", PGSS_DUMP_FILE, LOG);
 
 	/* Unlink query-texts file; it's not needed while shutdown */
 	unlink(PGSS_TEXT_FILE);

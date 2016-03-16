@@ -6962,11 +6962,7 @@ AlterSystemSetConfigFile(AlterSystemStmt *altersysstmt)
 		 * at worst it can lose the parameters set by last ALTER SYSTEM
 		 * command.
 		 */
-		if (rename(AutoConfTmpFileName, AutoConfFileName) < 0)
-			ereport(ERROR,
-					(errcode_for_file_access(),
-					 errmsg("could not rename file \"%s\" to \"%s\": %m",
-							AutoConfTmpFileName, AutoConfFileName)));
+		durable_rename(AutoConfTmpFileName, AutoConfFileName, ERROR);
 	}
 	PG_CATCH();
 	{
@@ -7223,6 +7219,17 @@ init_custom_variable(const char *name,
 	if (context == PGC_POSTMASTER &&
 		!process_shared_preload_libraries_in_progress)
 		elog(FATAL, "cannot create PGC_POSTMASTER variables after startup");
+
+	/*
+	 * Before pljava commit 398f3b876ed402bdaec8bc804f29e2be95c75139
+	 * (2015-12-15), two of that module's PGC_USERSET variables facilitated
+	 * trivial escalation to superuser privileges.  Restrict the variables to
+	 * protect sites that have yet to upgrade pljava.
+	 */
+	if (context == PGC_USERSET &&
+		(strcmp(name, "pljava.classpath") == 0 ||
+		 strcmp(name, "pljava.vmoptions") == 0))
+		context = PGC_SUSET;
 
 	gen = (struct config_generic *) guc_malloc(ERROR, sz);
 	memset(gen, 0, sz);

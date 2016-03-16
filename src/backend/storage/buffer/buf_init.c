@@ -3,6 +3,7 @@
  * buf_init.c
  *	  buffer manager initialization routines
  *
+ * Portions Copyright (c) 2015-2016, Postgres Professional
  * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
@@ -95,12 +96,9 @@ InitBufferPool(void)
 			BufferDesc *buf = GetBufferDescriptor(i);
 
 			CLEAR_BUFFERTAG(buf->tag);
-			buf->flags = 0;
-			buf->usage_count = 0;
-			buf->refcount = 0;
-			buf->wait_backend_pid = 0;
 
-			SpinLockInit(&buf->buf_hdr_lock);
+			pg_atomic_init_u32(&buf->state, 0);
+			buf->wait_backend_pid = 0;
 
 			buf->buf_id = i;
 

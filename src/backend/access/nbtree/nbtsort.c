@@ -55,6 +55,7 @@
  * This code isn't concerned about the FSM at all. The caller is responsible
  * for initializing that.
  *
+ * Portions Copyright (c) 2015-2016, Postgres Professional
  * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
@@ -591,6 +592,22 @@ _bt_buildadd(BTWriteState *wstate, BTPageState *state, IndexTuple itup)
 	{
 		Assert(state->btps_minkey == NULL);
 		state->btps_minkey = CopyIndexTuple(itup);
+	}
+
+	/* Truncate nonkey attributes when inserting on nonleaf pages */
+	if (wstate->index->rd_index->indnatts
+		!= wstate->index->rd_index->indnkeyatts)
+	{
+		BTPageOpaque pageop = (BTPageOpaque) PageGetSpecialPointer(npage);
+
+		if (!P_ISLEAF(pageop))
+		{
+			itup = index_reform_tuple(wstate->index,
+					itup, wstate->index->rd_index->indnatts,
+					wstate->index->rd_index->indnkeyatts);
+			itupsz = IndexTupleDSize(*itup);
+			itupsz = MAXALIGN(itupsz);
+		}
 	}
 
 	/*

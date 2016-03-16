@@ -27,6 +27,18 @@ my @client_program_files = (
 	'pg_isready',    'pg_receivexlog', 'pg_restore', 'psql',
 	'reindexdb',     'vacuumdb',       @client_contribs);
 
+sub SubstituteMakefileVariables {
+	local $_ = shift; # Line to substitue
+	my $mf = shift; # Makefile text
+	while (/\$\((\w+)\)/) {
+			my $varname = $1;
+			if ($mf =~ /^$varname\s*=\s*(.*)$/mg) {
+			my $varvalue=$1;
+			s/\$\($varname\)/$varvalue/g;
+			}
+	}
+	return $_;
+}
 sub lcopy
 {
 	my $src    = shift;
@@ -143,7 +155,7 @@ sub Install
 			$target . '/share/tsearch_data/');
 		CopySetOfFiles(
 			'Dictionaries sample files',
-			[ glob("src\\backend\\tsearch\\*_sample.*") ],
+			[ glob("src\\backend\\tsearch\\dicts\\*_sample*") ],
 			$target . '/share/tsearch_data/');
 
 		my $pl_extension_files = [];
@@ -494,8 +506,8 @@ sub CopySubdirFiles
 	}
 
 	$flist = '';
-	if ($mf =~ /^DATA_built\s*=\s*(.*)$/m) { $flist .= $1 }
-	if ($mf =~ /^DATA\s*=\s*(.*)$/m)       { $flist .= " $1" }
+	if ($mf =~ /^DATA_built\s*=\s*(.*)$/m) { $flist .= $1; }
+	if ($mf =~ /^DATA\s*=\s*(.*)$/m)       { $flist .= " $1"; }
 	$flist =~ s/^\s*//;    # Remove leading spaces if we had only DATA_built
 
 	if ($flist ne '')
@@ -516,7 +528,7 @@ sub CopySubdirFiles
 	if ($flist ne '')
 	{
 		$flist = ParseAndCleanRule($flist, $mf);
-
+		print STDERR "Installing TSEARCH data for module $module: $flist\n";
 		foreach my $f (split /\s+/, $flist)
 		{
 			lcopy("$subdir/$module/$f",
@@ -568,7 +580,7 @@ sub ParseAndCleanRule
 		    substr($flist, 0, index($flist, '$(addsuffix '))
 		  . substr($flist, $i + 1);
 	}
-	return $flist;
+	return SubstituteMakefileVariables($flist,$mf);
 }
 
 sub CopyIncludeFiles
@@ -582,7 +594,7 @@ sub CopyIncludeFiles
 		'Public headers', $target . '/include/',
 		'src/include/',   'postgres_ext.h',
 		'pg_config.h',    'pg_config_ext.h',
-		'pg_config_os.h', 'pg_config_manual.h');
+		'pg_config_os.h', 'dynloader.h', 'pg_config_manual.h');
 	lcopy('src/include/libpq/libpq-fs.h', $target . '/include/libpq/')
 	  || croak 'Could not copy libpq-fs.h';
 
@@ -605,7 +617,8 @@ sub CopyIncludeFiles
 	CopyFiles(
 		'Server headers',
 		$target . '/include/server/',
-		'src/include/', 'pg_config.h', 'pg_config_ext.h', 'pg_config_os.h');
+		'src/include/', 'pg_config.h', 'pg_config_ext.h', 'pg_config_os.h',
+		'dynloader.h');
 	CopyFiles(
 		'Grammar header',
 		$target . '/include/server/parser/',

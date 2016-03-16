@@ -16,13 +16,19 @@ SUBDIRS = \
 		dblink		\
 		dict_int	\
 		dict_xsyn	\
+		dump_stat   \
 		earthdistance	\
 		file_fdw	\
 		fuzzystrmatch	\
 		hstore		\
+		hunspell_en_us \
+		hunspell_fr \
+		hunspell_nl_nl \
+		hunspell_ru_ru \
 		intagg		\
 		intarray	\
 		isn		\
+		jsquery \
 		lo		\
 		ltree		\
 		oid2name	\
@@ -39,7 +45,9 @@ SUBDIRS = \
 		pgstattuple	\
 		postgres_fdw	\
 		seg		\
+		shared_ispell \
 		spi		\
+		sr_plan \
 		tablefunc	\
 		tcn		\
 		test_decoding	\

@@ -21,7 +21,7 @@
         Note that the definition of the
         <link linkend="catalog-pg-statistic"><structname>pg_statistic</structname></link>
         table might change occasionally, which means that generated dump might be incompatible
-        with future releases of PostgreSQL.
+        with future releases of <productname>PostgreSQL</productname>.
     </para>
 
     <sect2>
@@ -74,7 +74,9 @@ array_in(<replaceable class="PARAMETER">array_text</>, <replaceable class="PARAM
                     <para>
                         Produced statements could be saved to a file, e.g.
 <screen>
-test=# \COPY (select dump_statistic()) TO 'dump_stat.sql'
+test=# \t
+test=# \o dump_stat.sql
+test=# select dump_statistic();
 </screen>
                     </para>
                 </listitem>
@@ -279,7 +281,8 @@ test=# SELECT anyarray_elemtype(array_in('{1,2,3}', 'int'::regtype, -1));
                         <function>to_namespace</function> duplicates the behavior of
                         the cast to the
                         <link linkend="datatype-oid"><structname>regnamespace</structname></link>
-                        type, which is not present in the 9.4 release (and prior releases).
+                        type, which is not present in the
+                        <productname>PostgreSQL</productname> 9.4 release (and prior releases).
                         This function returns the <literal>oid</> of the given schema.
                     </para>
                 </listitem>

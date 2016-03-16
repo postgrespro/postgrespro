@@ -95,6 +95,7 @@
  * with the higher XID backs out.
  *
  *
+ * Portions Copyright (c) 2015-2016, Postgres Professional
  * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
@@ -646,7 +647,7 @@ check_exclusion_or_unique_constraint(Relation heap, Relation index,
 	Oid		   *constr_procs;
 	uint16	   *constr_strats;
 	Oid		   *index_collations = index->rd_indcollation;
-	int			index_natts = index->rd_index->indnatts;
+	int			index_nkeyatts = index->rd_index->indnkeyatts;
 	IndexScanDesc index_scan;
 	HeapTuple	tup;
 	ScanKeyData scankeys[INDEX_MAX_KEYS];
@@ -673,7 +674,7 @@ check_exclusion_or_unique_constraint(Relation heap, Relation index,
 	 * If any of the input values are NULL, the constraint check is assumed to
 	 * pass (i.e., we assume the operators are strict).
 	 */
-	for (i = 0; i < index_natts; i++)
+	for (i = 0; i < index_nkeyatts; i++)
 	{
 		if (isnull[i])
 			return true;
@@ -685,7 +686,7 @@ check_exclusion_or_unique_constraint(Relation heap, Relation index,
 	 */
 	InitDirtySnapshot(DirtySnapshot);
 
-	for (i = 0; i < index_natts; i++)
+	for (i = 0; i < index_nkeyatts; i++)
 	{
 		ScanKeyEntryInitialize(&scankeys[i],
 							   0,
@@ -717,8 +718,8 @@ check_exclusion_or_unique_constraint(Relation heap, Relation index,
 retry:
 	conflict = false;
 	found_self = false;
-	index_scan = index_beginscan(heap, index, &DirtySnapshot, index_natts, 0);
-	index_rescan(index_scan, scankeys, index_natts, NULL, 0);
+	index_scan = index_beginscan(heap, index, &DirtySnapshot, index_nkeyatts, 0);
+	index_rescan(index_scan, scankeys, index_nkeyatts, NULL, 0);
 
 	while ((tup = index_getnext(index_scan,
 								ForwardScanDirection)) != NULL)

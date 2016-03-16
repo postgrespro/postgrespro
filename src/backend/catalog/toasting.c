@@ -4,6 +4,7 @@
  *	  This file contains routines to support creation of toast tables
  *
  *
+ * Portions Copyright (c) 2015-2016, Postgres Professional
  * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
@@ -313,6 +314,7 @@ create_toast_table(Relation rel, Oid toastOid, Oid toastIndexOid,
 
 	indexInfo = makeNode(IndexInfo);
 	indexInfo->ii_NumIndexAttrs = 2;
+	indexInfo->ii_NumIndexKeyAttrs = 2;
 	indexInfo->ii_KeyAttrNumbers[0] = 1;
 	indexInfo->ii_KeyAttrNumbers[1] = 2;
 	indexInfo->ii_Expressions = NIL;

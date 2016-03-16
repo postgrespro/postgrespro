@@ -3,6 +3,7 @@
  * ts_selfuncs.c
  *	  Selectivity estimation functions for text search operators.
  *
+ * Portions Copyright (c) 2015-2016, Postgres Professional
  * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
  *
  *
@@ -400,6 +401,7 @@ tsquery_opr_selec(QueryItem *item, char *operand,
 												lookup, length, minfreq);
 				break;
 
+			case OP_PHRASE:
 			case OP_AND:
 				s1 = tsquery_opr_selec(item + 1, operand,
 									   lookup, length, minfreq);

@@ -3,6 +3,7 @@
  * pg_wchar.h
  *	  multibyte-character support
  *
+ * Portions Copyright (c) 2015-2016, Postgres Professional
  * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
@@ -320,6 +321,10 @@ typedef struct pg_enc2name
 } pg_enc2name;
 
 extern const pg_enc2name pg_enc2name_tbl[];
+
+#ifdef USE_ICU
+extern pg_enc2name pg_enc2iananame_tbl[];
+#endif
 
 /*
  * Encoding names for gettext

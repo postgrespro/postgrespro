@@ -3,6 +3,7 @@
  * nbtutils.c
  *	  Utility code for Postgres btree implementation.
  *
+ * Portions Copyright (c) 2015-2016, Postgres Professional
  * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
@@ -63,17 +64,24 @@ _bt_mkscankey(Relation rel, IndexTuple itup)
 {
 	ScanKey		skey;
 	TupleDesc	itupdesc;
-	int			natts;
+	int			nkeyatts;
 	int16	   *indoption;
 	int			i;
 
 	itupdesc = RelationGetDescr(rel);
-	natts = RelationGetNumberOfAttributes(rel);
+	nkeyatts = rel->rd_index->indnkeyatts;
 	indoption = rel->rd_indoption;
 
-	skey = (ScanKey) palloc(natts * sizeof(ScanKeyData));
+	Assert(rel->rd_index->indnkeyatts != 0);
+	Assert(rel->rd_index->indnkeyatts <= rel->rd_index->indnatts);
 
-	for (i = 0; i < natts; i++)
+	/*
+	 * We'll execute search using ScanKey constructed on key columns.
+	 * Non key (included) columns must be omitted.
+	 */
+	skey = (ScanKey) palloc(nkeyatts * sizeof(ScanKeyData));
+
+	for (i = 0; i < nkeyatts; i++)
 	{
 		FmgrInfo   *procinfo;
 		Datum		arg;
@@ -115,16 +123,16 @@ ScanKey
 _bt_mkscankey_nodata(Relation rel)
 {
 	ScanKey		skey;
-	int			natts;
+	int			nkeyatts;
 	int16	   *indoption;
 	int			i;
 
-	natts = RelationGetNumberOfAttributes(rel);
+	nkeyatts = IndexRelationGetNumberOfKeyAttributes(rel);
 	indoption = rel->rd_indoption;
 
-	skey = (ScanKey) palloc(natts * sizeof(ScanKeyData));
+	skey = (ScanKey) palloc(nkeyatts * sizeof(ScanKeyData));
 
-	for (i = 0; i < natts; i++)
+	for (i = 0; i < nkeyatts; i++)
 	{
 		FmgrInfo   *procinfo;
 		int			flags;
@@ -1285,12 +1293,9 @@ _bt_fix_scankey_strategy(ScanKey skey, int16 *indoption)
  *
  * Depending on the operator type, the key may be required for both scan
  * directions or just one.  Also, if the key is a row comparison header,
- * we have to mark the appropriate subsidiary ScanKeys as required.  In
- * such cases, the first subsidiary key is required, but subsequent ones
- * are required only as long as they correspond to successive index columns
- * and match the leading column as to sort direction.
- * Otherwise the row comparison ordering is different from the index ordering
- * and so we can't stop the scan on the basis of those lower-order columns.
+ * we have to mark its first subsidiary ScanKey as required.  (Subsequent
+ * subsidiary ScanKeys are normally for lower-order columns, and thus
+ * cannot be required, since they're after the first non-equality scankey.)
  *
  * Note: when we set required-key flag bits in a subsidiary scankey, we are
  * scribbling on a data structure belonging to the index AM's caller, not on
@@ -1328,24 +1333,12 @@ _bt_mark_scankey_required(ScanKey skey)
 	if (skey->sk_flags & SK_ROW_HEADER)
 	{
 		ScanKey		subkey = (ScanKey) DatumGetPointer(skey->sk_argument);
-		AttrNumber	attno = skey->sk_attno;
 
-		/* First subkey should be same as the header says */
-		Assert(subkey->sk_attno == attno);
-
-		for (;;)
-		{
-			Assert(subkey->sk_flags & SK_ROW_MEMBER);
-			if (subkey->sk_attno != attno)
-				break;			/* non-adjacent key, so not required */
-			if (subkey->sk_strategy != skey->sk_strategy)
-				break;			/* wrong direction, so not required */
-			subkey->sk_flags |= addflags;
-			if (subkey->sk_flags & SK_ROW_END)
-				break;
-			subkey++;
-			attno++;
-		}
+		/* First subkey should be same column/operator as the header */
+		Assert(subkey->sk_flags & SK_ROW_MEMBER);
+		Assert(subkey->sk_attno == skey->sk_attno);
+		Assert(subkey->sk_strategy == skey->sk_strategy);
+		subkey->sk_flags |= addflags;
 	}
 }
 
@@ -1428,13 +1421,6 @@ _bt_checkkeys(IndexScanDesc scan,
 		Datum		datum;
 		bool		isNull;
 		Datum		test;
-
-		/*
-		 * If the scan key has already matched we can skip this key, as long
-		 * as the index tuple does not contain NULL values.
-		 */
-		if (key->sk_flags & SK_BT_MATCHED && !IndexTupleHasNulls(tuple))
-			continue;
 
 		/* row-comparison keys need special processing */
 		if (key->sk_flags & SK_ROW_HEADER)

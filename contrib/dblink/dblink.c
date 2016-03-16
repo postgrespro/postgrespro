@@ -10,6 +10,7 @@
  *
  * contrib/dblink/dblink.c
  * Copyright (c) 2001-2015, PostgreSQL Global Development Group
+ * Copyright (c) 2015-2016, Postgres Professional
  * ALL RIGHTS RESERVED;
  *
  * Permission to use, copy, modify, and distribute this software and its
@@ -2058,7 +2059,7 @@ get_pkey_attnames(Relation rel, int16 *numatts)
 		/* we're only interested if it is the primary key */
 		if (index->indisprimary)
 		{
-			*numatts = index->indnatts;
+			*numatts = index->indnkeyatts;
 			if (*numatts > 0)
 			{
 				result = (char **) palloc(*numatts * sizeof(char *));

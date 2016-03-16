@@ -2,7 +2,8 @@
 #
 # Makefile for backend/tsearch
 #
-# Copyright (c) 2006-2015, PostgreSQL Global Development Group
+# Portions Copyright (c) 2015-2016, Postgres Professional
+# Portions Copyright (c) 2006-2016, PostgreSQL Global Development Group
 #
 # src/backend/tsearch/Makefile
 #
@@ -13,8 +14,10 @@ include $(top_builddir)/src/Makefile.global
 
 DICTDIR=tsearch_data
 
-DICTFILES=synonym_sample.syn thesaurus_sample.ths hunspell_sample.affix \
-	ispell_sample.affix ispell_sample.dict
+DICTFILES=dicts/synonym_sample.syn dicts/thesaurus_sample.ths \
+	dicts/hunspell_sample.affix dicts/ispell_sample.affix dicts/ispell_sample.dict \
+	dicts/hunspell_sample_long.affix dicts/hunspell_sample_long.dict \
+	dicts/hunspell_sample_num.affix dicts/hunspell_sample_num.dict
 
 OBJS = ts_locale.o ts_parse.o wparser.o wparser_def.o dict.o \
 	dict_simple.o dict_synonym.o dict_thesaurus.o \

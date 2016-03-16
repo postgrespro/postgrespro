@@ -3,6 +3,7 @@
  * tsvector_parser.c
  *	  Parser for tsvector
  *
+ * Portions Copyright (c) 2015-2016, Postgres Professional
  * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
  *
  *
@@ -89,7 +90,14 @@ do { \
 	} \
 } while (0)
 
-#define ISOPERATOR(x)	( pg_mblen(x)==1 && ( *(x)=='!' || *(x)=='&' || *(x)=='|' || *(x)=='(' || *(x)==')' ) )
+#define ISOPERATOR(x) \
+	( pg_mblen(x) == 1 && ( *(x) == '!' ||	\
+							*(x) == '&' ||	\
+							*(x) == '|' ||	\
+							*(x) == '?' ||	\
+							*(x) == '(' ||	\
+							*(x) == ')'		\
+						  ) )
 
 /* Fills gettoken_tsvector's output parameters, and returns true */
 #define RETURN_TOKEN \

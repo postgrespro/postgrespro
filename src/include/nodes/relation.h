@@ -4,6 +4,7 @@
  *	  Definitions for planner's internal data structures.
  *
  *
+ * Portions Copyright (c) 2015-2016, Postgres Professional
  * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
@@ -492,10 +493,11 @@ typedef struct RelOptInfo
  * IndexOptInfo
  *		Per-index information for planning/optimization
  *
- *		indexkeys[], indexcollations[], opfamily[], and opcintype[]
- *		each have ncolumns entries.
+ *		indexkeys[], indexcollations[] each have ncolumns entries.
+ *		opfamily[], and opcintype[]	each have nkeycolumns entries. They do
+ *		not contain any information about included attributes.
  *
- *		sortopfamily[], reverse_sort[], and nulls_first[] likewise have
+ *		sortopfamily[], reverse_sort[], and nulls_first[] have
  *		ncolumns entries, if the index is ordered; but if it is unordered,
  *		those pointers are NULL.
  *
@@ -529,7 +531,9 @@ typedef struct IndexOptInfo
 
 	/* index descriptor information */
 	int			ncolumns;		/* number of columns in index */
-	int		   *indexkeys;		/* column numbers of index's keys, or 0 */
+	int			nkeycolumns;	/* number of key columns in index */
+	int		   *indexkeys;		/* column numbers of index's attributes
+								 * both key and included columns, or 0 */
 	Oid		   *indexcollations;	/* OIDs of collations of index columns */
 	Oid		   *opfamily;		/* OIDs of operator families for columns */
 	Oid		   *opcintype;		/* OIDs of opclass declared input data types */

@@ -3,6 +3,7 @@
  * ts_utils.h
  *	  helper utilities for tsearch
  *
+ * Portions Copyright (c) 2015-2016, Postgres Professional
  * Copyright (c) 1998-2015, PostgreSQL Global Development Group
  *
  * src/include/tsearch/ts_utils.h
@@ -55,7 +56,7 @@ extern TSQuery parse_tsquery(char *buf,
 extern void pushValue(TSQueryParserState state,
 		  char *strval, int lenval, int16 weight, bool prefix);
 extern void pushStop(TSQueryParserState state);
-extern void pushOperator(TSQueryParserState state, int8 oper);
+extern void pushOperator(TSQueryParserState state, int8 oper, int16 distance);
 
 /*
  * parse plain text and lexize words
@@ -104,8 +105,15 @@ extern text *generateHeadline(HeadlineParsedText *prs);
 /*
  * Common check function for tsvector @@ tsquery
  */
+typedef struct ExecPhraseData
+{
+	int				npos;
+	bool			allocated;
+	WordEntryPos   *pos;
+} ExecPhraseData;
+
 extern bool TS_execute(QueryItem *curitem, void *checkval, bool calcnot,
-		   bool (*chkcond) (void *checkval, QueryOperand *val));
+		   bool (*chkcond) (void *checkval, QueryOperand *val, ExecPhraseData *data));
 extern bool tsquery_requires_match(QueryItem *curitem);
 
 /*
@@ -120,6 +128,8 @@ extern Datum to_tsquery_byid(PG_FUNCTION_ARGS);
 extern Datum to_tsquery(PG_FUNCTION_ARGS);
 extern Datum plainto_tsquery_byid(PG_FUNCTION_ARGS);
 extern Datum plainto_tsquery(PG_FUNCTION_ARGS);
+extern Datum phraseto_tsquery_byid(PG_FUNCTION_ARGS);
+extern Datum phraseto_tsquery(PG_FUNCTION_ARGS);
 
 /*
  * GiST support function
@@ -166,7 +176,7 @@ extern Datum gin_tsquery_consistent_6args(PG_FUNCTION_ARGS);
  * TSQuery Utilities
  */
 extern QueryItem *clean_NOT(QueryItem *ptr, int32 *len);
-extern QueryItem *clean_fakeval(QueryItem *ptr, int32 *len);
+extern TSQuery cleanup_fakeval_and_phrase(TSQuery in);
 
 typedef struct QTNode
 {
