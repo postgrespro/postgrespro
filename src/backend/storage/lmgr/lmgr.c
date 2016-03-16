@@ -355,6 +355,30 @@ UnlockRelationForExtension(Relation relation, LOCKMODE lockmode)
 	LockRelease(&tag, lockmode, false);
 }
 
+void
+LockSmgrForExtension(SMgrRelation smgr, LOCKMODE lockmode)
+{
+	LOCKTAG		tag;
+
+	SET_LOCKTAG_SMGR(tag, smgr->smgr_rnode.node.relNode);
+
+	(void) LockAcquire(&tag, lockmode, false, false);
+}
+
+/*
+ *		UnlockRelationForExtension
+ */
+void
+UnlockSmgrForExtension(SMgrRelation smgr, LOCKMODE lockmode)
+{
+	LOCKTAG		tag;
+
+	SET_LOCKTAG_SMGR(tag ,smgr->smgr_rnode.node.relNode);
+
+	LockRelease(&tag, lockmode, false);
+}
+
+
 /*
  *		LockPage
  *
