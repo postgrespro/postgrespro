@@ -196,11 +196,13 @@ extern void printQuery(const PGresult *result, const printQueryOpt *opt,
 extern void setDecimalLocale(void);
 extern const printTextFormat *get_line_style(const printTableOpt *opt);
 extern void refresh_utf8format(const printTableOpt *opt);
-
+/* Let build system to redefine default pager */
+#ifndef DEFAULT_PAGER
 #ifndef __CYGWIN__
 #define DEFAULT_PAGER "more"
 #else
 #define DEFAULT_PAGER "less"
+#endif
 #endif
 
 #endif   /* PRINT_H */

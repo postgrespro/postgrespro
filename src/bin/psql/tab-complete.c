@@ -861,11 +861,12 @@ initialize_readline(void)
 {
 	rl_readline_name = (char *) pset.progname;
 	rl_attempted_completion_function = psql_completion;
-
+#ifndef HAVE_WIN32_LIBEDIT
 	rl_basic_word_break_characters = WORD_BREAKS;
 
+	/* In WinLibEdit rl_basic_word_break_characters is constant */
 	completion_max_records = 1000;
-
+#endif
 	/*
 	 * There is a variable rl_completion_query_items for this but apparently
 	 * it's not defined everywhere.

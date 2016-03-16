@@ -28,6 +28,7 @@
 #include "mainloop.h"
 #include "print.h"
 #include "settings.h"
+#include "mb/pg_wchar.h"
 
 
 
@@ -95,6 +96,10 @@ main(int argc, char *argv[])
 	bool		new_pass;
 
 	set_pglocale_pgservice(argv[0], PG_TEXTDOMAIN("psql"));
+#if defined(HAVE_WIN32_LIBEDIT) && defined(ENABLE_NLS)
+	bind_textdomain_codeset(PG_TEXTDOMAIN("psql"),"UTF-8");
+	bind_textdomain_codeset(PG_TEXTDOMAIN("libpq"),"UTF-8");
+#endif
 
 	if (argc > 1)
 	{
@@ -144,7 +149,12 @@ main(int argc, char *argv[])
 	pset.popt.topt.env_columns = getenv("COLUMNS") ? atoi(getenv("COLUMNS")) : 0;
 
 	pset.notty = (!isatty(fileno(stdin)) || !isatty(fileno(stdout)));
-
+#ifdef HAVE_WIN_32_LIBEDIT
+	if (!pset.notty && pset.encoding == PG_SQL_ASCII) {
+		_setmode(_fileno(stdout),_O_U8TEXT);
+		pset.encoding = PG_UTF8;
+	}
+#endif
 	pset.getPassword = TRI_DEFAULT;
 
 	EstablishVariableSpace();
@@ -222,7 +232,7 @@ main(int argc, char *argv[])
 		keywords[5] = "fallback_application_name";
 		values[5] = pset.progname;
 		keywords[6] = "client_encoding";
-		values[6] = (pset.notty || getenv("PGCLIENTENCODING")) ? NULL : "auto";
+		values[6] = (pset.notty || getenv("PGCLIENTENCODING")) ? NULL : "UTF8";
 		keywords[7] = NULL;
 		values[7] = NULL;
 
