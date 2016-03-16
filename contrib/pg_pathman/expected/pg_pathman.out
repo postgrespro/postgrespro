@@ -588,6 +588,18 @@ EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt BETWEEN '2014-11-15' A
          Index Cond: (dt <= 'Thu Jan 15 00:00:00 2015'::timestamp without time zone)
 (4 rows)
 
+CREATE TABLE test.range_rel_test1 (
+    id  SERIAL PRIMARY KEY,
+    dt  TIMESTAMP,
+    txt TEXT,
+    abc INTEGER);
+SELECT pathman.attach_range_partition('test.range_rel', 'test.range_rel_test1', '2013-01-01'::DATE, '2014-01-01'::DATE);
+ERROR:  Partition must have the exact same structure as parent P0001
+CREATE TABLE test.range_rel_test2 (
+    id  SERIAL PRIMARY KEY,
+    dt  TIMESTAMP);
+SELECT pathman.attach_range_partition('test.range_rel', 'test.range_rel_test2', '2013-01-01'::DATE, '2014-01-01'::DATE);
+ERROR:  Partition must have the exact same structure as parent P0001
 /*
  * Clean up
  */

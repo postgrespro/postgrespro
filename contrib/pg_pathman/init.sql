@@ -234,6 +234,34 @@ $$
 LANGUAGE plpgsql;
 
 /*
+ * Check if two relations have equal structures
+ */
+CREATE OR REPLACE FUNCTION @extschema@.validate_relations_equality(relation1 OID, relation2 OID)
+RETURNS BOOLEAN AS
+$$
+DECLARE
+    rec RECORD;
+BEGIN
+    FOR rec IN (
+        WITH
+            a1 AS (select * from pg_attribute where attrelid = relation1 and attnum > 0),
+            a2 AS (select * from pg_attribute where attrelid = relation2 and attnum > 0)
+        SELECT a1.attname name1, a2.attname name2, a1.atttypid type1, a2.atttypid type2
+        FROM a1
+        FULL JOIN a2 ON a1.attnum = a2.attnum
+    )
+    LOOP
+        IF rec.name1 IS NULL OR rec.name2 IS NULL OR rec.name1 != rec.name2 THEN
+            RETURN False;
+        END IF;
+    END LOOP;
+
+    RETURN True;
+END
+$$
+LANGUAGE plpgsql;
+
+/*
  * Check if regclass if date or timestamp
  */
 CREATE OR REPLACE FUNCTION @extschema@.is_date(cls REGTYPE)

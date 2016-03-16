@@ -886,6 +886,10 @@ BEGIN
 		RAISE EXCEPTION 'Specified range overlaps with existing partitions';
 	END IF;
 
+    IF NOT @extschema@.validate_relations_equality(p_relation::regclass, p_partition::regclass) THEN
+        RAISE EXCEPTION 'Partition must have the exact same structure as parent';
+    END IF;
+
 	/* Set inheritance */
 	EXECUTE format('ALTER TABLE %s INHERIT %s'
 				   , p_partition

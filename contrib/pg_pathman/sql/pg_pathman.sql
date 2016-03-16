@@ -138,6 +138,16 @@ SELECT pathman.attach_range_partition('test.range_rel', 'test.range_rel_archive'
 EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt BETWEEN '2014-11-15' AND '2015-01-15';
 SELECT pathman.detach_range_partition('test.range_rel_archive');
 EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt BETWEEN '2014-11-15' AND '2015-01-15';
+CREATE TABLE test.range_rel_test1 (
+    id  SERIAL PRIMARY KEY,
+    dt  TIMESTAMP,
+    txt TEXT,
+    abc INTEGER);
+SELECT pathman.attach_range_partition('test.range_rel', 'test.range_rel_test1', '2013-01-01'::DATE, '2014-01-01'::DATE);
+CREATE TABLE test.range_rel_test2 (
+    id  SERIAL PRIMARY KEY,
+    dt  TIMESTAMP);
+SELECT pathman.attach_range_partition('test.range_rel', 'test.range_rel_test2', '2013-01-01'::DATE, '2014-01-01'::DATE);
 
 /*
  * Clean up
