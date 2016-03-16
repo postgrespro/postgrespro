@@ -385,17 +385,24 @@ DECLARE
 
     v_part_num INT;
     v_sql TEXT;
-    -- v_type TEXT;
     v_cond TEXT;
+    v_child_relname_exists INTEGER := 1;
 BEGIN
     v_attname := attname FROM @extschema@.pathman_config
                  WHERE relname = p_parent_relname;
 
     /* get next value from sequence */
-    v_part_num := nextval(format('%s_seq', p_parent_relname));
-    v_child_relname := format('%s_%s'
-                              , p_parent_relname
-                              , v_part_num);
+    LOOP
+        v_part_num := nextval(format('%s_seq', p_parent_relname));
+        v_child_relname := format('%s_%s'
+                                  , p_parent_relname
+                                  , v_part_num);
+        v_child_relname_exists := count(*)
+                                  FROM pg_class
+                                  WHERE relnamespace::regnamespace || '.' || relname = v_child_relname
+                                  LIMIT 1;
+        EXIT WHEN v_child_relname_exists = 0;
+    END LOOP;
     -- v_child_relname := format('%s_%s'
     --                           , p_parent_relname
     --                           , regexp_replace(p_start_value::text, '[ :-]*', '', 'g'));
