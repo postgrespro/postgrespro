@@ -1886,6 +1886,11 @@ printSSLInfo(void)
 static void
 checkWin32Codepage(void)
 {
+#ifdef HAVE_WIN32_LIBEDIT
+	if (isatty(fileno(stdout)))
+		printf(_("WARNING: Unicode mode enabled. "
+		         "You need TTF font in your console window\n"));
+#else
 	unsigned int wincp,
 				concp;
 
@@ -1898,6 +1903,7 @@ checkWin32Codepage(void)
 				 "         page \"Notes for Windows users\" for details.\n"),
 			   concp, wincp);
 	}
+#endif	
 }
 #endif
 

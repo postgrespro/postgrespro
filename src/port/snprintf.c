@@ -271,7 +271,7 @@ flushbuffer(PrintfTarget *target)
 		{
 			/* Convert message from buffer (expected as utf8)
 			   to widechar */
-			HANDLE consoleHandle = _get_osf_handle(_fileno(target->stream));
+			HANDLE consoleHandle = _get_osfhandle(_fileno(target->stream));
 			DWORD actuallyWritten;
 			wchar_t *widebuf= (wchar_t *)malloc(nc*sizeof(wchar_t));
 			written = MultiByteToWideChar(CP_UTF8,0,target->bufstart,nc,widebuf,nc);
@@ -280,6 +280,7 @@ flushbuffer(PrintfTarget *target)
 				target->nchars += nc;
 			else	
 				target->failed = true;
+			free(widebuf);
 		} else {
 #endif		
 		written = fwrite(target->bufstart, 1, nc, target->stream);
@@ -1172,10 +1173,12 @@ int pg_fputs(const char *s, FILE *stream)
 		errno = EINVAL;
 		return -1;
 	}
-	target.bufstart = target.bufptr = s;
-	target.nchars = strlen(s);
+	target.bufstart = s;
+	target.nchars =  0;
+	target.bufptr= s+strlen(s);
 	target.bufend=NULL;
 	target.failed=false;
+	target.stream = stream;
 	flushbuffer(&target);
 	return target.failed ? -1 : target.nchars;
 }
