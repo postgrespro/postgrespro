@@ -1,20 +1,86 @@
 <!-- doc/src/sgml/release-pro-9.5.sgml -->
 <!-- See header comment in release.sgml about typical markup -->
+ <sect1 id="release-pro-9-5-1-2">
+ <title>Postgres Pro 9.5.1.1</title>
+ <note>
+  <title>Release Date</title>
+  <simpara>2016-02-26</simpara>
+  <simpara>Current as of 2016-02-19</simpara>
+ </note>
+  <sect2>
+   <title>Overview</title>
 
- <sect1 id="release-pro-9-5">
-  <title>Postgres Pro 9.5</title>
+   <para>
+    Major enhancements in <productname>Postgres Pro</> 9.5.1.2 over
+    <productname>PostgrePro</> 9.5.1.1 include:
+   </para>
+
+   <!-- This list duplicates items below, but without authors or details-->
+
+   <itemizedlist>
+    <listitem><para>
+    Include jsquery module (query language for jsonb fields.
+    </para>
+    </listitem>
+    <listitem>
+     <para>
+     Improvement of substring simularity search (pg_trgm module).
+     </para>
+    </listitem>
+    <listitem>
+     <para>
+     Support of loading of the ispell dictionaries into shared memory. 
+     </para>
+    </listitem>
+   </itemizedlist>
+   </sect2>
+   <sect2>
+   <title>Changes</title>
+   <para>
+    Below you will find a detailed account of the changes between
+    <productname>PostgrePro</productname> 9.5.12 and the previous minor
+    release.
+   </para>
+   <sect3><title>Additional modules</title>
+   <itemizedlist>
+   <listitem>
+   <para>
+   <literal>jsquery</literal> module - query operators for jsonb structures. Support GIN
+   inexes. Authors Teodor Sigaev, Alexander Korotkov, Oleg Bartunov.
+   </para>
+   </listitem>
+   <listitem>
+   <para>
+   Improvements of <literal>pg_trgm</literal> module. Substring simularity search improved
+   (Artur Zakirov)
+   </para>
+   </listitem>
+   <listitem>
+   <para>
+   <literal>shared_ispell</literal> module
+   Support for loading fulltext-search dictionaries into shared memory.
+   Improves speed, because there is now no need to load huspell
+   dictionary into each session again and again. (Artur Zakirov)
+   </para>
+   </listitem>
+   </itemizedlist>
+   </sect3>
+   </sect2>
+ </sect1>
+ <sect1 id="release-pro-9-5-0-1">
+  <title>Postgres Pro 9.5.0.1</title>
 
   <note>
    <title>Release Date</title>
    <simpara>2016-02-01</simpara>
-   <simpara>Current as of 2016-01-28</simpara>
   </note>
 
   <sect2>
    <title>Overview</title>
 
    <para>
-    Major enhancements in <productname>Postgres Pro</> 9.5 include:
+    Major enhancements in <productname>Postgres Pro</> 9.5 over
+    <productname>PostgreSQL</> 9.5 include:
    </para>
 
    <!-- This list duplicates items below, but without authors or details-->

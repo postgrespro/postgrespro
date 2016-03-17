@@ -4,6 +4,7 @@
  * src/backend/utils/adt/formatting.c
  *
  *
+ *   Portions Copyright (c) 2015-2016, Postgres Professional
  *	 Portions Copyright (c) 1999-2015, PostgreSQL Global Development Group
  *
  *

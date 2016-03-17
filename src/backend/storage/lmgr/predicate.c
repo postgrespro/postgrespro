@@ -64,6 +64,7 @@
  *
  * (7)	A write from a serializable transaction must ensure that an xact
  *		record exists for the transaction, with the same lifespan (until
+ *
  *		all concurrent transaction complete or the transaction is rolled
  *		back) so that rw-dependencies to that transaction can be
  *		detected.
@@ -125,6 +126,7 @@
  *		- Protects both PredXact and SerializableXidHash.
  *
  *
+ * Portions Copyright (c) 2015-2016, Postgres Professional
  * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *

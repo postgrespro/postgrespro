@@ -1769,7 +1769,7 @@ set path = ( /usr/local/pgsql/bin $path )
     shell start-up file unless you installed into a location that is
     searched by default:
 <programlisting>
-MANPATH=/usr/local/pgsql/man:$MANPATH
+MANPATH=/usr/local/pgsql/share/man:$MANPATH
 export MANPATH
 </programlisting>
    </para>
@@ -2720,7 +2720,7 @@ PHSS_30849  s700_800 u2comp/be/plugin library Patch
      <varname>MANPATH</varname> variable
      in <filename>/etc/default/man</filename>, for example:
 <programlisting>
-MANPATH=/usr/lib/scohelp/%L/man:/usr/dt/man:/usr/man:/usr/share/man:scohelp:/usr/local/man:/usr/local/pgsql/man
+MANPATH=/usr/lib/scohelp/%L/man:/usr/dt/man:/usr/man:/usr/share/man:scohelp:/usr/local/man:/usr/local/pgsql/share/man
 </programlisting>
     </para>
 

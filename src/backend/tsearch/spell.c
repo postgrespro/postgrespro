@@ -3,6 +3,7 @@
  * spell.c
  *		Normalizing word with ISpell
  *
+ * Portions Copyright (c) 2015-2016, Postgres Professional
  * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
  *
  * Ispell dictionary

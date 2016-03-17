@@ -219,7 +219,7 @@ gtrgm_consistent(PG_FUNCTION_ARGS)
 		switch (strategy)
 		{
 			case SimilarityStrategyNumber:
-			case SubwordSimilarityStrategyNumber:
+			case WordSimilarityStrategyNumber:
 				qtrg = generate_trgm(VARDATA(query),
 									 querysize - VARHDRSZ);
 				break;
@@ -288,11 +288,11 @@ gtrgm_consistent(PG_FUNCTION_ARGS)
 	switch (strategy)
 	{
 		case SimilarityStrategyNumber:
-		case SubwordSimilarityStrategyNumber:
-			/* Similarity search is exact. Subword similarity search is inexact */
-			*recheck = (strategy == SubwordSimilarityStrategyNumber);
+		case WordSimilarityStrategyNumber:
+			/* Similarity search is exact. Word similarity search is inexact */
+			*recheck = (strategy == WordSimilarityStrategyNumber);
 			nlimit = (strategy == SimilarityStrategyNumber) ?
-				trgm_sml_limit : trgm_subword_limit;
+				similarity_threshold : word_similarity_threshold;
 
 			if (GIST_LEAF(entry))
 			{					/* all leafs contains orig trgm */
@@ -472,14 +472,14 @@ gtrgm_distance(PG_FUNCTION_ARGS)
 	switch (strategy)
 	{
 		case DistanceStrategyNumber:
-		case SubwordDistanceStrategyNumber:
-			*recheck = strategy == SubwordDistanceStrategyNumber;
+		case WordDistanceStrategyNumber:
+			*recheck = strategy == WordDistanceStrategyNumber;
 			if (GIST_LEAF(entry))
 			{					/* all leafs contains orig trgm */
 				/*
 				 * Prevent gcc optimizing the sml variable using volatile
 				 * keyword. Otherwise res can differ from the
-				 * subword_similarity_dist_op() function.
+				 * word_similarity_dist_op() function.
 				 */
 				float4 volatile sml = cnt_sml(qtrg, key, *recheck);
 				res = 1.0 - sml;

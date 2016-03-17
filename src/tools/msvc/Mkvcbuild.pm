@@ -35,10 +35,15 @@ my @contrib_uselibpgport   = ('oid2name', 'pg_standby', 'vacuumlo');
 my @contrib_uselibpgcommon = ('oid2name', 'pg_standby', 'vacuumlo');
 my $contrib_extralibs      = undef;
 my $contrib_extraincludes =
-  { 'tsearch2' => ['contrib/tsearch2'], 'dblink' => ['src/backend'] };
+  { 'tsearch2' => ['contrib/tsearch2'], 'dblink' => ['src/backend'],
+    'jsquery' => ['contrib/jsquery'] };
 my $contrib_extrasource = {
 	'cube' => [ 'contrib/cube/cubescan.l', 'contrib/cube/cubeparse.y' ],
-	'seg'  => [ 'contrib/seg/segscan.l',   'contrib/seg/segparse.y' ], };
+	'seg'  => [ 'contrib/seg/segscan.l',   'contrib/seg/segparse.y' ],
+	'jsquery' => [ 'contrib/jsquery/jsquery_scan.l', 'contrib/jsquery/jsquery_gram.y' ],
+ };
+
+
 my @contrib_excludes = (
 	'commit_ts',      'hstore_plperl', 'hstore_plpython', 'intagg',
 	'ltree_plpython', 'pgcrypto',      'sepgsql',         'brin');

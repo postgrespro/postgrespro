@@ -28,6 +28,7 @@ SUBDIRS = \
 		intagg		\
 		intarray	\
 		isn		\
+		jsquery \
 		lo		\
 		ltree		\
 		oid2name	\
@@ -44,6 +45,7 @@ SUBDIRS = \
 		pgstattuple	\
 		postgres_fdw	\
 		seg		\
+		shared_ispell \
 		spi		\
 		sr_plan \
 		tablefunc	\

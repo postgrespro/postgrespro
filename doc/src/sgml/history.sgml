@@ -1,19 +1,19 @@
 <!-- doc/src/sgml/history.sgml -->
 
 <sect1 id="history">
- <title>A Brief History of <productname>&productname;</productname></title>
+ <title>A Brief History of <productname>PostgreSQL</productname></title>
 
  <indexterm zone="history">
   <primary>history</primary>
-  <secondary>of &productname;</secondary>
+  <secondary>of PostgreSQL</secondary>
  </indexterm>
 
  <para>
   The object-relational database management system now known as
-  <productname>&productname;</productname> is derived from the
+  <productname>PostgreSQL</productname> is derived from the
   <productname>POSTGRES</productname> package written at the
   University of California at Berkeley.  With over two decades of
-  development behind it, <productname>&productname;</productname> is now
+  development behind it, <productname>PostgreSQL</productname> is now
   the most advanced open-source database available anywhere.
  </para>
 
@@ -117,7 +117,7 @@
       <acronym>SQL</acronym> (implemented in the server).  (Interface
       library <link linkend="libpq">libpq</link> was named after PostQUEL.)
       Subqueries
-      were not supported until <productname>&productname;</productname>
+      were not supported until <productname>PostgreSQL</productname>
       (see below), but they could be imitated in
       <productname>Postgres95</productname> with user-defined
       <acronym>SQL</acronym> functions. Aggregate functions were
@@ -184,12 +184,12 @@
  </sect2>
 
  <sect2>
-  <title><productname>&productname;</productname></title>
+  <title><productname>PostgreSQL</productname></title>
 
   <para>
    By 1996, it became clear that the name <quote>Postgres95</quote>
    would not stand the test of time. We chose a new name,
-   <productname>&productname;</productname>, to reflect the relationship
+   <productname>PostgreSQL</productname>, to reflect the relationship
    between the original <productname>POSTGRES</productname> and the
    more recent versions with <acronym>SQL</acronym> capability.  At
    the same time, we set the version numbering to start at 6.0,
@@ -199,7 +199,7 @@
 
   <para>
    Many people continue to refer to
-   <productname>&productname;</productname> as <quote>Postgres</quote>
+   <productname>PostgreSQL</productname> as <quote>Postgres</quote>
    (now rarely in all capital letters) because of tradition or because
    it is easier to pronounce.  This usage is widely accepted as a
    nickname or alias.
@@ -209,14 +209,15 @@
    The emphasis during development of
    <productname>Postgres95</productname> was on identifying and
    understanding existing problems in the server code.  With
-   <productname>&productname;</productname>, the emphasis has shifted to
+   <productname>PostgreSQL</productname>, the emphasis has shifted to
    augmenting features and capabilities, although work continues in
    all areas.
   </para>
 
   <para>
-   Details about what has happened in <productname>&productname;</> since
+   Details about what has happened in <productname>PostgreSQL</> since
    then can be found in <xref linkend="release">.
+
   </para>
  </sect2>
 </sect1>
