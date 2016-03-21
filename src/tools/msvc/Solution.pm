@@ -552,7 +552,7 @@ sub AddProject
 	{
 		$proj->AddIncludeDir($self->{options}->{libedit} . '\include');
 		$proj->AddLibrary($self->{options}->{libedit} . "\\" . 
-			($self->{platform} eq 'x64'? 'lib64': 'lib32').'\edit_static.lib');
+			($self->{platform} eq 'x64'? 'lib64': 'lib32').'\edit.lib');
 	}		
 	return $proj;
 }

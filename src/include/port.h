@@ -163,7 +163,7 @@ extern int	pg_fprintf(FILE *stream, const char *fmt,...) pg_attribute_printf(2, 
 extern int	pg_printf(const char *fmt,...) pg_attribute_printf(1, 2);
 
 #ifdef HAVE_WIN32_LIBEDIT
-extern int fputs(const char *s, FILE *stream);
+extern int pg_fputs(const char *s, FILE *stream);
 #endif
 /*
  *	The GCC-specific code below prevents the pg_attribute_printf above from
