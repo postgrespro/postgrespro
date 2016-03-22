@@ -231,7 +231,13 @@ main(int argc, char *argv[])
 		keywords[5] = "fallback_application_name";
 		values[5] = pset.progname;
 		keywords[6] = "client_encoding";
-		values[6] = (pset.notty || getenv("PGCLIENTENCODING")) ? NULL : "UTF8";
+		values[6] = (pset.notty || getenv("PGCLIENTENCODING")) ? NULL :
+#ifdef HAVE_WIN32_LIBEDIT
+		"UTF8"
+#else
+		"auto"
+#endif		
+		;
 		keywords[7] = NULL;
 		values[7] = NULL;
 

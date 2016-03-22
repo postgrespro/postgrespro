@@ -1708,7 +1708,13 @@ do_connect(char *dbname, char *user, char *host, char *port)
 		keywords[++paramnum] = "fallback_application_name";
 		values[paramnum] = pset.progname;
 		keywords[++paramnum] = "client_encoding";
-		values[paramnum] = (pset.notty || getenv("PGCLIENTENCODING")) ?  NULL : "UTF8";
+		values[paramnum] = (pset.notty || getenv("PGCLIENTENCODING")) ?  NULL :
+#ifdef HAVE_WIN32_LIBEDIT
+		"UTF8"
+#else
+		"auto"
+#endif		
+		;
 
 		/* add array terminator */
 		keywords[++paramnum] = NULL;
