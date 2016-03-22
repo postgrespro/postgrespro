@@ -74,6 +74,7 @@ array_in(<replaceable class="PARAMETER">array_text</>, <replaceable class="PARAM
                     <para>
                         Produced statements could be saved to a file, e.g.
 <screen>
+&dollar; psql test -A
 test=# \t
 test=# \o dump_stat.sql
 test=# select dump_statistic();
