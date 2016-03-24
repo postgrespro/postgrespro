@@ -23,6 +23,8 @@ DOCS = doc/pg_arman.txt
 
 EXTRA_CLEAN = datapagemap.c datapagemap.h xlogreader.c
 
+REGRESS = init option show delete backup restore
+
 # asciidoc and xmlto are present, so install the html documentation and man
 # pages as well. html is part of the vanilla documentation. Man pages need a
 # special handling at installation.
@@ -57,7 +59,6 @@ PG_CPPFLAGS = -I$(libpq_srcdir)
 override CPPFLAGS := -DFRONTEND $(CPPFLAGS) $(PG_CPPFLAGS)
 PG_LIBS = $(libpq_pgport)
 
-REGRESS = init option show delete backup restore
 
 
 envtest:
