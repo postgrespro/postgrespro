@@ -535,7 +535,7 @@ sub AddProject
 	if ($self->{options}->{icu})
 	{
 		my $libdir = $self->{options}->{icu}.'\lib';
-		$libdir .= '\lib64' if $self->{platform} eq 'x64';
+		$libdir .= '\lib64' if $self->{platform} eq 'x64' and -d $libdir.'\lib64';
 		$proj->AddIncludeDir($self->{options}->{icu} . '\include');
 		$proj->AddLibrary($libdir.'\icuin.lib');
 		$proj->AddLibrary($libdir.'\icuuc.lib');

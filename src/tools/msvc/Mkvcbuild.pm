@@ -577,8 +577,8 @@ sub mkvcbuild
 		}
 		$plperl->AddReference($postgres);
 		my @perl_libs =
-		  grep { /perl\d+.lib$/ }
-		  glob($solution->{options}->{perl} . '\lib\CORE\perl*.lib');
+		  grep { /perl\d+\.(lib|a)$/ }
+		  glob($solution->{options}->{perl} . '\lib\CORE\*.*');
 		if (@perl_libs == 1)
 		{
 			$plperl->AddLibrary($perl_libs[0]);
