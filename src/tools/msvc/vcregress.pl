@@ -341,8 +341,6 @@ sub contribcheck
 		next if ($module eq "sepgsql");
 		# Need database with UTF8 encoding, not SQL_ASCII
 		next if ($module eq "hunspell_ru_ru");
-		# Need to preload shared library on postmaster start
-		next if ($module eq "pg_pathman");
 
 		subdircheck("$topdir/contrib", $module);
 		my $status = $? >> 8;
