@@ -101,3 +101,7 @@ endif # ASCIIDOC
 clean: clean-docs
 clean-docs:
 	$(MAKE) -C doc/ clean
+
+# Disable make check
+check:
+	true
