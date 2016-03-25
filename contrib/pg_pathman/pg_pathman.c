@@ -90,11 +90,32 @@ static void change_varnos(Node *node, Oid old_varno, Oid new_varno);
 static bool change_varno_walker(Node *node, change_varno_context *context);
 
 /* copied from allpaths.h */
+static void set_plain_rel_size(PlannerInfo *root, RelOptInfo *rel,
+				   RangeTblEntry *rte);
 static void set_plain_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte);
+static void set_append_rel_size(PlannerInfo *root, RelOptInfo *rel,
+					Index rti, RangeTblEntry *rte);
 static void set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte);
 static List *accumulate_append_subpath(List *subpaths, Path *path);
 static void set_pathkeys(PlannerInfo *root, RelOptInfo *childrel, Path *path);
+static void generate_mergeappend_paths(PlannerInfo *root, RelOptInfo *rel,
+						   List *live_childrels,
+						   List *all_child_pathkeys);
 
+
+char *
+bms_print(Bitmapset *bms)
+{
+	StringInfoData str;
+	int x;
+
+	initStringInfo(&str);
+	x = -1;
+	while ((x = bms_next_member(bms, x)) >= 0)
+		appendStringInfo(&str, " %d", x);
+
+	return str.data;
+}
 
 /*
  * Compare two Datums with the given comarison function
@@ -305,6 +326,7 @@ handle_modification_query(Query *parse)
 			   *wrappers = NIL;
 	RangeTblEntry *rte;
 	WrapperNode *wrap;
+	Expr *expr;
 	bool found;
 
 	Assert(parse->commandType == CMD_UPDATE ||
@@ -317,9 +339,13 @@ handle_modification_query(Query *parse)
 	if (!found)
 		return;
 
-	/* Parse syntax tree and extract partition ranges */
 	ranges = list_make1_int(make_irange(0, prel->children_count - 1, false));
-	wrap = walk_expr_tree((Expr *) eval_const_expressions(NULL, parse->jointree->quals), prel);
+	expr = (Expr *) eval_const_expressions(NULL, parse->jointree->quals);
+	if (!expr)
+		return;
+
+	/* Parse syntax tree and extract partition ranges */
+	wrap = walk_expr_tree(expr, prel);
 	wrappers = lappend(wrappers, wrap);
 	ranges = irange_list_intersect(ranges, wrap->rangeset);
 
@@ -449,8 +475,36 @@ pathman_set_rel_pathlist_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, Ran
 
 		/* Clear old path list */
 		list_free(rel->pathlist);
+
+		/* Set apropriate varnos */
+		if (root->simple_rel_array_size > 2)
+		{
+			foreach(lc, root->eq_classes)
+			{
+				EquivalenceClass *cur_ec = (EquivalenceClass *) lfirst(lc);
+				ListCell   *lc2;
+
+				if (list_length(cur_ec->ec_members) > 1)
+				{
+					EquivalenceMember *orig_em = (EquivalenceMember *) linitial(cur_ec->ec_members);
+
+					change_varnos((Node *) orig_em->em_expr, rti, root->simple_rel_array[2]->relid);
+				}
+			}
+
+			foreach(lc, root->parse->targetList)
+			{
+				TargetEntry *t = (TargetEntry *) lfirst(lc);
+
+				change_varnos((Node *) t->expr, rti, root->simple_rel_array[2]->relid);
+			}
+			change_varnos((Node *) rel->reltargetlist, rti, root->simple_rel_array[2]->relid);
+		}
+
 		rel->pathlist = NIL;
 		set_append_rel_pathlist(root, rel, rti, rte);
+		set_append_rel_size(root, rel, rti, rte);
+
 	}
 
 	/* Invoke original hook if needed */
@@ -458,6 +512,50 @@ pathman_set_rel_pathlist_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, Ran
 	{
 		set_rel_pathlist_hook_original(root, rel, rti, rte);
 	}
+}
+
+static void
+set_append_rel_size(PlannerInfo *root, RelOptInfo *rel,
+					Index rti, RangeTblEntry *rte)
+{
+	double parent_rows = 0;
+	double parent_size = 0;
+	ListCell   *l;
+	int			i;
+
+	foreach(l, root->append_rel_list)
+	{
+		AppendRelInfo *appinfo = (AppendRelInfo *) lfirst(l);
+		int			childRTindex,
+					parentRTindex = rti;
+		RangeTblEntry *childRTE;
+		RelOptInfo *childrel;
+
+		/* append_rel_list contains all append rels; ignore others */
+		if (appinfo->parent_relid != parentRTindex)
+			continue;
+
+		childRTindex = appinfo->child_relid;
+		childRTE = root->simple_rte_array[childRTindex];
+
+		childrel = find_base_rel(root, childRTindex);
+		Assert(childrel->reloptkind == RELOPT_OTHER_MEMBER_REL);
+
+		/*
+		 * Accumulate size information from each live child.
+		 */
+		Assert(childrel->rows > 0);
+
+		parent_rows += childrel->rows;
+		parent_size += childrel->width * childrel->rows;
+	}
+
+	Assert(parent_rows > 0);
+	rel->rows = parent_rows;
+	rel->width = rint(parent_size / parent_rows);
+	// for (i = 0; i < nattrs; i++)
+	// 	rel->attr_widths[i] = rint(parent_attrsizes[i] / parent_rows);
+	rel->tuples = parent_rows;
 }
 
 static void
@@ -540,6 +638,32 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti,
 	appinfo->parent_reloid = rte->relid;
 	root->append_rel_list = lappend(root->append_rel_list, appinfo);
 	root->total_table_pages += (double) childrel->pages;
+
+	/* Add to equivalence members */
+	foreach(lc, root->eq_classes)
+	{
+		EquivalenceClass *cur_ec = (EquivalenceClass *) lfirst(lc);
+		ListCell   *lc2;
+
+		if (list_length(cur_ec->ec_members) > 0)
+		{
+			EquivalenceMember *cur_em = (EquivalenceMember *) linitial(cur_ec->ec_members);
+			EquivalenceMember *em = makeNode(EquivalenceMember);
+
+			em->em_expr = copyObject(cur_em->em_expr);
+			change_varnos((Node *) em->em_expr, rti, childRTindex);
+			em->em_relids = bms_add_member(NULL, childRTindex);
+			em->em_nullable_relids = cur_em->em_nullable_relids;
+			em->em_is_const = false;
+			em->em_is_child = true;
+			em->em_datatype = cur_em->em_datatype;
+			cur_ec->ec_members = lappend(cur_ec->ec_members, em);
+		}
+	}
+
+	/* Add child to relids */
+	rel->relids = bms_add_member(rel->relids, childRTindex);
+	root->all_baserels = bms_add_member(root->all_baserels, childRTindex);
 
 	heap_close(newrelation, NoLock);
 }
@@ -642,7 +766,10 @@ change_varno_walker(Node *node, change_varno_context *context)
 		Var		   *var = (Var *) node;
 
 		if (var->varno == context->old_varno)
+		{
 			var->varno = context->new_varno;
+			var->varnoold = context->new_varno;
+		}
 		return false;
 	}
 	if (IsA(node, RestrictInfo))
@@ -1145,6 +1272,23 @@ handle_arrexpr(const ScalarArrayOpExpr *expr, const PartRelationInfo *prel)
  */
 
 /*
+ * set_plain_rel_size
+ *	  Set size estimates for a plain relation (no subquery, no inheritance)
+ */
+static void
+set_plain_rel_size(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
+{
+	/*
+	 * Test any partial indexes of rel for applicability.  We must do this
+	 * first since partial unique indexes can affect size estimates.
+	 */
+	check_partial_indexes(root, rel);
+
+	/* Mark rel with estimated output rows, width, etc */
+	set_baserel_size_estimates(root, rel);
+}
+
+/*
  * set_plain_rel_pathlist
  *	  Build access paths for a plain relation (no subquery, no inheritance)
  */
@@ -1168,7 +1312,7 @@ set_plain_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
 	path = create_seqscan_path(root, rel, required_outer);
 #endif
 	add_path(rel, path);
-	set_pathkeys(root, rel, path);
+	// set_pathkeys(root, rel, path);
 
 	/* Consider index scans */
 	create_index_paths(root, rel);
@@ -1217,6 +1361,8 @@ set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
 	List	   *live_childrels = NIL;
 	List	   *subpaths = NIL;
 	bool		subpaths_valid = true;
+	List	   *all_child_pathkeys = NIL;
+	List	   *all_child_outers = NIL;
 	ListCell   *l;
 
 	/*
@@ -1231,6 +1377,7 @@ set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
 		int			childRTindex;
 		RangeTblEntry *childRTE;
 		RelOptInfo *childrel;
+		ListCell   *lcp;
 
 		/* append_rel_list contains all append rels; ignore others */
 		if (appinfo->parent_relid != parentRTindex)
@@ -1251,6 +1398,7 @@ set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
 		}
 		else
 		{
+			set_plain_rel_size(root, childrel, childRTE);
 			set_plain_rel_pathlist(root, childrel, childRTE);
 		}
 		set_cheapest(childrel);
@@ -1276,6 +1424,70 @@ set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
 											  childrel->cheapest_total_path);
 		else
 			subpaths_valid = false;
+
+		/*
+		 * Collect lists of all the available path orderings and
+		 * parameterizations for all the children.  We use these as a
+		 * heuristic to indicate which sort orderings and parameterizations we
+		 * should build Append and MergeAppend paths for.
+		 */
+		foreach(lcp, childrel->pathlist)
+		{
+			Path	   *childpath = (Path *) lfirst(lcp);
+			List	   *childkeys = childpath->pathkeys;
+			Relids		childouter = PATH_REQ_OUTER(childpath);
+
+			/* Unsorted paths don't contribute to pathkey list */
+			if (childkeys != NIL)
+			{
+				ListCell   *lpk;
+				bool		found = false;
+
+				/* Have we already seen this ordering? */
+				foreach(lpk, all_child_pathkeys)
+				{
+					List	   *existing_pathkeys = (List *) lfirst(lpk);
+
+					if (compare_pathkeys(existing_pathkeys,
+										 childkeys) == PATHKEYS_EQUAL)
+					{
+						found = true;
+						break;
+					}
+				}
+				if (!found)
+				{
+					/* No, so add it to all_child_pathkeys */
+					all_child_pathkeys = lappend(all_child_pathkeys,
+												 childkeys);
+				}
+			}
+
+			/* Unparameterized paths don't contribute to param-set list */
+			if (childouter)
+			{
+				ListCell   *lco;
+				bool		found = false;
+
+				/* Have we already seen this param set? */
+				foreach(lco, all_child_outers)
+				{
+					Relids		existing_outers = (Relids) lfirst(lco);
+
+					if (bms_equal(existing_outers, childouter))
+					{
+						found = true;
+						break;
+					}
+				}
+				if (!found)
+				{
+					/* No, so add it to all_child_outers */
+					all_child_outers = lappend(all_child_outers,
+											   childouter);
+				}
+			}
+		}
 	}
 
 	/*
@@ -1286,6 +1498,13 @@ set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
 	if (subpaths_valid)
 		add_path(rel, (Path *) create_append_path(rel, subpaths, NULL));
 
+	/*
+	 * Also build unparameterized MergeAppend paths based on the collected
+	 * list of child pathkeys.
+	 */
+	if (subpaths_valid)
+		generate_mergeappend_paths(root, rel, live_childrels,
+								   all_child_pathkeys);
 }
 
 void
@@ -1305,4 +1524,109 @@ static List *
 accumulate_append_subpath(List *subpaths, Path *path)
 {
 	return lappend(subpaths, path);
+}
+
+
+
+
+//---------------------------------------------------------------
+
+
+
+/*
+ * generate_mergeappend_paths
+ *		Generate MergeAppend paths for an append relation
+ *
+ * Generate a path for each ordering (pathkey list) appearing in
+ * all_child_pathkeys.
+ *
+ * We consider both cheapest-startup and cheapest-total cases, ie, for each
+ * interesting ordering, collect all the cheapest startup subpaths and all the
+ * cheapest total paths, and build a MergeAppend path for each case.
+ *
+ * We don't currently generate any parameterized MergeAppend paths.  While
+ * it would not take much more code here to do so, it's very unclear that it
+ * is worth the planning cycles to investigate such paths: there's little
+ * use for an ordered path on the inside of a nestloop.  In fact, it's likely
+ * that the current coding of add_path would reject such paths out of hand,
+ * because add_path gives no credit for sort ordering of parameterized paths,
+ * and a parameterized MergeAppend is going to be more expensive than the
+ * corresponding parameterized Append path.  If we ever try harder to support
+ * parameterized mergejoin plans, it might be worth adding support for
+ * parameterized MergeAppends to feed such joins.  (See notes in
+ * optimizer/README for why that might not ever happen, though.)
+ */
+static void
+generate_mergeappend_paths(PlannerInfo *root, RelOptInfo *rel,
+						   List *live_childrels,
+						   List *all_child_pathkeys)
+{
+	ListCell   *lcp;
+
+	foreach(lcp, all_child_pathkeys)
+	{
+		List	   *pathkeys = (List *) lfirst(lcp);
+		List	   *startup_subpaths = NIL;
+		List	   *total_subpaths = NIL;
+		bool		startup_neq_total = false;
+		ListCell   *lcr;
+
+		/* Select the child paths for this ordering... */
+		foreach(lcr, live_childrels)
+		{
+			RelOptInfo *childrel = (RelOptInfo *) lfirst(lcr);
+			Path	   *cheapest_startup,
+					   *cheapest_total;
+
+			/* Locate the right paths, if they are available. */
+			cheapest_startup =
+				get_cheapest_path_for_pathkeys(childrel->pathlist,
+											   pathkeys,
+											   NULL,
+											   STARTUP_COST);
+			cheapest_total =
+				get_cheapest_path_for_pathkeys(childrel->pathlist,
+											   pathkeys,
+											   NULL,
+											   TOTAL_COST);
+
+			/*
+			 * If we can't find any paths with the right order just use the
+			 * cheapest-total path; we'll have to sort it later.
+			 */
+			if (cheapest_startup == NULL || cheapest_total == NULL)
+			{
+				cheapest_startup = cheapest_total =
+					childrel->cheapest_total_path;
+				/* Assert we do have an unparameterized path for this child */
+				Assert(cheapest_total->param_info == NULL);
+			}
+
+			/*
+			 * Notice whether we actually have different paths for the
+			 * "cheapest" and "total" cases; frequently there will be no point
+			 * in two create_merge_append_path() calls.
+			 */
+			if (cheapest_startup != cheapest_total)
+				startup_neq_total = true;
+
+			startup_subpaths =
+				accumulate_append_subpath(startup_subpaths, cheapest_startup);
+			total_subpaths =
+				accumulate_append_subpath(total_subpaths, cheapest_total);
+		}
+
+		/* ... and build the MergeAppend paths */
+		add_path(rel, (Path *) create_merge_append_path(root,
+														rel,
+														startup_subpaths,
+														pathkeys,
+														NULL));
+		if (startup_neq_total)
+			add_path(rel, (Path *) create_merge_append_path(root,
+															rel,
+															total_subpaths,
+															pathkeys,
+															NULL));
+	}
 }
