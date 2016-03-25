@@ -97,7 +97,6 @@ static void set_append_rel_size(PlannerInfo *root, RelOptInfo *rel,
 					Index rti, RangeTblEntry *rte);
 static void set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte);
 static List *accumulate_append_subpath(List *subpaths, Path *path);
-static void set_pathkeys(PlannerInfo *root, RelOptInfo *childrel, Path *path);
 static void generate_mergeappend_paths(PlannerInfo *root, RelOptInfo *rel,
 						   List *live_childrels,
 						   List *all_child_pathkeys);
@@ -482,7 +481,6 @@ pathman_set_rel_pathlist_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, Ran
 			foreach(lc, root->eq_classes)
 			{
 				EquivalenceClass *cur_ec = (EquivalenceClass *) lfirst(lc);
-				ListCell   *lc2;
 
 				if (list_length(cur_ec->ec_members) > 1)
 				{
@@ -521,14 +519,12 @@ set_append_rel_size(PlannerInfo *root, RelOptInfo *rel,
 	double parent_rows = 0;
 	double parent_size = 0;
 	ListCell   *l;
-	int			i;
 
 	foreach(l, root->append_rel_list)
 	{
 		AppendRelInfo *appinfo = (AppendRelInfo *) lfirst(l);
 		int			childRTindex,
 					parentRTindex = rti;
-		RangeTblEntry *childRTE;
 		RelOptInfo *childrel;
 
 		/* append_rel_list contains all append rels; ignore others */
@@ -536,7 +532,6 @@ set_append_rel_size(PlannerInfo *root, RelOptInfo *rel,
 			continue;
 
 		childRTindex = appinfo->child_relid;
-		childRTE = root->simple_rte_array[childRTindex];
 
 		childrel = find_base_rel(root, childRTindex);
 		Assert(childrel->reloptkind == RELOPT_OTHER_MEMBER_REL);
@@ -639,12 +634,12 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti,
 	root->append_rel_list = lappend(root->append_rel_list, appinfo);
 	root->total_table_pages += (double) childrel->pages;
 
-	/* Add to equivalence members */
+	/* Add equivalence members */
 	foreach(lc, root->eq_classes)
 	{
 		EquivalenceClass *cur_ec = (EquivalenceClass *) lfirst(lc);
-		ListCell   *lc2;
 
+		/* Copy equivalence member from parent and make some modifications */
 		if (list_length(cur_ec->ec_members) > 0)
 		{
 			EquivalenceMember *cur_em = (EquivalenceMember *) linitial(cur_ec->ec_members);
@@ -664,6 +659,9 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti,
 	/* Add child to relids */
 	rel->relids = bms_add_member(rel->relids, childRTindex);
 	root->all_baserels = bms_add_member(root->all_baserels, childRTindex);
+
+	/* Recalc parent relation tuples count */
+	rel->tuples += childrel->tuples;
 
 	heap_close(newrelation, NoLock);
 }
@@ -1505,19 +1503,6 @@ set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
 	if (subpaths_valid)
 		generate_mergeappend_paths(root, rel, live_childrels,
 								   all_child_pathkeys);
-}
-
-void
-set_pathkeys(PlannerInfo *root, RelOptInfo *childrel, Path *path)
-{
-	ListCell *lc;
-	PathKey *pathkey;
-
-	foreach (lc, root->sort_pathkeys)
-	{
-		pathkey = (PathKey *) lfirst(lc);
-		path->pathkeys = lappend(path->pathkeys, pathkey);
-	}
 }
 
 static List *
