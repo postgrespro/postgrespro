@@ -381,6 +381,51 @@ EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE (dt >= '2015-01-15' AND d
 (8 rows)
 
 /*
+ * Sorting
+ */
+SET enable_indexscan = OFF;
+SET enable_seqscan = ON;
+EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt < '2015-03-01' ORDER BY dt;
+             QUERY PLAN              
+-------------------------------------
+ Sort
+   Sort Key: range_rel_1.dt
+   ->  Append
+         ->  Seq Scan on range_rel_1
+         ->  Seq Scan on range_rel_2
+(5 rows)
+
+EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel_1 UNION ALL SELECT * FROM test.range_rel_2 ORDER BY dt;
+             QUERY PLAN              
+-------------------------------------
+ Sort
+   Sort Key: range_rel_1.dt
+   ->  Append
+         ->  Seq Scan on range_rel_1
+         ->  Seq Scan on range_rel_2
+(5 rows)
+
+SET enable_indexscan = ON;
+SET enable_seqscan = OFF;
+EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt < '2015-03-01' ORDER BY dt;
+                        QUERY PLAN                        
+----------------------------------------------------------
+ Merge Append
+   Sort Key: range_rel_1.dt
+   ->  Index Scan using range_rel_1_dt_idx on range_rel_1
+   ->  Index Scan using range_rel_2_dt_idx on range_rel_2
+(4 rows)
+
+EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel_1 UNION ALL SELECT * FROM test.range_rel_2 ORDER BY dt;
+                        QUERY PLAN                        
+----------------------------------------------------------
+ Merge Append
+   Sort Key: range_rel_1.dt
+   ->  Index Scan using range_rel_1_dt_idx on range_rel_1
+   ->  Index Scan using range_rel_2_dt_idx on range_rel_2
+(4 rows)
+
+/*
  * Test CTE query
  */
 EXPLAIN (COSTS OFF)
