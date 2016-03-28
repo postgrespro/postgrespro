@@ -557,7 +557,7 @@
 #define MEMSET_LOOP_LIMIT 1024
 
 /* Define to the address where bug reports for this package should be sent. */
-#define PACKAGE_BUGREPORT "pgsql-bugs@postgrespro.com"
+#define PACKAGE_BUGREPORT "bugs@postgrespro.ru"
 
 /* Define to the full name of this package. */
 #define PACKAGE_NAME "PostgresPro"
