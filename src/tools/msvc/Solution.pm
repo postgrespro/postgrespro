@@ -128,7 +128,7 @@ sub GenerateFiles
 	  || confess("Could not open configure.in for reading\n");
 	while (<C>)
 	{
-		if (/^AC_INIT\(\[PostgresPro\], \[([^\]]+)\]/)
+		if (/^AC_INIT\(\[PostgreSQL\], \[([^\]]+)\]/)
 		{
 			$self->{strver} = $1;
 			if ($self->{strver} !~ /^(\d+)\.(\d+)(?:\.(\d+))*/)
