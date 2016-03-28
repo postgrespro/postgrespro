@@ -45,6 +45,9 @@
 
 static int strcmp_icu(char *arg1, int len1, char *arg2, int len2);
 static int strxfrm_icu(char *dst, char *src, int len);
+
+/* We are going to use strxfrm from ICU which we trust in */
+#define TRUST_STRXFRM
 #endif /* USE_ICU */
 
 
