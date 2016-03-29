@@ -380,6 +380,15 @@ show_version(bool all)
 	if (all)
 		printf("VERSION = ");
 	printf("PostgreSQL " PG_VERSION "\n");
+#ifdef 	PGPRO_VERSION
+	if (all)
+	{	/*
+			For compatibility works only in ALL mode
+		*/
+		printf("PGPRO_VERSION = ");
+		printf("PostgresPro " PGPRO_VERSION "\n");
+	}
+#endif
 }
 
 
