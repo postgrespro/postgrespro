@@ -107,6 +107,7 @@ distdir:
 	done
 	$(MAKE) -C $(distdir) distprep
 	$(MAKE) -C $(distdir)/doc/src/sgml/ INSTALL
+	$(MAKE) -C $(distdir)/contrib/pg_arman/doc pg_arman.1 XMLTO=/usr/bin/xmlto ASCIIDOC=/usr/bin/asciidoc
 	cp $(distdir)/doc/src/sgml/INSTALL $(distdir)/
 	$(MAKE) -C $(distdir) distclean
 	rm -f $(distdir)/README.git
