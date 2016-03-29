@@ -72,7 +72,7 @@ static PlannedStmt * pathman_planner_hook(Query *parse, int cursorOptions, Param
 
 /* Utility functions */
 static void handle_modification_query(Query *parse);
-static void append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti,
+static int append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti,
 				RangeTblEntry *rte, int index, Oid childOID, List *wrappers);
 static Node *wrapper_make_expression(WrapperNode *wrap, int index, bool *alwaysTrue);
 static void disable_inheritance(Query *parse);
@@ -391,6 +391,7 @@ pathman_set_rel_pathlist_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, Ran
 	RangeTblEntry **new_rte_array;
 	int len;
 	bool found;
+	int first_child_relid = 0;
 
 	/* This works only for SELECT queries */
 	if (root->parse->commandType != CMD_SELECT || !inheritance_disabled)
@@ -467,8 +468,13 @@ pathman_set_rel_pathlist_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, Ran
 
 			for (i = irange_lower(irange); i <= irange_upper(irange); i++)
 			{
+				int idx;
+
 				childOid = dsm_arr[i];
-				append_child_relation(root, rel, rti, rte, i, childOid, wrappers);
+				idx = append_child_relation(root, rel, rti, rte, i, childOid, wrappers);
+
+				if (!first_child_relid)
+					first_child_relid = idx;
 			}
 		}
 
@@ -476,27 +482,12 @@ pathman_set_rel_pathlist_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, Ran
 		list_free(rel->pathlist);
 
 		/* Set apropriate varnos */
-		if (root->simple_rel_array_size > 2)
+		if (first_child_relid)
 		{
-			foreach(lc, root->eq_classes)
-			{
-				EquivalenceClass *cur_ec = (EquivalenceClass *) lfirst(lc);
-
-				if (list_length(cur_ec->ec_members) > 1)
-				{
-					EquivalenceMember *orig_em = (EquivalenceMember *) linitial(cur_ec->ec_members);
-
-					change_varnos((Node *) orig_em->em_expr, rti, root->simple_rel_array[2]->relid);
-				}
-			}
-
-			foreach(lc, root->parse->targetList)
-			{
-				TargetEntry *t = (TargetEntry *) lfirst(lc);
-
-				change_varnos((Node *) t->expr, rti, root->simple_rel_array[2]->relid);
-			}
-			change_varnos((Node *) rel->reltargetlist, rti, root->simple_rel_array[2]->relid);
+			change_varnos((Node *) root->canon_pathkeys, rti, first_child_relid);
+			change_varnos((Node *) root->eq_classes, rti, first_child_relid);
+			change_varnos((Node *) root->parse->targetList, rti, first_child_relid);
+			change_varnos((Node *) rel->reltargetlist, rti, first_child_relid);
 		}
 
 		rel->pathlist = NIL;
@@ -553,7 +544,11 @@ set_append_rel_size(PlannerInfo *root, RelOptInfo *rel,
 	rel->tuples = parent_rows;
 }
 
-static void
+/*
+ * Creates child relation and adds it to root.
+ * Returns child index in simple_rel_array
+ */
+static int
 append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti,
 	RangeTblEntry *rte, int index, Oid childOid, List *wrappers)
 {
@@ -664,6 +659,8 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti,
 	rel->tuples += childrel->tuples;
 
 	heap_close(newrelation, NoLock);
+
+	return childRTindex;
 }
 
 /* Convert wrapper into expression for given index */
@@ -742,7 +739,7 @@ wrapper_make_expression(WrapperNode *wrap, int index, bool *alwaysTrue)
 }
 
 /*
- * Changes varno attribute in RestrictInfo objects
+ * Changes varno attribute in all variables nested in the node
  */
 static void
 change_varnos(Node *node, Oid old_varno, Oid new_varno)
@@ -757,31 +754,56 @@ change_varnos(Node *node, Oid old_varno, Oid new_varno)
 static bool
 change_varno_walker(Node *node, change_varno_context *context)
 {
+	ListCell   *lc;
+	Var		   *var;
+	EquivalenceClass *ec;
+
 	if (node == NULL)
 		return false;
-	if (IsA(node, Var))
-	{
-		Var		   *var = (Var *) node;
 
-		if (var->varno == context->old_varno)
-		{
-			var->varno = context->new_varno;
-			var->varnoold = context->new_varno;
-		}
-		return false;
-	}
-	if (IsA(node, RestrictInfo))
+	switch(node->type)
 	{
-		change_varnos_in_restrinct_info((RestrictInfo *) node, context);
-		return false;
-	}
-	if (IsA(node, List))
-	{
-		ListCell *lc;
+		case T_Var:
+			var = (Var *) node;
+			if (var->varno == context->old_varno)
+			{
+				var->varno = context->new_varno;
+				var->varnoold = context->new_varno;
+			}
+			return false;
 
-		foreach(lc, (List *) node)
-			change_varno_walker((Node *) lfirst(lc), context);
-		return false;
+		case T_RestrictInfo:
+			change_varnos_in_restrinct_info((RestrictInfo *) node, context);
+			return false;
+
+		case T_PathKey:
+			change_varno_walker((Node *) ((PathKey *) node)->pk_eclass, context);
+			return false;
+
+		case T_EquivalenceClass:
+			ec = (EquivalenceClass *) node;
+
+			foreach(lc, ec->ec_members)
+				change_varno_walker((Node *) lfirst(lc), context);
+			foreach(lc, ec->ec_derives)
+				change_varno_walker((Node *) lfirst(lc), context);
+			return false;
+
+		case T_EquivalenceMember:
+			change_varno_walker((Node *) ((EquivalenceMember *) node)->em_expr, context);
+			return false;
+
+		case T_TargetEntry:
+			change_varno_walker((Node *) ((TargetEntry *) node)->expr, context);
+			return false;
+
+		case T_List:
+			foreach(lc, (List *) node)
+				change_varno_walker((Node *) lfirst(lc), context);
+			return false;
+
+		default:
+			break;
 	}
 
 	/* Should not find an unplanned subquery */
@@ -797,13 +819,11 @@ change_varnos_in_restrinct_info(RestrictInfo *rinfo, change_varno_context *conte
 
 	change_varno_walker((Node *) rinfo->clause, context);
 	if (rinfo->left_em)
-	{
 		change_varno_walker((Node *) rinfo->left_em->em_expr, context);
-	}
+
 	if (rinfo->right_em)
-	{
 		change_varno_walker((Node *) rinfo->right_em->em_expr, context);
-	}
+
 	if (rinfo->orclause)
 		foreach(lc, ((BoolExpr *) rinfo->orclause)->args)
 		{
