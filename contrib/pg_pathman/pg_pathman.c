@@ -635,11 +635,15 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti,
 		EquivalenceClass *cur_ec = (EquivalenceClass *) lfirst(lc);
 
 		/* Copy equivalence member from parent and make some modifications */
-		if (list_length(cur_ec->ec_members) > 0)
+		foreach(lc2, cur_ec->ec_members)
 		{
-			EquivalenceMember *cur_em = (EquivalenceMember *) linitial(cur_ec->ec_members);
-			EquivalenceMember *em = makeNode(EquivalenceMember);
+			EquivalenceMember *cur_em = (EquivalenceMember *) lfirst(lc2);
+			EquivalenceMember *em;
 
+			if (!bms_is_member(rti, cur_em->em_relids))
+				continue;
+
+			em = makeNode(EquivalenceMember);
 			em->em_expr = copyObject(cur_em->em_expr);
 			change_varnos((Node *) em->em_expr, rti, childRTindex);
 			em->em_relids = bms_add_member(NULL, childRTindex);
