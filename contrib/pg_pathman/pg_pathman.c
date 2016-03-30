@@ -590,6 +590,9 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti,
 		childrel->reltargetlist = lappend(childrel->reltargetlist, new_target);
 	}
 
+	/* Copy attr_needed (used in build_joinrel_tlist() function) */
+	childrel->attr_needed = rel->attr_needed;
+
 	/* Copy restrictions */
 	childrel->baserestrictinfo = NIL;
 	forboth(lc, wrappers, lc2, rel->baserestrictinfo)
@@ -761,6 +764,7 @@ change_varno_walker(Node *node, change_varno_context *context)
 	ListCell   *lc;
 	Var		   *var;
 	EquivalenceClass *ec;
+	EquivalenceMember *em;
 
 	if (node == NULL)
 		return false;
@@ -794,7 +798,13 @@ change_varno_walker(Node *node, change_varno_context *context)
 			return false;
 
 		case T_EquivalenceMember:
-			change_varno_walker((Node *) ((EquivalenceMember *) node)->em_expr, context);
+			em = (EquivalenceMember *) node;
+			change_varno_walker((Node *) em->em_expr, context);
+			if (bms_is_member(context->old_varno, em->em_relids))
+			{
+				bms_del_member(em->em_relids, context->old_varno);
+				bms_add_member(em->em_relids, context->new_varno);
+			}
 			return false;
 
 		case T_TargetEntry:
