@@ -429,8 +429,8 @@ pathman_set_rel_pathlist_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, Ran
 		 * Expand simple_rte_array and simple_rel_array
 		 */
 
-		 if (ranges)
-		 {
+		if (ranges)
+		{
 			len = irange_list_length(ranges);
 
 			/* Expand simple_rel_array and simple_rte_array */
@@ -536,7 +536,6 @@ set_append_rel_size(PlannerInfo *root, RelOptInfo *rel,
 		parent_size += childrel->width * childrel->rows;
 	}
 
-	Assert(parent_rows > 0);
 	rel->rows = parent_rows;
 	rel->width = rint(parent_size / parent_rows);
 	// for (i = 0; i < nattrs; i++)
@@ -803,8 +802,8 @@ change_varno_walker(Node *node, change_varno_context *context)
 			change_varno_walker((Node *) em->em_expr, context);
 			if (bms_is_member(context->old_varno, em->em_relids))
 			{
-				bms_del_member(em->em_relids, context->old_varno);
-				bms_add_member(em->em_relids, context->new_varno);
+				em->em_relids = bms_del_member(em->em_relids, context->old_varno);
+				em->em_relids = bms_add_member(em->em_relids, context->new_varno);
 			}
 			return false;
 
