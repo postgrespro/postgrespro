@@ -657,6 +657,7 @@ append_child_relation(PlannerInfo *root, RelOptInfo *rel, Index rti,
 			cur_ec->ec_members = lappend(cur_ec->ec_members, em);
 		}
 	}
+	childrel->has_eclass_joins = rel->has_eclass_joins;
 
 	/* Add child to relids */
 	rel->relids = bms_add_member(rel->relids, childRTindex);
