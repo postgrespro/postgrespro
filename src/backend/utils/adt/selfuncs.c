@@ -4466,7 +4466,7 @@ examine_variable(PlannerInfo *root, Node *node, int varRelid,
 						 * should match has_unique_index().
 						 */
 						if (index->unique &&
-							index->ncolumns == 1 &&
+							index->nkeycolumns == 1 &&
 							(index->indpred == NIL || index->predOK))
 							vardata->isunique = true;
 
@@ -6556,7 +6556,7 @@ btcostestimate(PG_FUNCTION_ARGS)
 	 * NullTest invalidates that theory, even though it sets eqQualHere.
 	 */
 	if (index->unique &&
-		indexcol == index->ncolumns - 1 &&
+		indexcol == index->nkeycolumns - 1 &&
 		eqQualHere &&
 		!found_saop &&
 		!found_is_null_op)

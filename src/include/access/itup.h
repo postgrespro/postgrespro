@@ -149,7 +149,7 @@ extern Datum nocache_index_getattr(IndexTuple tup, int attnum,
 extern void index_deform_tuple(IndexTuple tup, TupleDesc tupleDescriptor,
 				   Datum *values, bool *isnull);
 extern IndexTuple CopyIndexTuple(IndexTuple source);
-extern IndexTuple index_reform_tuple(Relation idxrel, IndexTuple tup,
-									 int natts, int nkeyatts);
+extern IndexTuple index_reform_tuple(Relation idxrel, IndexTuple olditup,
+									 int indnatts, int indnkeyatts);
 
 #endif   /* ITUP_H */

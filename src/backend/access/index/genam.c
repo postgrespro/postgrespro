@@ -175,13 +175,14 @@ BuildIndexValueDescription(Relation indexRelation,
 	StringInfoData buf;
 	Form_pg_index idxrec;
 	HeapTuple	ht_idx;
-	int			natts = indexRelation->rd_rel->relnatts;
-	int			nkeyatts;
+	int			indnkeyatts;
 	int			i;
 	int			keyno;
 	Oid			indexrelid = RelationGetRelid(indexRelation);
 	Oid			indrelid;
 	AclResult	aclresult;
+
+	indnkeyatts = IndexRelationGetNumberOfKeyAttributes(indexRelation);
 
 	/*
 	 * Check permissions- if the user does not have access to view all of the
@@ -220,7 +221,7 @@ BuildIndexValueDescription(Relation indexRelation,
 		 * No table-level access, so step through the columns in the index and
 		 * make sure the user has SELECT rights on all of them.
 		 */
-		for (keyno = 0; keyno < idxrec->indnatts; keyno++)
+		for (keyno = 0; keyno < idxrec->indnkeyatts; keyno++)
 		{
 			AttrNumber	attnum = idxrec->indkey.values[keyno];
 
@@ -246,8 +247,7 @@ BuildIndexValueDescription(Relation indexRelation,
 	appendStringInfo(&buf, "(%s)=(",
 					 pg_get_indexdef_columns(indexrelid, true));
 
-	nkeyatts = IndexRelationGetNumberOfKeyAttributes(indexRelation);
-	for (i = 0; i < natts; i++)
+	for (i = 0; i < indnkeyatts; i++)
 	{
 		char	   *val;
 
@@ -257,31 +257,19 @@ BuildIndexValueDescription(Relation indexRelation,
 		{
 			Oid			foutoid;
 			bool		typisvarlena;
-			TupleDesc	tupdesc = RelationGetDescr(indexRelation);
 			/*
-			 * For key attributes the provided data is not necessarily of the
-			 * type stored in the index; rather it is of the index opclass's
-			 * input type. So look at rd_opcintype not the index tupdesc.
+			 * The provided data is not necessarily of the type stored in the
+			 * index; rather it is of the index opclass's input type. So look
+			 * at rd_opcintype not the index tupdesc.
 			 *
 			 * Note: this is a bit shaky for opclasses that have pseudotype
 			 * input types such as ANYARRAY or RECORD.  Currently, the
 			 * typoutput functions associated with the pseudotypes will work
 			 * okay, but we might have to try harder in future.
-			 *
-			 * For included attributes just use info stored in the index
-			 * tupdesc.
 			 */
-			if (i < nkeyatts)
-			{
-				getTypeOutputInfo(indexRelation->rd_opcintype[i],
-								&foutoid, &typisvarlena);
-				val = OidOutputFunctionCall(foutoid, values[i]);
-			}
-			else
-			{
-				getTypeOutputInfo(tupdesc->attrs[i]->atttypid, &foutoid, &typisvarlena);
-				val = OidOutputFunctionCall(foutoid, values[i]);
-			}
+			getTypeOutputInfo(indexRelation->rd_opcintype[i],
+							&foutoid, &typisvarlena);
+			val = OidOutputFunctionCall(foutoid, values[i]);
 		}
 
 		if (i > 0)
@@ -376,7 +364,7 @@ systable_beginscan(Relation heapRelation,
 		{
 			int			j;
 
-			for (j = 0; j < irel->rd_index->indnatts; j++)
+			for (j = 0; j < IndexRelationGetNumberOfAttributes(irel); j++)
 			{
 				if (key[i].sk_attno == irel->rd_index->indkey.values[j])
 				{
@@ -384,7 +372,7 @@ systable_beginscan(Relation heapRelation,
 					break;
 				}
 			}
-			if (j == irel->rd_index->indnatts)
+			if (j == IndexRelationGetNumberOfAttributes(irel))
 				elog(ERROR, "column is not in index");
 		}
 
@@ -578,7 +566,7 @@ systable_beginscan_ordered(Relation heapRelation,
 	{
 		int			j;
 
-		for (j = 0; j < indexRelation->rd_index->indnatts; j++)
+		for (j = 0; j < IndexRelationGetNumberOfAttributes(indexRelation); j++)
 		{
 			if (key[i].sk_attno == indexRelation->rd_index->indkey.values[j])
 			{
@@ -586,7 +574,7 @@ systable_beginscan_ordered(Relation heapRelation,
 				break;
 			}
 		}
-		if (j == indexRelation->rd_index->indnatts)
+		if (j == IndexRelationGetNumberOfAttributes(indexRelation))
 			elog(ERROR, "column is not in index");
 	}
 

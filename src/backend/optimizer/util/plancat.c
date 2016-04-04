@@ -595,7 +595,7 @@ infer_arbiter_indexes(PlannerInfo *root)
 			goto next;
 
 		/* Build BMS representation of cataloged index attributes */
-		for (natt = 0; natt < idxForm->indnatts; natt++)
+		for (natt = 0; natt < idxForm->indnkeyatts; natt++)
 		{
 			int			attno = idxRel->rd_index->indkey.values[natt];
 
@@ -1514,7 +1514,7 @@ has_unique_index(RelOptInfo *rel, AttrNumber attno)
 		 * just the specified attr is unique.
 		 */
 		if (index->unique &&
-			index->ncolumns == 1 &&
+			index->nkeycolumns == 1 &&
 			index->indexkeys[0] == attno &&
 			(index->indpred == NIL || index->predOK))
 			return true;
