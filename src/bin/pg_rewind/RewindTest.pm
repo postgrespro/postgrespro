@@ -188,6 +188,7 @@ max_connections = 10
 
 	# Accept replication connections on master
 	configure_hba_for_replication $test_master_datadir;
+}
 
 sub start_master
 {
