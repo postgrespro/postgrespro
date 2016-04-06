@@ -275,7 +275,7 @@ void
 load_check_constraints(Oid parent_oid, Snapshot snapshot)
 {
 	PartRelationInfo *prel;
-	RangeRelation *rangerel;
+	RangeRelation *rangerel = NULL;
 	SPIPlanPtr plan;
 	bool	found;
 	int		ret,
@@ -306,7 +306,7 @@ load_check_constraints(Oid parent_oid, Snapshot snapshot)
 	{
 		SPITupleTable *tuptable = SPI_tuptable;
 		Oid *children;
-		RangeEntry *ranges;
+		RangeEntry *ranges = NULL;
 		Datum min;
 		Datum max;
 		int hash;
