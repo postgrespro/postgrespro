@@ -12,6 +12,7 @@
 #include "postgres.h"
 #include "fmgr.h"
 #include "miscadmin.h"
+#include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
 #include "nodes/pg_list.h"
 #include "nodes/relation.h"
@@ -95,11 +96,13 @@ static void set_plain_rel_size(PlannerInfo *root, RelOptInfo *rel,
 static void set_plain_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte);
 static void set_append_rel_size(PlannerInfo *root, RelOptInfo *rel,
 					Index rti, RangeTblEntry *rte);
-static void set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte);
+static void set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeTblEntry *rte, PathKey *pathkeyAsc, PathKey *pathkeyDesc);
 static List *accumulate_append_subpath(List *subpaths, Path *path);
 static void generate_mergeappend_paths(PlannerInfo *root, RelOptInfo *rel,
 						   List *live_childrels,
-						   List *all_child_pathkeys);
+						   List *all_child_pathkeys,
+						   PathKey *pathkeyAsc,
+						   PathKey *pathkeyDesc);
 
 
 char *
@@ -407,6 +410,41 @@ pathman_set_rel_pathlist_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, Ran
 		Oid		   *dsm_arr;
 		List	   *ranges,
 				   *wrappers;
+		PathKey	   *pathkeyAsc = NULL,
+				   *pathkeyDesc = NULL;
+
+		if (prel->parttype == PT_RANGE)
+		{
+			/*
+			 * Get pathkeys for ascending and descending sort by patition
+			 * column.
+			 */
+			List		   *pathkeys;
+			Var			   *var;
+			Oid				vartypeid,
+							varcollid;
+			int32			type_mod;
+			TypeCacheEntry *tce;
+
+			/* Make Var from patition column */
+			get_rte_attribute_type(rte, prel->attnum,
+								   &vartypeid, &type_mod, &varcollid);
+			var = makeVar(rti, prel->attnum, vartypeid, type_mod, varcollid, 0);
+			var->location = -1;
+
+			/* Determine operator type */
+			tce = lookup_type_cache(var->vartype, TYPECACHE_LT_OPR | TYPECACHE_GT_OPR);
+
+			/* Make pathkeys */
+			pathkeys = build_expression_pathkey(root, (Expr *)var, NULL,
+												tce->lt_opr, NULL, false);
+			if (pathkeys)
+				pathkeyAsc = (PathKey *) linitial(pathkeys);
+			pathkeys = build_expression_pathkey(root, (Expr *)var, NULL,
+												tce->gt_opr, NULL, false);
+			if (pathkeys)
+				pathkeyDesc = (PathKey *) linitial(pathkeys);
+		}
 
 		rte->inh = true;
 		dsm_arr = (Oid *) dsm_array_get_pointer(&prel->children);
@@ -491,9 +529,8 @@ pathman_set_rel_pathlist_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, Ran
 		}
 
 		rel->pathlist = NIL;
-		set_append_rel_pathlist(root, rel, rti, rte);
+		set_append_rel_pathlist(root, rel, rti, rte, pathkeyAsc, pathkeyDesc);
 		set_append_rel_size(root, rel, rti, rte);
-
 	}
 
 	/* Invoke original hook if needed */
@@ -1387,7 +1424,8 @@ set_foreign_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
  */
 static void
 set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
-						Index rti, RangeTblEntry *rte)
+						Index rti, RangeTblEntry *rte,
+						PathKey *pathkeyAsc, PathKey *pathkeyDesc)
 {
 	int			parentRTindex = rti;
 	List	   *live_childrels = NIL;
@@ -1536,7 +1574,8 @@ set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
 	 */
 	if (subpaths_valid)
 		generate_mergeappend_paths(root, rel, live_childrels,
-								   all_child_pathkeys);
+								   all_child_pathkeys, pathkeyAsc,
+								   pathkeyDesc);
 }
 
 static List *
@@ -1550,7 +1589,21 @@ accumulate_append_subpath(List *subpaths, Path *path)
 
 //---------------------------------------------------------------
 
+/*
+ * Returns the same list in reversed order.
+ */
+static List *
+list_reverse(List *l)
+{
+	List *result = NIL;
+	ListCell *lc;
 
+	foreach (lc, l)
+	{
+		result = lcons(lfirst(lc), result);
+	}
+	return result;
+}
 
 /*
  * generate_mergeappend_paths
@@ -1578,7 +1631,8 @@ accumulate_append_subpath(List *subpaths, Path *path)
 static void
 generate_mergeappend_paths(PlannerInfo *root, RelOptInfo *rel,
 						   List *live_childrels,
-						   List *all_child_pathkeys)
+						   List *all_child_pathkeys,
+						   PathKey *pathkeyAsc, PathKey *pathkeyDesc)
 {
 	ListCell   *lcp;
 
@@ -1588,6 +1642,7 @@ generate_mergeappend_paths(PlannerInfo *root, RelOptInfo *rel,
 		List	   *startup_subpaths = NIL;
 		List	   *total_subpaths = NIL;
 		bool		startup_neq_total = false;
+		bool		presorted = true;
 		ListCell   *lcr;
 
 		/* Select the child paths for this ordering... */
@@ -1619,6 +1674,7 @@ generate_mergeappend_paths(PlannerInfo *root, RelOptInfo *rel,
 					childrel->cheapest_total_path;
 				/* Assert we do have an unparameterized path for this child */
 				Assert(cheapest_total->param_info == NULL);
+				presorted = false;
 			}
 
 			/*
@@ -1635,17 +1691,61 @@ generate_mergeappend_paths(PlannerInfo *root, RelOptInfo *rel,
 				accumulate_append_subpath(total_subpaths, cheapest_total);
 		}
 
-		/* ... and build the MergeAppend paths */
-		add_path(rel, (Path *) create_merge_append_path(root,
-														rel,
-														startup_subpaths,
-														pathkeys,
-														NULL));
-		if (startup_neq_total)
+		/*
+		 * When first pathkey matching ascending/descending sort by partition
+		 * column then build path with Append node, because MergeAppend is not
+		 * required in this case.
+		 */
+		if ((PathKey *) linitial(pathkeys) == pathkeyAsc && presorted)
+		{
+			Path *path;
+
+			path = (Path *) create_append_path(rel, startup_subpaths, NULL);
+			path->pathkeys = pathkeys;
+			add_path(rel, path);
+
+			if (startup_neq_total)
+			{
+				path = (Path *) create_append_path(rel, total_subpaths, NULL);
+				path->pathkeys = pathkeys;
+				add_path(rel, path);
+			}
+		}
+		else if ((PathKey *) linitial(pathkeys) == pathkeyDesc && presorted)
+		{
+			/*
+			 * When pathkey is descending sort by partition column then we
+			 * need to scan partitions in reversed order.
+			 */
+			Path *path;
+
+			path = (Path *) create_append_path(rel,
+								list_reverse(startup_subpaths), NULL);
+			path->pathkeys = pathkeys;
+			add_path(rel, path);
+
+			if (startup_neq_total)
+			{
+				path = (Path *) create_append_path(rel,
+								list_reverse(total_subpaths), NULL);
+				path->pathkeys = pathkeys;
+				add_path(rel, path);
+			}
+		}
+		else
+		{
+			/* ... and build the MergeAppend paths */
 			add_path(rel, (Path *) create_merge_append_path(root,
 															rel,
-															total_subpaths,
+															startup_subpaths,
 															pathkeys,
 															NULL));
+			if (startup_neq_total)
+				add_path(rel, (Path *) create_merge_append_path(root,
+																rel,
+																total_subpaths,
+																pathkeys,
+																NULL));
+		}
 	}
 }
