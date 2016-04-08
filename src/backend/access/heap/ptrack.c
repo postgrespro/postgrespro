@@ -18,7 +18,7 @@
 #include <unistd.h>
 
 
-//-8
+/* Effective data size */
 #define MAPSIZE (BLCKSZ - MAXALIGN(SizeOfPageHeaderData))
 
 /* Number of bits allocated for each heap block. */
@@ -49,6 +49,7 @@ static void ptrack_set(BlockNumber heapBlk, Buffer vmBuf);
 void SetPtrackClearLSN(bool set_invalid);
 Datum pg_ptrack_test(PG_FUNCTION_ARGS);
 
+/* Tracking memory block inside critical zone */
 void
 ptrack_add_block(BlockNumber block_number, RelFileNode rel)
 {
@@ -59,10 +60,12 @@ ptrack_add_block(BlockNumber block_number, RelFileNode rel)
 	Assert(blocks_track_count < XLR_MAX_BLOCK_ID);
 }
 
-void ptrack_save(void)
+/* Save tracked memory block after end of critical zone */
+void
+ptrack_save(void)
 {
 	Buffer pbuf = InvalidBuffer;
-	int i;
+	unsigned int i;
 
 	for (i = 0; i < blocks_track_count; i++)
 	{
@@ -88,11 +91,9 @@ void ptrack_save(void)
 	blocks_track_count = 0;
 }
 
+/* Set one bit to buffer */
 void
-ptrack_set(
-		BlockNumber heapBlk,
-		Buffer vmBuf
-	)
+ptrack_set(BlockNumber heapBlk, Buffer vmBuf)
 {
 	BlockNumber mapBlock = HEAPBLK_TO_MAPBLOCK(heapBlk);
 	uint32		mapByte = HEAPBLK_TO_MAPBYTE(heapBlk);
@@ -109,6 +110,7 @@ ptrack_set(
 
 	if (!(map[mapByte] & (1 << mapBit)))
 	{
+		/* Bad luck. Take an exclusive lock now after unlock share.*/
 		LockBuffer(vmBuf, BUFFER_LOCK_UNLOCK);
 		LockBuffer(vmBuf, BUFFER_LOCK_EXCLUSIVE);
 		if (!(map[mapByte] & (1 << mapBit)))
@@ -133,7 +135,7 @@ ptrack_readbuf(RelFileNode rnode, BlockNumber blkno, bool extend)
 	SMgrRelation smgr = smgropen(rnode, InvalidBackendId);
 
 	/*
-	 * If we haven't cached the size of the visibility map fork yet, check it
+	 * If we haven't cached the size of the ptrack map fork yet, check it
 	 * first.
 	 */
 	if (smgr->smgr_ptrack_nblocks == InvalidBlockNumber)
@@ -214,7 +216,9 @@ ptrack_extend(SMgrRelation smgr, BlockNumber vm_nblocks)
 	UnlockSmgrForExtension(smgr, ExclusiveLock);
 }
 
-void ptrack_clear(void)
+/* Clear all ptrack files */
+void
+ptrack_clear(void)
 {
 	HeapTuple tuple;
 	Relation catalog = heap_open(RelationRelationId, AccessShareLock);
@@ -308,6 +312,7 @@ SetPtrackClearLSN(bool set_invalid)
 	//LWLockRelease(ControlFileLock);
 }
 
+/* Test ptrack file */
 Datum
 pg_ptrack_test(PG_FUNCTION_ARGS)
 {
