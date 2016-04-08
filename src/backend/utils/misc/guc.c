@@ -994,7 +994,7 @@ static struct config_bool ConfigureNamesBool[] =
 		},
 		&ptrack_enable,
 		false,
-		NULL, NULL, NULL
+		NULL, &assign_ptrack_enable, NULL
 	},
 
 	{

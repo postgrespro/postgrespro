@@ -13,9 +13,9 @@ extern bool ptrack_enable;
 
 extern void ptrack_save(void);
 
-extern void 
-ptrack_add_block(BlockNumber block_number, RelFileNode rel);
+extern void ptrack_add_block(BlockNumber block_number, RelFileNode rel);
 
 extern void ptrack_clear(void);
+extern void assign_ptrack_enable(bool newval, void *extra);
 
 #endif   /* VISIBILITYMAP_H */
