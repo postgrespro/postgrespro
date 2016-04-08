@@ -988,7 +988,7 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
-		{"ptrack_enable", PGC_POSTMASTER, WAL_SETTINGS,
+		{"ptrack_enable", PGC_SU_BACKEND, WAL_SETTINGS,
 			gettext_noop("Enable page tracking."),
 			NULL
 		},
