@@ -271,21 +271,19 @@ SetPtrackClearLSN(bool set_invalid)
 {
 	int			fd;
 	XLogRecPtr	ptr;
-	char		path[MAXPGPATH];
 	if (set_invalid)
 		ptr = InvalidXLogRecPtr;
 	else
 		ptr = GetXLogInsertRecPtr();
-	snprintf(path, sizeof(path), "%s/global/ptrack_control", DataDir);
 	//LWLockAcquire(ControlFileLock, LW_EXCLUSIVE);
-	fd = BasicOpenFile(path,
-					   O_RDWR | O_CREAT | O_EXCL | PG_BINARY,
+	fd = BasicOpenFile("global/ptrack_control",
+					   O_RDWR | O_CREAT | PG_BINARY,
 					   S_IRUSR | S_IWUSR);
 	if (fd < 0)
 		ereport(PANIC,
 				(errcode_for_file_access(),
 				 errmsg("could not create ptrack control file \"%s\": %m",
-						path)));
+						"global/ptrack_control")));
 
 	errno = 0;
 	if (write(fd, &ptr, sizeof(XLogRecPtr)) != sizeof(XLogRecPtr))
@@ -470,7 +468,6 @@ pg_ptrack_test(PG_FUNCTION_ARGS)
 void
 assign_ptrack_enable(bool newval, void *extra)
 {
-	/*elog(WARNING, "assign_ptrack_enable:%s %i", newval ? "true" : "false", IsInitProcessingMode());
-	if(IsInitProcessingMode() && !newval)
-		SetPtrackClearLSN(true);*/
+	if(DataDir != NULL && !IsBootstrapProcessingMode() && !newval)
+		SetPtrackClearLSN(true);
 }
