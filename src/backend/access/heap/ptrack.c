@@ -46,7 +46,7 @@ bool ptrack_enable = false;
 static Buffer ptrack_readbuf(RelFileNode rnode, BlockNumber blkno, bool extend);
 static void ptrack_extend(SMgrRelation smgr, BlockNumber nvmblocks);
 static void ptrack_set(BlockNumber heapBlk, Buffer vmBuf);
-void SetPtrackClearLSN(void);
+void SetPtrackClearLSN(bool set_invalid);
 Datum pg_ptrack_test(PG_FUNCTION_ARGS);
 
 void
@@ -263,23 +263,29 @@ void ptrack_clear(void)
 	systable_endscan(scan);
 	heap_close(catalog, AccessShareLock);
 
-	SetPtrackClearLSN();
+	SetPtrackClearLSN(false);
 }
 
 void
-SetPtrackClearLSN(void)
+SetPtrackClearLSN(bool set_invalid)
 {
 	int			fd;
-	XLogRecPtr	ptr = GetXLogInsertRecPtr();
+	XLogRecPtr	ptr;
+	char		path[MAXPGPATH];
+	if (set_invalid)
+		ptr = InvalidXLogRecPtr;
+	else
+		ptr = GetXLogInsertRecPtr();
+	snprintf(path, sizeof(path), "%s/global/ptrack_control", DataDir);
 	//LWLockAcquire(ControlFileLock, LW_EXCLUSIVE);
-	fd = BasicOpenFile("global/ptrack_control",
-					   O_RDWR | O_CREAT | PG_BINARY,
+	fd = BasicOpenFile(path,
+					   O_RDWR | O_CREAT | O_EXCL | PG_BINARY,
 					   S_IRUSR | S_IWUSR);
 	if (fd < 0)
 		ereport(PANIC,
 				(errcode_for_file_access(),
 				 errmsg("could not create ptrack control file \"%s\": %m",
-						"global/ptrack_control")));
+						path)));
 
 	errno = 0;
 	if (write(fd, &ptr, sizeof(XLogRecPtr)) != sizeof(XLogRecPtr))
@@ -459,4 +465,12 @@ pg_ptrack_test(PG_FUNCTION_ARGS)
 	result_elems[1] = UInt32GetDatum(necessary_data_counter);
 	result_array = construct_array(result_elems, 2, 23, 4, true, 'i');
 	PG_RETURN_ARRAYTYPE_P(result_array);
+}
+
+void
+assign_ptrack_enable(bool newval, void *extra)
+{
+	/*elog(WARNING, "assign_ptrack_enable:%s %i", newval ? "true" : "false", IsInitProcessingMode());
+	if(IsInitProcessingMode() && !newval)
+		SetPtrackClearLSN(true);*/
 }
