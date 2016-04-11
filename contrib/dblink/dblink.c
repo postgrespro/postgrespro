@@ -101,7 +101,7 @@ static remoteConn *getConnectionByName(const char *name);
 static HTAB *createConnHash(void);
 static void createNewConnection(const char *name, remoteConn *rconn);
 static void deleteConnection(const char *name);
-static char **get_pkey_attnames(Relation rel, int16* indnkeyatts);
+static char **get_pkey_attnames(Relation rel, int16 *indnkeyatts);
 static char **get_text_array_contents(ArrayType *array, int *numitems);
 static char *get_sql_insert(Relation rel, int *pkattnums, int pknumatts, char **src_pkattvals, char **tgt_pkattvals);
 static char *get_sql_delete(Relation rel, int *pkattnums, int pknumatts, char **tgt_pkattvals);

@@ -552,22 +552,15 @@ _bt_buildadd(BTWriteState *wstate, BTPageState *state, IndexTuple itup)
 			 * assume that hikey is already truncated, and so they should not
 			 * worry about it, when copying the high key into the parent page
 			 * as a downlink.
-			 * NOTE It is not crutial for reliability in present,
-			 * but maybe it will be that in the future.
-			 * NOTE this code will be changed by the "btree compression" patch,
-			 * which is in progress now.
 			 */
-			keytup = index_reform_tuple(wstate->index, oitup,
-											indnatts, indnkeyatts);
+			keytup = index_truncate_tuple(wstate->index, oitup);
 
 			/*  delete "wrong" high key, insert keytup as P_HIKEY. */
-			START_CRIT_SECTION();
 			PageIndexTupleDelete(opage, P_HIKEY);
 
 			if (!_bt_pgaddtup(opage, IndexTupleSize(keytup), keytup, P_HIKEY))
 				elog(ERROR, "failed to rewrite compressed item in index \"%s\"",
 					RelationGetRelationName(wstate->index));
-			END_CRIT_SECTION();
 		}
 
 		/*
@@ -593,8 +586,7 @@ _bt_buildadd(BTWriteState *wstate, BTPageState *state, IndexTuple itup)
 		 * truncated by the time we handle them.
 		 */
 		if (indnkeyatts != indnatts && P_ISLEAF(opageop))
-			state->btps_minkey = index_reform_tuple(wstate->index, oitup,
-											indnatts, indnkeyatts);
+			state->btps_minkey = index_truncate_tuple(wstate->index, oitup);
 		else
 			state->btps_minkey = CopyIndexTuple(oitup);
 
@@ -637,8 +629,7 @@ _bt_buildadd(BTWriteState *wstate, BTPageState *state, IndexTuple itup)
 		 * into the parent page as a downlink
 		 */
 		if (indnkeyatts < indnatts && P_ISLEAF(pageop))
-			state->btps_minkey = index_reform_tuple(wstate->index, itup,
-											indnatts, indnkeyatts);
+			state->btps_minkey = index_truncate_tuple(wstate->index, itup);
 		else
 			state->btps_minkey = CopyIndexTuple(itup);	}
 
@@ -650,9 +641,7 @@ _bt_buildadd(BTWriteState *wstate, BTPageState *state, IndexTuple itup)
 
 		if (!P_ISLEAF(pageop))
 		{
-			itup = index_reform_tuple(wstate->index,
-					itup, wstate->index->rd_index->indnatts,
-					wstate->index->rd_index->indnkeyatts);
+			itup = index_truncate_tuple(wstate->index, itup);
 			itupsz = IndexTupleDSize(*itup);
 			itupsz = MAXALIGN(itupsz);
 		}

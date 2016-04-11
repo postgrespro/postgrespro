@@ -505,7 +505,7 @@ CREATE [ [ GLOBAL | LOCAL ] { TEMPORARY | TEMP } | UNLOGGED ] TABLE [ IF NOT EXI
       Optional clause <literal>INCLUDING</literal> allows to add into the index
       a portion of columns on which the uniqueness is not enforced upon.
       Note, that althogh constraint is not enforced upon included columns, it still
-      depends on them. Consequently, some operations on these columns (e.g. <literal>DROP COLUMN<literal>)
+      depends on them. Consequently, some operations on these columns (e.g. <literal>DROP COLUMN</literal>)
       can cause cascade constraint and index deletion.
       See paragraph about <literal>INCLUDING</literal> in
       <xref linkend="SQL-CREATEINDEX"> for more information.
@@ -545,7 +545,7 @@ CREATE [ [ GLOBAL | LOCAL ] { TEMPORARY | TEMP } | UNLOGGED ] TABLE [ IF NOT EXI
       Optional clause <literal>INCLUDING</literal> allows to add into the index
       a portion of columns on which the constraint is not enforced upon.
       Note, that althogh constraint is not enforced upon included columns, it still
-      depends on them. Consequently, some operations on these columns (e.g. <literal>DROP COLUMN<literal>)
+      depends on them. Consequently, some operations on these columns (e.g. <literal>DROP COLUMN</literal>)
       can cause cascade constraint and index deletion.
       See paragraph about <literal>INCLUDING</literal> in
       <xref linkend="SQL-CREATEINDEX"> for more information.

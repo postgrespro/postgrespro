@@ -748,14 +748,6 @@ _bt_insertonpg(Relation rel,
 		elog(ERROR, "cannot insert to incompletely split page %u",
 			 BufferGetBlockNumber(buf));
 
-	/* Truncate nonkey attributes when inserting on nonleaf pages. */
-	if (rel->rd_index->indnatts != rel->rd_index->indnkeyatts
-		&& !P_ISLEAF(lpageop))
-	{
-			itup = index_reform_tuple(rel, itup,
-				rel->rd_index->indnatts, rel->rd_index->indnkeyatts);
-	}
-
 	itemsz = IndexTupleDSize(*itup);
 	itemsz = MAXALIGN(itemsz);	/* be safe, PageAddItem will do this but we
 								 * need to be consistent */
@@ -1094,7 +1086,7 @@ _bt_split(Relation rel, Buffer buf, Buffer cbuf, OffsetNumber firstright,
 	 */
 	if (indnatts != indnkeyatts && P_ISLEAF(lopaque))
 	{
-		lefthikey = index_reform_tuple(rel, item, indnatts, indnkeyatts);
+		lefthikey = index_truncate_tuple(rel, item);
 		itemsz = IndexTupleSize(lefthikey);
 		itemsz = MAXALIGN(itemsz);
 	}
@@ -1991,10 +1983,7 @@ _bt_newroot(Relation rel, Buffer lbuf, Buffer rbuf)
 	right_item_sz = ItemIdGetLength(itemid);
 	item = (IndexTuple) PageGetItem(lpage, itemid);
 
-	if (rel->rd_index->indnatts != rel->rd_index->indnkeyatts)
-		right_item = index_reform_tuple(rel, item, rel->rd_index->indnatts, rel->rd_index->indnkeyatts);
-	else
-		right_item = CopyIndexTuple(item);
+	right_item = CopyIndexTuple(item);
 	ItemPointerSet(&(right_item->t_tid), rbkno, P_HIKEY);
 
 	/* NO EREPORT(ERROR) from here till newroot op is logged */
