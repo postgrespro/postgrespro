@@ -499,6 +499,7 @@ CREATE [ [ GLOBAL | LOCAL ] { TEMPORARY | TEMP } | UNLOGGED ] TABLE [ IF NOT EXI
       primary key constraint defined for the table.  (Otherwise it
       would just be the same constraint listed twice.)
      </para>
+
      <para>
       Adding a unique constraint will automatically create a unique btree
       index on the column or group of columns used in the constraint.
@@ -510,13 +511,16 @@ CREATE [ [ GLOBAL | LOCAL ] { TEMPORARY | TEMP } | UNLOGGED ] TABLE [ IF NOT EXI
       See paragraph about <literal>INCLUDING</literal> in
       <xref linkend="SQL-CREATEINDEX"> for more information.
      </para>
+
     </listitem>
    </varlistentry>
 
    <varlistentry>
     <term><literal>PRIMARY KEY</> (column constraint)</term>
     <term><literal>PRIMARY KEY ( <replaceable class="PARAMETER">column_name</replaceable> [, ... ] )
-    <optional>INCLUDING ( <replaceable class="PARAMETER">column_name</replaceable> [, ...])</optional></> (table constraint)</term>    <listitem>
+    <optional>INCLUDING ( <replaceable class="PARAMETER">column_name</replaceable> [, ...])</optional></> (table constraint)</term>
+
+    <listitem>
      <para>
       The <literal>PRIMARY KEY</> constraint specifies that a column or
       columns of a table can contain only unique (non-duplicate), nonnull

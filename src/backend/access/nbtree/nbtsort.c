@@ -628,24 +628,18 @@ _bt_buildadd(BTWriteState *wstate, BTPageState *state, IndexTuple itup)
 		 * Truncate the tuple that we're going to insert
 		 * into the parent page as a downlink
 		 */
-		if (indnkeyatts < indnatts && P_ISLEAF(pageop))
-			state->btps_minkey = index_truncate_tuple(wstate->index, itup);
-		else
-			state->btps_minkey = CopyIndexTuple(itup);	}
-
-	/* Truncate nonkey attributes when inserting on nonleaf pages */
-	if (wstate->index->rd_index->indnatts
-		!= wstate->index->rd_index->indnkeyatts)
-	{
-		BTPageOpaque pageop = (BTPageOpaque) PageGetSpecialPointer(npage);
-
-		if (!P_ISLEAF(pageop))
+		if (indnkeyatts != indnatts && P_ISLEAF(pageop))
 		{
-			itup = index_truncate_tuple(wstate->index, itup);
+			state->btps_minkey = index_truncate_tuple(wstate->index, itup);
 			itupsz = IndexTupleDSize(*itup);
 			itupsz = MAXALIGN(itupsz);
 		}
+		else
+			state->btps_minkey = CopyIndexTuple(itup);
 	}
+
+
+
 
 	/*
 	 * Add the new item into the current page.

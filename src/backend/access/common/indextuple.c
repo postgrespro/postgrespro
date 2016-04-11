@@ -471,6 +471,5 @@ index_truncate_tuple(Relation idxrel, IndexTuple olditup)
 	itupdesc->natts = indnatts;
 
 	Assert(IndexTupleSize(newitup) <= IndexTupleSize(olditup));
-
 	return newitup;
 }
