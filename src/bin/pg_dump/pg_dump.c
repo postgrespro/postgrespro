@@ -5444,7 +5444,7 @@ getIndexes(Archive *fout, TableInfo tblinfo[], int numTables)
 			/*
 			 * In PGPRO_9.5.2 we add INCLUDING columns functionality
 			 * that requires new fields to be added.
-			 * i.indnkeyattrs is new, and besides we should use
+			 * i.indnkeyatts is new, and besides we should use
 			 * i.indnatts instead of t.relnatts for index relations.
 			 *
 			 */
@@ -5484,6 +5484,8 @@ getIndexes(Archive *fout, TableInfo tblinfo[], int numTables)
 							  "SELECT t.tableoid, t.oid, "
 							  "t.relname AS indexname, "
 					 "pg_catalog.pg_get_indexdef(i.indexrelid) AS indexdef, "
+							  "NULL AS indnkeyatts, "
+							  "NULL AS indnatts, "
 							  "t.relnatts AS indnkeys, "
 							  "i.indkey, i.indisclustered, "
 							  "i.indisreplident, t.relpages, "
@@ -5515,6 +5517,8 @@ getIndexes(Archive *fout, TableInfo tblinfo[], int numTables)
 							  "SELECT t.tableoid, t.oid, "
 							  "t.relname AS indexname, "
 					 "pg_catalog.pg_get_indexdef(i.indexrelid) AS indexdef, "
+							  "NULL AS indnkeyatts, "
+							  "NULL AS indnatts, "
 							  "t.relnatts AS indnkeys, "
 							  "i.indkey, i.indisclustered, "
 							  "false AS indisreplident, t.relpages, "
@@ -5542,6 +5546,8 @@ getIndexes(Archive *fout, TableInfo tblinfo[], int numTables)
 							  "SELECT t.tableoid, t.oid, "
 							  "t.relname AS indexname, "
 					 "pg_catalog.pg_get_indexdef(i.indexrelid) AS indexdef, "
+							  "NULL AS indnkeyatts, "
+							  "NULL AS indnatts, "
 							  "t.relnatts AS indnkeys, "
 							  "i.indkey, i.indisclustered, "
 							  "false AS indisreplident, t.relpages, "
@@ -5572,6 +5578,8 @@ getIndexes(Archive *fout, TableInfo tblinfo[], int numTables)
 							  "SELECT t.tableoid, t.oid, "
 							  "t.relname AS indexname, "
 					 "pg_catalog.pg_get_indexdef(i.indexrelid) AS indexdef, "
+							  "NULL AS indnkeyatts, "
+							  "NULL AS indnatts, "
 							  "t.relnatts AS indnkeys, "
 							  "i.indkey, i.indisclustered, "
 							  "false AS indisreplident, t.relpages, "
@@ -5601,6 +5609,8 @@ getIndexes(Archive *fout, TableInfo tblinfo[], int numTables)
 							  "SELECT t.tableoid, t.oid, "
 							  "t.relname AS indexname, "
 					 "pg_catalog.pg_get_indexdef(i.indexrelid) AS indexdef, "
+							  "NULL AS indnkeyatts, "
+							  "NULL AS indnatts, "
 							  "t.relnatts AS indnkeys, "
 							  "i.indkey, i.indisclustered, "
 							  "false AS indisreplident, t.relpages, "
@@ -5630,6 +5640,8 @@ getIndexes(Archive *fout, TableInfo tblinfo[], int numTables)
 							  "SELECT t.tableoid, t.oid, "
 							  "t.relname AS indexname, "
 							  "pg_get_indexdef(i.indexrelid) AS indexdef, "
+							  "NULL AS indnkeyatts, "
+							  "NULL AS indnatts, "
 							  "t.relnatts AS indnkeys, "
 							  "i.indkey, false AS indisclustered, "
 							  "false AS indisreplident, t.relpages, "
@@ -5657,6 +5669,8 @@ getIndexes(Archive *fout, TableInfo tblinfo[], int numTables)
 							  "t.oid, "
 							  "t.relname AS indexname, "
 							  "pg_get_indexdef(i.indexrelid) AS indexdef, "
+							  "NULL AS indnkeyatts, "
+							  "NULL AS indnatts, "
 							  "t.relnatts AS indnkeys, "
 							  "i.indkey, false AS indisclustered, "
 							  "false AS indisreplident, t.relpages, "
