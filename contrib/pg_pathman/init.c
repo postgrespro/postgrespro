@@ -177,7 +177,7 @@ load_relations_hashtable(bool reinitialize)
 	char		sql[] = "SELECT pg_class.relfilenode, pg_attribute.attnum, cfg.parttype, pg_attribute.atttypid "
 						"FROM %s.pathman_config as cfg "
 						"JOIN pg_class ON pg_class.relfilenode = cfg.relname::regclass::oid "
-						"JOIN pg_attribute ON pg_attribute.attname = cfg.attname "
+						"JOIN pg_attribute ON pg_attribute.attname = lower(cfg.attname) "
 						"AND attrelid = pg_class.relfilenode";
 	char *query;
 
@@ -274,7 +274,7 @@ create_relations_hashtable()
 void
 load_check_constraints(Oid parent_oid, Snapshot snapshot)
 {
-	PartRelationInfo *prel;
+	PartRelationInfo *prel = NULL;
 	RangeRelation *rangerel = NULL;
 	SPIPlanPtr plan;
 	bool	found;

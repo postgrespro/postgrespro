@@ -342,6 +342,7 @@ handle_modification_query(Query *parse)
 	if (!found)
 		return;
 
+	/* Parse syntax tree and extract partition ranges */
 	ranges = list_make1_int(make_irange(0, prel->children_count - 1, false));
 	expr = (Expr *) eval_const_expressions(NULL, parse->jointree->quals);
 	if (!expr)
@@ -417,8 +418,8 @@ pathman_set_rel_pathlist_hook(PlannerInfo *root, RelOptInfo *rel, Index rti, Ran
 		if (prel->parttype == PT_RANGE)
 		{
 			/*
-			 * Get pathkeys for ascending and descending sort by patition
-			 * column.
+			 * Get pathkeys for ascending and descending sort by partition
+			 * column
 			 */
 			List		   *pathkeys;
 			Var			   *var;
