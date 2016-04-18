@@ -120,7 +120,7 @@ typedef enum
 {
 	CEOUC_WAIT,
 	CEOUC_NOWAIT,
-	CEOUC_LIVELOCK_PREVENTING_WAIT,
+	CEOUC_LIVELOCK_PREVENTING_WAIT
 } CEOUC_WAIT_MODE;
 
 static bool check_exclusion_or_unique_constraint(Relation heap, Relation index,
