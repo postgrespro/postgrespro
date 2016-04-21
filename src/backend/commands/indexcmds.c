@@ -337,9 +337,8 @@ DefineIndex(Oid relationId,
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
 				 errmsg("included columns must not intersect with key columns")));
-	/*
-	 * count attributes in index
-	 */
+
+	/* count key attributes in index */
 	numberOfKeyAttributes = list_length(stmt->indexParams);
 	if (numberOfKeyAttributes <= 0)
 		ereport(ERROR,
@@ -349,12 +348,13 @@ DefineIndex(Oid relationId,
 	/*
 	 * We append any INCLUDING columns onto the indexParams list so that
 	 * we have one list with all columns. Later we can determine which of these
-	 * are key columns, and which are just part of the INCLUDING list by check the list
-	 * position. A list item in a position less than ii_NumIndexKeyAttrs is part of
-	 * the key columns, and anything equal to and over is part of the
-	 * INCLUDING columns.
+	 * are key columns, and which are just part of the INCLUDING list by check
+	 * the list position. A list item in a position less than
+	 * ii_NumIndexKeyAttrs is part of the key columns, and anything equal to
+	 * and over is part of the INCLUDING columns.
 	 */
-	stmt->indexParams = list_concat(stmt->indexParams, stmt->indexIncludingParams);
+	stmt->indexParams = list_concat(stmt->indexParams,
+									stmt->indexIncludingParams);
 	numberOfAttributes = list_length(stmt->indexParams);
 
 	if (numberOfAttributes <= 0)

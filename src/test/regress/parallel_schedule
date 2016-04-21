@@ -55,7 +55,7 @@ test: copy copyselect
 # ----------
 test: create_misc create_operator
 # These depend on the above two
-test: create_index create_view
+test: create_index index_including create_view
 
 # ----------
 # Another group of parallel tests

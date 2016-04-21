@@ -2385,7 +2385,7 @@ INSERT INTO covering_index_heap VALUES(1,2,'AAA');
 -- this should fail because of unique index on f1,f2:
 INSERT INTO covering_index_heap VALUES(1,2,'BBB');
 ERROR:  duplicate key value violates unique constraint "covering_index_index"
-DETAIL:  Key (f1, f2, f3 (included))=(1, 2, BBB) already exists.
+DETAIL:  Key (f1, f2)=(1, 2) already exists.
 -- and this shouldn't:
 INSERT INTO covering_index_heap VALUES(1,4,'AAA');
 -- Try to build index on table that already contains data

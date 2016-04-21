@@ -426,6 +426,10 @@ ConstructTupleDescriptor(Relation heapRelation,
 		namestrcpy(&to->attname, (const char *) lfirst(colnames_item));
 		colnames_item = lnext(colnames_item);
 
+		/*
+		 * Code below is concerned to the opclasses which are not used
+		 * with the included columns.
+		 */
 		if (i >= indexInfo->ii_NumIndexKeyAttrs)
 			continue;
 
@@ -1197,6 +1201,7 @@ index_constraint_create(Relation heapRelation,
 								   RelationGetRelid(heapRelation),
 								   indexInfo->ii_KeyAttrNumbers,
 								   indexInfo->ii_NumIndexKeyAttrs,
+								   indexInfo->ii_NumIndexAttrs,
 								   InvalidOid,	/* no domain */
 								   indexRelationId,		/* index OID */
 								   InvalidOid,	/* no foreign key */
@@ -1704,10 +1709,10 @@ BuildIndexInfo(Relation index)
 void
 BuildSpeculativeIndexInfo(Relation index, IndexInfo *ii)
 {
-	int			nkeycols;
+	int			indnkeyatts;
 	int			i;
 
-	nkeycols = IndexRelationGetNumberOfKeyAttributes(index);
+	indnkeyatts = IndexRelationGetNumberOfKeyAttributes(index);
 
 	/*
 	 * fetch info for checking unique indexes
@@ -1717,16 +1722,16 @@ BuildSpeculativeIndexInfo(Relation index, IndexInfo *ii)
 	if (index->rd_rel->relam != BTREE_AM_OID)
 		elog(ERROR, "unexpected non-btree speculative unique index");
 
-	ii->ii_UniqueOps = (Oid *) palloc(sizeof(Oid) * nkeycols);
-	ii->ii_UniqueProcs = (Oid *) palloc(sizeof(Oid) * nkeycols);
-	ii->ii_UniqueStrats = (uint16 *) palloc(sizeof(uint16) * nkeycols);
+	ii->ii_UniqueOps = (Oid *) palloc(sizeof(Oid) * indnkeyatts);
+	ii->ii_UniqueProcs = (Oid *) palloc(sizeof(Oid) * indnkeyatts);
+	ii->ii_UniqueStrats = (uint16 *) palloc(sizeof(uint16) * indnkeyatts);
 
 	/*
 	 * We have to look up the operator's strategy number.  This provides a
 	 * cross-check that the operator does match the index.
 	 */
 	/* We need the func OIDs and strategy numbers too */
-	for (i = 0; i < nkeycols; i++)
+	for (i = 0; i < indnkeyatts; i++)
 	{
 		ii->ii_UniqueStrats[i] = BTEqualStrategyNumber;
 		ii->ii_UniqueOps[i] =

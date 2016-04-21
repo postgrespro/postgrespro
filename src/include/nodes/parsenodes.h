@@ -1829,7 +1829,8 @@ typedef struct Constraint
 	char	   *cooked_expr;	/* expr, as nodeToString representation */
 
 	/* Fields used for unique constraints (UNIQUE and PRIMARY KEY): */
-	List	   *keys;			/* String nodes naming referenced column(s) */
+	List	   *keys;			/* String nodes naming referenced key column(s) */
+	List	   *including;		/* String nodes naming referenced nonkey column(s) */
 
 	/* Fields used for EXCLUSION constraints: */
 	List	   *exclusions;		/* list of (IndexElem, operator name) pairs */
