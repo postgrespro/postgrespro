@@ -537,8 +537,8 @@ compareDocR(const void *va, const void *vb)
 #define MAXQROPOS	MAXENTRYPOS
 typedef struct
 {
-	bool			operandexist;
-	bool			reverseinsert; /* indicates order to insert,
+	bool			operandexists;
+	bool			reverseinsert; /* indicates insert order,
 									  true means descending order */
 	uint32			npos;
 	WordEntryPos	pos[MAXQROPOS];
@@ -559,7 +559,7 @@ checkcondition_QueryOperand(void *checkval, QueryOperand *val, ExecPhraseData *d
 	QueryRepresentation			*qr = (QueryRepresentation *) checkval;
 	QueryRepresentationOperand	*opData = QR_GET_OPERAND_DATA(qr, val);
 
-	if (!opData->operandexist)
+	if (!opData->operandexists)
 		return false;
 
 	if (data)
@@ -589,7 +589,7 @@ resetQueryRepresentation(QueryRepresentation *qr, bool reverseinsert)
 
 	for(i = 0; i < qr->query->size; i++)
 	{
-		qr->operandData[i].operandexist = false;
+		qr->operandData[i].operandexists = false;
 		qr->operandData[i].reverseinsert = reverseinsert;
 		qr->operandData[i].npos = 0;
 	}
@@ -609,7 +609,7 @@ fillQueryRepresentationData(QueryRepresentation *qr, DocRepresentation *entry)
 
 		opData = QR_GET_OPERAND_DATA(qr, entry->data.query.items[i]);
 
-		opData->operandexist = true;
+		opData->operandexists = true;
 
 		if (opData->npos == 0)
 		{
@@ -618,17 +618,17 @@ fillQueryRepresentationData(QueryRepresentation *qr, DocRepresentation *entry)
 			opData->npos++;
 			continue;
 		}
-		
+
 		lastPos = opData->reverseinsert ?
 					(MAXQROPOS - opData->npos) :
 					(opData->npos - 1);
-		
+
 		if (WEP_GETPOS(opData->pos[lastPos]) != WEP_GETPOS(entry->pos))
 		{
 			lastPos = opData->reverseinsert ?
 						(MAXQROPOS - 1 - opData->npos) :
 						(opData->npos);
-						
+
 			opData->pos[lastPos] = entry->pos;
 			opData->npos++;
 		}
@@ -721,7 +721,7 @@ get_docrep(TSVector txt, QueryRepresentation *qr, int *doclen)
 	WordEntry  *entry,
 			   *firstentry;
 	WordEntryPos *post;
-	int32		dimt,
+	int32		dimt,	/* number of 'post' items */
 				j,
 				i,
 				nitem;
@@ -769,14 +769,15 @@ get_docrep(TSVector txt, QueryRepresentation *qr, int *doclen)
 				doc = (DocRepresentation *) repalloc(doc, sizeof(DocRepresentation) * len);
 			}
 
-			/* iterations over entry's positions */	
+			/* iterations over entry's positions */
 			for (j = 0; j < dimt; j++)
 			{
-				if ( curoperand->weight == 0 || (curoperand->weight & (1 << WEP_GETWEIGHT(post[j]))) )
+				if (curoperand->weight == 0 ||
+					curoperand->weight & (1 << WEP_GETWEIGHT(post[j])))
 				{
 					doc[cur].pos = post[j];
 					doc[cur].data.map.entry = entry;
-					doc[cur].data.map.item = (QueryItem*)curoperand;
+					doc[cur].data.map.item = (QueryItem *) curoperand;
 					cur++;
 				}
 			}
