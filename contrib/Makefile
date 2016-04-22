@@ -41,6 +41,7 @@ SUBDIRS = \
 		pg_standby	\
 		pg_stat_statements \
 		pg_trgm		\
+		pg_variables	\
 		pgcrypto	\
 		pgrowlocks	\
 		pgstattuple	\
