@@ -1,0 +1,583 @@
+<sect1 id="pg-variables">
+  <title>pg_variables - session variables with various types</title>
+  <sect2 id="pg-varaibles-introduction">
+    <title>Introduction</title>
+    <para>
+      The <emphasis role="strong">pg_variables</emphasis> module
+      provides functions to work with variables of various types.
+      Created variables live only in the current user session.
+    </para>
+  </sect2>
+  <sect2 id="pg-variables-functions">
+    <title>Module functions</title>
+    <sect3 id="pg-variables-integer-variables">
+      <title>Integer variables</title>
+      <informaltable>
+        <tgroup cols="2">
+          <thead>
+            <row>
+              <entry>
+                Function
+              </entry>
+              <entry>
+                Returns
+              </entry>
+            </row>
+          </thead>
+          <tbody>
+            <row>
+              <entry>
+                <literal>pgv_set_int(package text, name text, value int)</literal>
+              </entry>
+              <entry>
+                <literal>void</literal>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <literal>pgv_get_int(package text, name text, strict bool default true)</literal>
+              </entry>
+              <entry>
+                <literal>int</literal>
+              </entry>
+            </row>
+          </tbody>
+        </tgroup>
+      </informaltable>
+    </sect3>
+    <sect3 id="pg-variables-text-variables">
+      <title>Text variables</title>
+      <informaltable>
+        <tgroup cols="2">
+          <thead>
+            <row>
+              <entry>
+                Function
+              </entry>
+              <entry>
+                Returns
+              </entry>
+            </row>
+          </thead>
+          <tbody>
+            <row>
+              <entry>
+                <literal>pgv_set_text(package text, name text, value text)</literal>
+              </entry>
+              <entry>
+                <literal>void</literal>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <literal>pgv_get_text(package text, name text, strict bool default true)</literal>
+              </entry>
+              <entry>
+                <literal>text</literal>
+              </entry>
+            </row>
+          </tbody>
+        </tgroup>
+      </informaltable>
+    </sect3>
+    <sect3 id="pg-variables-numeric-variables">
+      <title>Numeric variables</title>
+      <informaltable>
+        <tgroup cols="2">
+          <thead>
+            <row>
+              <entry>
+                Function
+              </entry>
+              <entry>
+                Returns
+              </entry>
+            </row>
+          </thead>
+          <tbody>
+            <row>
+              <entry>
+                <literal>pgv_set_numeric(package text, name text, value numeric)</literal>
+              </entry>
+              <entry>
+                <literal>void</literal>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <literal>pgv_get_numeric(package text, name text, strict bool default true)</literal>
+              </entry>
+              <entry>
+                <literal>numeric</literal>
+              </entry>
+            </row>
+          </tbody>
+        </tgroup>
+      </informaltable>
+    </sect3>
+    <sect3 id="timestamp-variables">
+      <title>Timestamp variables</title>
+      <informaltable>
+        <tgroup cols="2">
+          <thead>
+            <row>
+              <entry>
+                Function
+              </entry>
+              <entry>
+                Returns
+              </entry>
+            </row>
+          </thead>
+          <tbody>
+            <row>
+              <entry>
+                <literal>pgv_set_timestamp(package text, name text, value timestamp)</literal>
+              </entry>
+              <entry>
+                <literal>void</literal>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <literal>pgv_get_timestamp(package text, name text, strict bool default true)</literal>
+              </entry>
+              <entry>
+                <literal>timestamp</literal>
+              </entry>
+            </row>
+          </tbody>
+        </tgroup>
+      </informaltable>
+    </sect3>
+    <sect3 id="pg-variables-timestamp-with-timezone-variables">
+      <title>Timestamp with timezone variables</title>
+      <informaltable>
+        <tgroup cols="2">
+          <thead>
+            <row>
+              <entry>
+                Function
+              </entry>
+              <entry>
+                Returns
+              </entry>
+            </row>
+          </thead>
+          <tbody>
+            <row>
+              <entry>
+                <literal>pgv_set_timestamptz(package text, name text, value timestamptz)</literal>
+              </entry>
+              <entry>
+                <literal>void</literal>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <literal>pgv_get_timestamptz(package text, name text, strict bool default true)</literal>
+              </entry>
+              <entry>
+                <literal>timestamptz</literal>
+              </entry>
+            </row>
+          </tbody>
+        </tgroup>
+      </informaltable>
+    </sect3>
+    <sect3 id="pg-variables-date-variables">
+      <title>Date variables</title>
+      <informaltable>
+        <tgroup cols="2">
+          <thead>
+            <row>
+              <entry>
+                Function
+              </entry>
+              <entry>
+                Returns
+              </entry>
+            </row>
+          </thead>
+          <tbody>
+            <row>
+              <entry>
+                <literal>pgv_set_date(package text, name text, value date)</literal>
+              </entry>
+              <entry>
+                <literal>void</literal>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <literal>pgv_get_date(package text, name text, strict bool default true)</literal>
+              </entry>
+              <entry>
+                <literal>date</literal>
+              </entry>
+            </row>
+          </tbody>
+        </tgroup>
+      </informaltable>
+    </sect3>
+    <sect3 id="pg-variables-jsonb-variables">
+      <title>Jsonb variables</title>
+      <informaltable>
+        <tgroup cols="2">
+          <thead>
+            <row>
+              <entry>
+                Function
+              </entry>
+              <entry>
+                Returns
+              </entry>
+            </row>
+          </thead>
+          <tbody>
+            <row>
+              <entry>
+                <literal>pgv_set_jsonb(package text, name text, value jsonb)</literal>
+              </entry>
+              <entry>
+                <literal>void</literal>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <literal>pgv_get_jsonb(package text, name text, strict bool default true)</literal>
+              </entry>
+              <entry>
+                <literal>jsonb</literal>
+              </entry>
+            </row>
+          </tbody>
+        </tgroup>
+      </informaltable>
+    </sect3>
+    <sect3 id="pg-variables-records">
+      <title>Records</title>
+      <informaltable>
+        <tgroup cols="2">
+          <thead>
+            <row>
+              <entry>
+                Function
+              </entry>
+              <entry>
+                Returns
+              </entry>
+            </row>
+          </thead>
+          <tbody>
+            <row>
+              <entry>
+                <literal>pgv_insert(package text, name text, r record)</literal>
+              </entry>
+              <entry>
+                <literal>void</literal>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <literal>pgv_update(package text, name text, r record)</literal>
+              </entry>
+              <entry>
+                <literal>boolean</literal>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <literal>pgv_delete(package text, name text, value anynonarray)</literal>
+              </entry>
+              <entry>
+                <literal>boolean</literal>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <literal>pgv_select(package text, name text)</literal>
+              </entry>
+              <entry>
+                <literal>set of record</literal>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <literal>pgv_select(package text, name text, value anynonarray)</literal>
+              </entry>
+              <entry>
+                <literal>record</literal>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <literal>pgv_select(package text, name text, value anyarray)</literal>
+              </entry>
+              <entry>
+                <literal>set of record</literal>
+              </entry>
+            </row>
+          </tbody>
+        </tgroup>
+      </informaltable>
+    </sect3>
+    <sect3 id="pg-variables-miscellaneous-functions">
+      <title>Miscellaneous functions</title>
+      <informaltable>
+        <tgroup cols="2">
+          <thead>
+            <row>
+              <entry>
+                Function
+              </entry>
+              <entry>
+                Returns
+              </entry>
+            </row>
+          </thead>
+          <tbody>
+            <row>
+              <entry>
+                <literal>pgv_exists(package text, name text)</literal>
+              </entry>
+              <entry>
+                <literal>bool</literal>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <literal>pgv_remove(package text, name text)</literal>
+              </entry>
+              <entry>
+                <literal>void</literal>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <literal>pgv_remove(package text)</literal>
+              </entry>
+              <entry>
+                <literal>void</literal>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <literal>pgv_free()</literal>
+              </entry>
+              <entry>
+                <literal>void</literal>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <literal>pgv_list()</literal>
+              </entry>
+              <entry>
+                <literal>table(package text, name text)</literal>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <literal>pgv_stats()</literal>
+              </entry>
+              <entry>
+                <literal>table(package text, used_memory bigint)</literal>
+              </entry>
+            </row>
+          </tbody>
+        </tgroup>
+      </informaltable>
+    </sect3>
+  </sect2>
+  <sect2 id="pg-variables-error-messages">
+    <title>Error messages</title>
+    <itemizedlist spacing="compact">
+      <listitem>
+        <para>
+          &quot;array argument can not be NULL&quot;
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          &quot;could not identify a hash function for type %s&quot;
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          &quot;could not identify a matching function for type %s&quot;
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          &quot;function returning record called in context that cannot
+          accept type record&quot;
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          &quot;name &quot;%s&quot; is too long&quot;
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          &quot;new record structure differs from variable
+          &quot;%s&quot; structure&quot;
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          &quot;package name can not be NULL&quot;
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          &quot;record argument can not be NULL&quot;
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          &quot;requested value type differs from variable
+          &quot;%s&quot; key type&quot;
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          &quot;searching for elements in multidimensional arrays is not
+          supported&quot;
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          &quot;there is a record in the variable &quot;%s&quot; with
+          same key&quot;
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          &quot;unrecognized package &quot;%s&quot;&quot;
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          &quot;unrecognized variable &quot;%s&quot;&quot;
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          &quot;variable &quot;%s&quot; requires %s value&quot;
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          &quot;variable name can not be NULL&quot;
+        </para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+  <sect2 id="pg-variables-examples">
+    <title>Examples</title>
+    <para>
+      It is easy to use functions to work with scalar variables:
+    </para>
+    <programlisting>
+SELECT pgv_set_int('vars', 'int1', 101);
+SELECT pgv_set_int('vars', 'int2', 102);
+
+SELECT pgv_get_int('vars', 'int1');
+ pgv_get_int 
+-------------
+         101
+(1 row)
+
+SELECT pgv_get_int('vars', 'int2');
+ pgv_get_int 
+-------------
+         102
+(1 row)
+</programlisting>
+    <para>
+      Let's assume we have a <emphasis role="strong">tab</emphasis>
+      table:
+    </para>
+    <programlisting>
+CREATE TABLE tab (id int, t varchar);
+INSERT INTO tab VALUES (0, 'str00'), (1, 'str11');
+</programlisting>
+    <para>
+      Then you can use functions to work with record variables:
+    </para>
+    <programlisting>
+SELECT pgv_insert('vars', 'r1', tab) FROM tab;
+
+SELECT pgv_select('vars', 'r1');
+ pgv_select
+------------
+ (1,str11)
+ (0,str00)
+(2 rows)
+
+SELECT pgv_select('vars', 'r1', 1);
+ pgv_select
+------------
+ (1,str11)
+(1 row)
+
+SELECT pgv_select('vars', 'r1', 0);
+ pgv_select
+------------
+ (0,str00)
+(1 row)
+
+SELECT pgv_select('vars', 'r1', ARRAY[1, 0]);
+ pgv_select
+------------
+ (1,str11)
+ (0,str00)
+(2 rows)
+
+SELECT pgv_delete('vars', 'r1', 1);
+
+SELECT pgv_select('vars', 'r1');
+ pgv_select
+------------
+ (0,str00)
+(1 row)
+</programlisting>
+    <para>
+      You can list packages and variables:
+    </para>
+    <programlisting>
+SELECT * FROM pgv_list() order by package, name;
+ package | name 
+---------+------
+ vars    | int1
+ vars    | int2
+ vars    | r1
+(3 rows)
+</programlisting>
+    <para>
+      And get used memory in bytes:
+    </para>
+    <programlisting>
+SELECT * FROM pgv_stats() order by package;
+ package | used_memory
+---------+-------------
+ vars    |       16736
+(1 row)
+</programlisting>
+    <para>
+      You can delete variables or hole packages:
+    </para>
+    <programlisting>
+SELECT pgv_remove('vars', 'int1');
+SELECT pgv_remove('vars');
+</programlisting>
+    <para>
+      You can delete all packages and variables:
+    </para>
+    <programlisting>
+SELECT pgv_free();
+</programlisting>
+  </sect2>
+</sect1>
