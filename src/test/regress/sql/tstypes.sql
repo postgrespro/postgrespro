@@ -62,32 +62,32 @@ SELECT 'a:* & nbb:*ac | doo:a* | goo'::tsquery;
 SELECT setweight('a:d & b:a & f'::tsquery, 'c');
 
 -- phrase transformation
-SELECT 'a ? (b|c)'::tsquery;
-SELECT '(a|b) ? c'::tsquery;
-SELECT '(a|b) ? (d|c)'::tsquery;
+SELECT 'a <-> (b|c)'::tsquery;
+SELECT '(a|b) <-> c'::tsquery;
+SELECT '(a|b) <-> (d|c)'::tsquery;
 
-SELECT 'a ? (b&c)'::tsquery;
-SELECT '(a&b) ? c'::tsquery;
-SELECT '(a&b) ? (d&c)'::tsquery;
+SELECT 'a <-> (b&c)'::tsquery;
+SELECT '(a&b) <-> c'::tsquery;
+SELECT '(a&b) <-> (d&c)'::tsquery;
 
-SELECT 'a ? !b'::tsquery;
-SELECT '!a ? b'::tsquery;
-SELECT '!a ? !b'::tsquery;
+SELECT 'a <-> !b'::tsquery;
+SELECT '!a <-> b'::tsquery;
+SELECT '!a <-> !b'::tsquery;
 
-SELECT 'a ? !(b&c)'::tsquery;
-SELECT 'a ? !(b|c)'::tsquery;
-SELECT  '!(a&b) ? c'::tsquery;
-SELECT  '!(a|b) ? c'::tsquery;
+SELECT 'a <-> !(b&c)'::tsquery;
+SELECT 'a <-> !(b|c)'::tsquery;
+SELECT  '!(a&b) <-> c'::tsquery;
+SELECT  '!(a|b) <-> c'::tsquery;
 
-SELECT  '(!a|b) ? c'::tsquery;
-SELECT  '(!a&b) ? c'::tsquery;
-SELECT  'c ? (!a|b)'::tsquery;
-SELECT  'c ? (!a&b)'::tsquery;
+SELECT  '(!a|b) <-> c'::tsquery;
+SELECT  '(!a&b) <-> c'::tsquery;
+SELECT  'c <-> (!a|b)'::tsquery;
+SELECT  'c <-> (!a&b)'::tsquery;
 
-SELECT  '(a|b) ? !c'::tsquery;
-SELECT  '(a&b) ? !c'::tsquery;
-SELECT  '!c ? (a|b)'::tsquery;
-SELECT  '!c ? (a&b)'::tsquery;
+SELECT  '(a|b) <-> !c'::tsquery;
+SELECT  '(a&b) <-> !c'::tsquery;
+SELECT  '!c <-> (a|b)'::tsquery;
+SELECT  '!c <-> (a&b)'::tsquery;
 
 --comparisons
 SELECT 'a' < 'b & c'::tsquery as "true";
@@ -105,11 +105,11 @@ SELECT 'foo & bar'::tsquery && 'asd';
 SELECT 'foo & bar'::tsquery || 'asd & fg';
 SELECT 'foo & bar'::tsquery || !!'asd & fg'::tsquery;
 SELECT 'foo & bar'::tsquery && 'asd | fg';
-SELECT 'a' ?? 'b & d'::tsquery;
-SELECT 'a & g' ?? 'b & d'::tsquery;
-SELECT 'a & g' ?? 'b | d'::tsquery;
-SELECT 'a & g' ?? 'b ? d'::tsquery;
-SELECT tsquery_phrase('a ?[3] g', 'b & d', 10);
+SELECT 'a' <-> 'b & d'::tsquery;
+SELECT 'a & g' <-> 'b & d'::tsquery;
+SELECT 'a & g' <-> 'b | d'::tsquery;
+SELECT 'a & g' <-> 'b <-> d'::tsquery;
+SELECT tsquery_phrase('a <3> g', 'b & d', 10);
 
 -- tsvector-tsquery operations
 
@@ -132,20 +132,20 @@ SELECT 'supeanova supernova'::tsvector @@ 'super:*'::tsquery AS "true";
 SELECT 'supeznova supernova'::tsvector @@ 'super:*'::tsquery AS "true";
 
 --phrase search
-SELECT to_tsvector('simple', '1 2 3 1') @@ '1 ? 2' AS "true";
-SELECT to_tsvector('simple', '1 2 3 1') @@ '1 ?[2] 2' AS "true";
-SELECT to_tsvector('simple', '1 2 3 1') @@ '1 ? 3' AS "false";
-SELECT to_tsvector('simple', '1 2 3 1') @@ '1 ?[2] 3' AS "true";
- 
-SELECT to_tsvector('simple', '1 2 11 3') @@ '1 ? 3' AS "false";
-SELECT to_tsvector('simple', '1 2 11 3') @@ '1:* ? 3' AS "true";
-  
-SELECT to_tsvector('simple', '1 2 3 4') @@ '1 ? 2 ? 3' AS "true";
-SELECT to_tsvector('simple', '1 2 3 4') @@ '(1 ? 2) ? 3' AS "true";
-SELECT to_tsvector('simple', '1 2 3 4') @@ '1 ? (2 ? 3)' AS "false";
-SELECT to_tsvector('simple', '1 2 3 4') @@ '1 ?[2] (2 ? 3)' AS "true";
-SELECT to_tsvector('simple', '1 2 1 2 3 4') @@ '(1 ? 2) ? 3' AS "true";
-SELECT to_tsvector('simple', '1 2 1 2 3 4') @@ '1 ? 2 ? 3' AS "true";
+SELECT to_tsvector('simple', '1 2 3 1') @@ '1 <-> 2' AS "true";
+SELECT to_tsvector('simple', '1 2 3 1') @@ '1 <2> 2' AS "true";
+SELECT to_tsvector('simple', '1 2 3 1') @@ '1 <-> 3' AS "false";
+SELECT to_tsvector('simple', '1 2 3 1') @@ '1 <2> 3' AS "true";
+
+SELECT to_tsvector('simple', '1 2 11 3') @@ '1 <-> 3' AS "false";
+SELECT to_tsvector('simple', '1 2 11 3') @@ '1:* <-> 3' AS "true";
+
+SELECT to_tsvector('simple', '1 2 3 4') @@ '1 <-> 2 <-> 3' AS "true";
+SELECT to_tsvector('simple', '1 2 3 4') @@ '(1 <-> 2) <-> 3' AS "true";
+SELECT to_tsvector('simple', '1 2 3 4') @@ '1 <-> (2 <-> 3)' AS "false";
+SELECT to_tsvector('simple', '1 2 3 4') @@ '1 <2> (2 <-> 3)' AS "true";
+SELECT to_tsvector('simple', '1 2 1 2 3 4') @@ '(1 <-> 2) <-> 3' AS "true";
+SELECT to_tsvector('simple', '1 2 1 2 3 4') @@ '1 <-> 2 <-> 3' AS "true";
 
 --ranking
 SELECT ts_rank(' a:1 s:2C d g'::tsvector, 'a | s');
@@ -169,24 +169,24 @@ SELECT ts_rank_cd(' a:1 s:2C d g'::tsvector, 'a & s');
 SELECT ts_rank_cd(' a:1 s:2B d g'::tsvector, 'a & s');
 SELECT ts_rank_cd(' a:1 s:2 d g'::tsvector, 'a & s');
 
-SELECT ts_rank_cd(' a:1 s:2A d g'::tsvector, 'a ? s');
-SELECT ts_rank_cd(' a:1 s:2C d g'::tsvector, 'a ? s');
-SELECT ts_rank_cd(' a:1 s:2 d g'::tsvector, 'a ? s');
-SELECT ts_rank_cd(' a:1 s:2 d:2A g'::tsvector, 'a ? s');
-SELECT ts_rank_cd(' a:1 s:2,3A d:2A g'::tsvector, 'a ?[2] s:A');
-SELECT ts_rank_cd(' a:1 b:2 s:3A d:2A g'::tsvector, 'a ?[2] s:A');
-SELECT ts_rank_cd(' a:1 sa:2D sb:2A g'::tsvector, 'a ? s:*');
-SELECT ts_rank_cd(' a:1 sa:2A sb:2D g'::tsvector, 'a ? s:*');
-SELECT ts_rank_cd(' a:1 sa:2A sb:2D g'::tsvector, 'a ? s:* ? sa:A');
-SELECT ts_rank_cd(' a:1 sa:2A sb:2D g'::tsvector, 'a ? s:* ? sa:B');
+SELECT ts_rank_cd(' a:1 s:2A d g'::tsvector, 'a <-> s');
+SELECT ts_rank_cd(' a:1 s:2C d g'::tsvector, 'a <-> s');
+SELECT ts_rank_cd(' a:1 s:2 d g'::tsvector, 'a <-> s');
+SELECT ts_rank_cd(' a:1 s:2 d:2A g'::tsvector, 'a <-> s');
+SELECT ts_rank_cd(' a:1 s:2,3A d:2A g'::tsvector, 'a <2> s:A');
+SELECT ts_rank_cd(' a:1 b:2 s:3A d:2A g'::tsvector, 'a <2> s:A');
+SELECT ts_rank_cd(' a:1 sa:2D sb:2A g'::tsvector, 'a <-> s:*');
+SELECT ts_rank_cd(' a:1 sa:2A sb:2D g'::tsvector, 'a <-> s:*');
+SELECT ts_rank_cd(' a:1 sa:2A sb:2D g'::tsvector, 'a <-> s:* <-> sa:A');
+SELECT ts_rank_cd(' a:1 sa:2A sb:2D g'::tsvector, 'a <-> s:* <-> sa:B');
 
-SELECT 'a:1 b:2'::tsvector @@ 'a ? b'::tsquery AS "true"; 
-SELECT 'a:1 b:2'::tsvector @@ 'a ?[0] b'::tsquery AS "false"; 
-SELECT 'a:1 b:2'::tsvector @@ 'a ?[1] b'::tsquery AS "true"; 
-SELECT 'a:1 b:2'::tsvector @@ 'a ?[2] b'::tsquery AS "true"; 
-SELECT 'a:1 b:3'::tsvector @@ 'a ? b'::tsquery AS "false"; 
-SELECT 'a:1 b:3'::tsvector @@ 'a ?[0] b'::tsquery AS "false"; 
-SELECT 'a:1 b:3'::tsvector @@ 'a ?[1] b'::tsquery AS "false"; 
-SELECT 'a:1 b:3'::tsvector @@ 'a ?[2] b'::tsquery AS "true"; 
-SELECT 'a:1 b:3'::tsvector @@ 'a ?[3] b'::tsquery AS "true"; 
+SELECT 'a:1 b:2'::tsvector @@ 'a <-> b'::tsquery AS "true";
+SELECT 'a:1 b:2'::tsvector @@ 'a <0> b'::tsquery AS "false";
+SELECT 'a:1 b:2'::tsvector @@ 'a <1> b'::tsquery AS "true";
+SELECT 'a:1 b:2'::tsvector @@ 'a <2> b'::tsquery AS "true";
+SELECT 'a:1 b:3'::tsvector @@ 'a <-> b'::tsquery AS "false";
+SELECT 'a:1 b:3'::tsvector @@ 'a <0> b'::tsquery AS "false";
+SELECT 'a:1 b:3'::tsvector @@ 'a <1> b'::tsquery AS "false";
+SELECT 'a:1 b:3'::tsvector @@ 'a <2> b'::tsquery AS "true";
+SELECT 'a:1 b:3'::tsvector @@ 'a <3> b'::tsquery AS "true";
 

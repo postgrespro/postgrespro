@@ -1672,8 +1672,8 @@ DATA(insert OID = 3680 (  "&&"	   PGNSP PGUID b f f 3615	 3615	 3615  0	0	 tsque
 DESCR("AND-concatenate");
 DATA(insert OID = 3681 (  "||"	   PGNSP PGUID b f f 3615	 3615	 3615  0	0	 tsquery_or   -		-	  ));
 DESCR("OR-concatenate");
-/* ?? operation calls tsquery_phrase, but function is polymorphic. So, point OID of tsquery_phrase */
-DATA(insert OID = 5005 (  "??"	   PGNSP PGUID b f f 3615    3615    3615  0    0    5003   -	-	));
+/* <-> operation calls tsquery_phrase, but function is polymorphic. So, point to OID of the tsquery_phrase */
+DATA(insert OID = 5005 (  "<->"	   PGNSP PGUID b f f 3615    3615    3615  0    0    5003   -	-	));
 DESCR("phrase-concatenate");
 DATA(insert OID = 3682 (  "!!"	   PGNSP PGUID l f f 0		 3615	 3615  0	0	 tsquery_not   -	-	  ));
 DESCR("NOT tsquery");

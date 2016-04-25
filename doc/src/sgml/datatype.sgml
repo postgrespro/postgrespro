@@ -3901,7 +3901,7 @@ SELECT to_tsvector('english', 'The Fat Rats');
      A <type>tsquery</type> value stores lexemes that are to be
      searched for, and combines them honoring the Boolean operators
      <literal>&amp;</literal> (AND), <literal>|</literal> (OR),
-     <literal>!</> (NOT) and <literal>?</> (FOLLOWED BY) phrase search
+     <literal>!</> (NOT) and <literal>&lt;-&gt;</> (FOLLOWED BY) phrase search
      operator.  Parentheses can be used to enforce grouping
      of the operators:
 
@@ -3923,7 +3923,7 @@ SELECT 'fat &amp; rat &amp; ! cat'::tsquery;
 </programlisting>
 
      In the absence of parentheses, <literal>!</> (NOT) binds most tightly,
-     and <literal>&amp;</literal> (AND) and <literal>?</literal> (FOLLOWED BY)
+     and <literal>&amp;</literal> (AND) and <literal>&lt;-&gt;</literal> (FOLLOWED BY)
      both bind more tightly than <literal>|</literal> (OR).
     </para>
 
