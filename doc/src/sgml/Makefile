@@ -103,7 +103,7 @@ endif
 ifeq ($(PGPRO_PACKAGE_NAME),)
 PRODUCT_NAME=$(PACKAGE_NAME)
 else
-PRODUCT_NAME=$(PGPRO_PACKAGE_NAME)
+PRODUCT_NAME="Postgres Pro"
 endif
 
 # The draft target creates HTML output in draft mode, without index (for faster build).

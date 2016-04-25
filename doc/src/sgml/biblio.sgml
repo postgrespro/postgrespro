@@ -5,7 +5,7 @@
 
   <para>
    Selected references and readings for <acronym>SQL</acronym>
-   and <productname>&productname;</productname>.
+   and <productname>PostgreSQL</productname>.
   </para>
 
   <para>
@@ -164,11 +164,11 @@
   </bibliodiv>
 
   <bibliodiv>
-   <title>&productname;-specific Documentation</title>
+   <title>PostgreSQL-specific Documentation</title>
    <para>This section is for related documentation.</para>
 
    <biblioentry id="SIM98">
-    <title>Enhancement of the ANSI SQL Implementation of &productname;</title>
+    <title>Enhancement of the ANSI SQL Implementation of PostgreSQL</title>
     <titleabbrev>Simkovics, 1998</titleabbrev>
     <authorgroup>
      <author>
@@ -199,7 +199,7 @@ ssimkovi@ag.or.at
      <para>
       Discusses SQL history and syntax, and describes the addition of
       <literal>INTERSECT</> and <literal>EXCEPT</> constructs into
-      <productname>&productname;</productname>.  Prepared as a Master's
+      <productname>PostgreSQL</productname>.  Prepared as a Master's
       Thesis with the support of O. Univ. Prof. Dr. Georg Gottlob and
       Univ. Ass. Mag. Katrin Seyr at Vienna University of Technology.
      </para>
