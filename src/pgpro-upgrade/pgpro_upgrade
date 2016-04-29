@@ -1,0 +1,56 @@
+#!/bin/sh
+# Utilities needed
+# 1. sh
+# 3. sed 
+if [ -z "$PGDATA" ]; then
+	echo "PGDATA environment variable is not set. Stop." 1>&2
+	exit 1
+fi
+PGBIN="`echo $0|sed 's![^/\\]*$!!'`"
+
+echo "$PGBIN"
+
+case "$PGBIN" in
+*/bin/)
+	PGSHARE="`echo $PGBIN|sed 's!bin/$!share!'`"
+	;;
+*) PGBIN=""
+	PGSHARE=""
+;;
+esac
+
+for dir in "$PGSHARE" /usr/pgsql-9.5/share /usr/share/postgresql/9.5 /usr/pgsql/9.5/share ; do
+	if [ -d "$dir/pgpro-upgrade" ]; then
+		DIR="$dir/pgpro-upgrade"
+		break
+	fi
+done
+if [ -z "$DIR" ]; then
+	echo "Cannot find feature scripts" 1>&2
+	exit 1
+fi
+BASELIST=`echo "select datname from pg_database;"|
+	"${PGBIN}postgres" --single template0 |
+	sed -n 's/^.*1: datname = "\([^"]*\)".*$/\1/p'`
+
+if [ -z "$BASELIST" ]; then
+	echo "Databases for upgrade not found" 1>&2
+	exit 1
+fi
+
+echo "Upgrading databases $BASELIST"
+
+#Search for upgrade scripts
+for i in "$DIR"/*.test; do
+	create="`echo "$i" |sed 's/\.test$/.sql/'`"
+	found=`< "$i"  "${PGBIN}postgres" --single template0 | 
+		sed -n 's/^[	 ]*1: [^ ]* = "\([ft]\)"[ 	].*$/\1/p'` 
+	if [ "$found" = "f" ]; then	
+		for base in $BASELIST; do
+			echo "Executing $create in $base"
+			< "$create"  "${PGBIN}postgres" --single template0 
+		done
+	fi
+done
+			
+
