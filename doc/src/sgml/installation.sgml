@@ -1579,7 +1579,7 @@ All of &productname; is successfully made. Ready to install.
     The standard installation provides all the header files needed for client
     application development as well as for server-side program
     development, such as custom functions or data types written in C.
-    (Prior to <productname>&productname;</> 8.0, a separate <literal>make
+    (Prior to <productname>PostgreSQL</> 8.0, a separate <literal>make
     install-all-headers</> command was needed for the latter, but this
     step has been folded into the standard install.)
    </para>

@@ -1094,7 +1094,7 @@ ALTER OPERATOR FAMILY integer_ops USING btree ADD
 
   <note>
    <para>
-    Prior to <productname>&productname;</productname> 8.3, there was no concept
+    Prior to <productname>PostgreSQL</productname> 8.3, there was no concept
     of operator families, and so any cross-data-type operators intended to be
     used with an index had to be bound directly into the index's operator
     class.  While this approach still works, it is deprecated because it
