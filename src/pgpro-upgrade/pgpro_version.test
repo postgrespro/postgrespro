@@ -1,1 +1,1 @@
-select count(*) > 0 as pgpro_version from pg_proc where  proname = 'pgpro_version';
+SELECT COUNT(*) > 0 AS pgpro_version FROM pg_proc WHERE proname = 'pgpro_version' AND pronamespace = 11;

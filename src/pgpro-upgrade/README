@@ -36,7 +36,7 @@ feature.
 Both files should have same base name and one — extension .test and
 other .sql
 
-1. Script with .sql extension contains usial create commands which would
+1. Script with .sql extension contains usual create commands which would
 create neccessary database object(s).
 
 2. Script with .text extension should contain single select query,

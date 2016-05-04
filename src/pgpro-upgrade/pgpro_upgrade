@@ -52,5 +52,3 @@ for i in "$DIR"/*.test; do
 		done
 	fi
 done
-			
-
