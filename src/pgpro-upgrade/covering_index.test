@@ -1,1 +1,1 @@
-select count(*)=0 from pg_attribute where attname='conincluding';
+select count(*)>0 from pg_attribute where attname='conincluding';
