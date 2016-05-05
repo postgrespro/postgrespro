@@ -1,1 +1,1 @@
-select relnatts=25 from pg_class where relname='pg_constraint';
+select count(*)>0 from pg_attribute where attname='conincluding';
