@@ -92,7 +92,8 @@ sub Install
 	my @client_dirs = ('bin', 'lib', 'share', 'symbols');
 	my @all_dirs = (
 		@client_dirs, 'doc', 'doc/contrib', 'doc/extension', 'share/contrib',
-		'share/extension', 'share/timezonesets', 'share/tsearch_data');
+		'share/extension', 'share/timezonesets', 'share/tsearch_data',
+		'share/pgpro-upgrade');
 	if ($insttype eq "client")
 	{
 		EnsureDirectories($target, @client_dirs);
@@ -175,6 +176,12 @@ sub Install
 			@pldirs);
 		CopySetOfFiles('PL Extension files',
 			$pl_extension_files, $target . '/share/extension/');
+		CopySetOfFiles('Catalog upgrade scripts',
+			[ glob("src\\pgpro-upgrade\\*.sql"),
+			  glob("src\\pgpro-upgrade\\*.test")],
+		      $target . "/share/pgpro-upgrade/");
+		CopyFiles("Upgrade driver script", $target . "/bin/",
+			    "src/pgpro-upgrade/", "pgpro_upgrade");
 	}
 
 	GenerateNLSFiles($target, $config->{nls}, $majorver) if ($config->{nls});
