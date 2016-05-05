@@ -1,0 +1,1 @@
+select relnatts=25 from pg_class where relname='pg_constraint';
