@@ -11,8 +11,8 @@ PGBIN="`echo $0|sed 's![^/\\]*$!!'`"
 echo "$PGBIN"
 
 case "$PGBIN" in
-*/bin/)
-	PGSHARE="`echo $PGBIN|sed 's!bin/$!share!'`"
+*/bin/|*\\bin\\)
+	PGSHARE="`echo $PGBIN|sed 's!bin.$!share!'`"
 	;;
 *) PGBIN=""
 	PGSHARE=""
