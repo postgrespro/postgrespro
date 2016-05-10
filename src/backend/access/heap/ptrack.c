@@ -15,8 +15,8 @@
 #include "storage/smgr.h"
 #include "utils/inval.h"
 #include "utils/array.h"
+#include "utils/relfilenodemap.h"
 #include <unistd.h>
-
 
 /* Effective data size */
 #define MAPSIZE (BLCKSZ - MAXALIGN(SizeOfPageHeaderData))
@@ -252,7 +252,7 @@ ptrack_clear(void)
 			char *map = PageGetContents(page);
 			LockBuffer(buf, BUFFER_LOCK_EXCLUSIVE);
 			START_CRIT_SECTION();
-			MemSet(map, 0, BLCKSZ-MAXALIGN(SizeOfPageHeaderData));
+			MemSet(map, 0, MAPSIZE);
 			MarkBufferDirty(buf);
 			END_CRIT_SECTION_WITHOUT_TRACK();
 			LockBuffer(buf, BUFFER_LOCK_UNLOCK);
@@ -268,6 +268,79 @@ ptrack_clear(void)
 	heap_close(catalog, AccessShareLock);
 
 	SetPtrackClearLSN(false);
+}
+
+/* Get ptrack file as bytea and clear him */
+bytea *
+ptrack_get_and_clear(Oid tablespace_oid, Oid table_oid)
+{
+	bytea *result = NULL;
+	BlockNumber nblock;
+	if (table_oid == InvalidOid)
+	{
+		elog(WARNING, "InvalidOid");
+		goto full_end;
+	}
+	Relation rel = RelationIdGetRelation(RelidByRelfilenode(tablespace_oid,
+															table_oid));
+
+	if (rel == InvalidRelation)
+	{
+		elog(WARNING, "InvalidRelation");
+		goto full_end;
+	}
+
+	RelationOpenSmgr(rel);
+	if (rel->rd_smgr == NULL)
+		goto end_rel;
+
+	LockSmgrForExtension(rel->rd_smgr, ExclusiveLock);
+
+	if (rel->rd_smgr->smgr_ptrack_nblocks == InvalidBlockNumber)
+	{
+		if (smgrexists(rel->rd_smgr, PAGESTRACK_FORKNUM))
+			rel->rd_smgr->smgr_ptrack_nblocks = smgrnblocks(rel->rd_smgr,
+															PAGESTRACK_FORKNUM);
+		else
+			rel->rd_smgr->smgr_ptrack_nblocks = 0;
+	}
+	if (rel->rd_smgr->smgr_ptrack_nblocks == 0)
+	{
+		UnlockSmgrForExtension(rel->rd_smgr, ExclusiveLock);
+		goto end_rel;
+	}
+	result = (bytea *) palloc(rel->rd_smgr->smgr_ptrack_nblocks*MAPSIZE + VARHDRSZ);
+	SET_VARSIZE(result, rel->rd_smgr->smgr_ptrack_nblocks*MAPSIZE + VARHDRSZ);
+
+	for(nblock = 0; nblock < rel->rd_smgr->smgr_ptrack_nblocks; nblock++)
+	{
+		Buffer	buf = ReadBufferExtended(rel, PAGESTRACK_FORKNUM,
+			   nblock, RBM_ZERO_ON_ERROR, NULL);
+		Page page = BufferGetPage(buf);
+		char *map = PageGetContents(page);
+		LockBuffer(buf, BUFFER_LOCK_EXCLUSIVE);
+		START_CRIT_SECTION();
+		memcpy(VARDATA(result) + nblock*MAPSIZE, map, MAPSIZE);
+		MemSet(map, 0, MAPSIZE);
+		MarkBufferDirty(buf);
+		END_CRIT_SECTION_WITHOUT_TRACK();
+		LockBuffer(buf, BUFFER_LOCK_UNLOCK);
+		ReleaseBuffer(buf);
+	}
+
+	UnlockSmgrForExtension(rel->rd_smgr, ExclusiveLock);
+	end_rel:
+		RelationClose(rel);
+
+	SetPtrackClearLSN(false);
+	full_end:
+	if (result == NULL)
+	{
+		result = palloc0(VARHDRSZ);
+		SET_VARSIZE(result, VARHDRSZ);
+	}
+
+	return result;
 }
 
 void
