@@ -115,6 +115,17 @@ pg_ptrack_clear(PG_FUNCTION_ARGS)
 	PG_RETURN_VOID();
 }
 
+Datum
+pg_ptrack_get_and_clear(PG_FUNCTION_ARGS)
+{
+	if (!superuser() && !has_rolreplication(GetUserId()))
+		ereport(ERROR,
+				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+		 (errmsg("must be superuser or replication role to clear ptrack files"))));
+
+	PG_RETURN_BYTEA_P(ptrack_get_and_clear(PG_GETARG_OID(0), PG_GETARG_OID(1)));
+}
+
 /*
  * pg_switch_xlog: switch to next xlog file
  */

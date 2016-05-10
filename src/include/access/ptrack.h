@@ -16,6 +16,7 @@ extern void ptrack_save(void);
 extern void ptrack_add_block(BlockNumber block_number, RelFileNode rel);
 
 extern void ptrack_clear(void);
+extern bytea *ptrack_get_and_clear(Oid tablespace_oid, Oid table_oid);
 extern void assign_ptrack_enable(bool newval, void *extra);
 
-#endif   /* VISIBILITYMAP_H */
+#endif   /* PTRACK_H */
