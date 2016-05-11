@@ -1,7 +1,44 @@
 <!-- doc/src/sgml/release-pro-9.5.sgml -->
 <!-- See header comment in release.sgml about typical markup -->
- <sect1 id="release-pro-9-5-2-3">
- <title>Postgres Pro 9.5.2.3</title>
+<sect1 id="release-pro-9-5-3-1">
+<title>Postgres Pro 9.5.3.1</title>
+<note>
+<title>Release Date</title>
+<simpara>2016-05-12</simpara>
+</note>
+<sect2>
+<title>Overview</title>
+<para>This release is based on <productname>PostgreSQL</productname>
+9.5.3</para>
+<para>Major enhancement in the  <productname>Postgres Pro</productname>
+ 9.5.3.1 over <productname>Postgres Pro</productname> 9.5.2.1 include:
+ </para>
+ <itemizedlist>
+ <listitem><para>
+ Russian translation of documentation is included
+</para></listitem>
+<listitem><para>
+Postgres Pro own system of catalog upgrade is included. 
+</para></listitem>
+<listitem><para>
+Covering indexes ported from 9.6 and upgrade scripts are added. Fixed
+pg_dump of covering indexes.
+</para></listitem>
+<listitem><para>
+Phrase search is now compatible with upcoming 9.6 release
+</para></listitem>
+<listitem><para>
+Added pg_variables contrib module, which provides session-wide
+variables, similar with Oracle package variables
+</para></listitem>
+<listitem><para>
+Lockfree Pin/UnpinBuffer backported from 9.6
+</para></listitem>
+ </itemizedlist>
+</sect2>
+</sect1>
+ <sect1 id="release-pro-9-5-2-1">
+ <title>Postgres Pro 9.5.2.1</title>
  <note>
   <title>Release Date</title>
   <simpara>2016-04-01</simpara>
@@ -12,14 +49,14 @@
  9.5.2.
  </para>
  <para>
- Note that PostgresPro doesn't suffer from abbreviated keys problem,
+ Note that Postgres Pro doesn't suffer from abbreviated keys problem,
  mentioned in the changes of upstream 9.5.2 release. When build with
- <literal>--with-icu</literal> option, PostgresPro doesn't use
+ <literal>--with-icu</literal> option, Postgres Pro doesn't use
  string comparation functions from system C library, and uses portable
  implementations from <productname>libicu</productname>.
  </para>
  <para>Major enhancement in the  <productname>Postgres Pro</productname>
- 9.5.2.3 over <productname>Postgres Pro</productname> 9.5.1.2 include:
+ 9.5.2.1 over <productname>Postgres Pro</productname> 9.5.1.2 include:
  </para>
  <itemizedlist>
  <listitem><para>Include pg_pathman module which provides functions for
