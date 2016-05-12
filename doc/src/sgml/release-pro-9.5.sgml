@@ -115,7 +115,7 @@ Lockfree Pin/UnpinBuffer backported from 9.6
 
    <itemizedlist>
     <listitem><para>
-    Include jsquery module (query language for jsonb fields.
+    Include jsquery module (query language for jsonb fields).
     </para>
     </listitem>
     <listitem>
@@ -134,10 +134,10 @@ Lockfree Pin/UnpinBuffer backported from 9.6
    <title>Changes</title>
    <para>
     Below you will find a detailed account of the changes between
-    <productname>PostgrePro</productname> 9.5.12 and the previous minor
+    <productname>PostgrePro</productname> 9.5.1.2 and the previous minor
     release.
    </para>
-   <sect3><title>Additional modules</title>
+   <sect3><title>Additional Modules</title>
    <itemizedlist>
    <listitem>
    <para>
@@ -185,7 +185,7 @@ Lockfree Pin/UnpinBuffer backported from 9.6
 
     <listitem>
      <para>
-       Scalability improvement for multicore/multeprocessor systems.
+       Scalability improvements for multicore/multeprocessor systems.
      </para>
     </listitem>
     <listitem>
@@ -201,7 +201,7 @@ Lockfree Pin/UnpinBuffer backported from 9.6
     </listitem>
     <listitem>
     <para>
-    Speedup of two-phase commit
+    Speedup of two-phase commit.
     </para>
     </listitem>
     <listitem>
@@ -221,10 +221,10 @@ Lockfree Pin/UnpinBuffer backported from 9.6
      </listitem>
     <listitem>
     <para>Some hunspell dictionaries for full-text search are bundled
-    with distribution</para>
+    with distribution.</para>
     </listitem>
     <listitem>
-    <para>Phrase search support in full text search</para>
+    <para>Phrase search support in full text search.</para>
     </listitem>
 
    </itemizedlist>
@@ -356,7 +356,7 @@ commit [90e649a7afac8c76]   Thu Dec 31 09:52:30 2015 +0300
      </para>
      <para>
       Reviewed by Michael Paquier, Jeff Janes and Andres Freund
-      Performance testing by Jesper Pedersen
+      Performance testing by Jesper Pedersen.
     </para>
     </listitem>
      </itemizedlist>
@@ -375,7 +375,7 @@ commit [90e649a7afac8c76]   Thu Dec 31 09:52:30 2015 +0300
     </listitem>
     <listitem>
     <para>
-    Improved hunspell dictionaries support.  Now it is possible to hunspell
+    Improved hunspell dictionaries support.  Now it is possible to use hunspell
     dictionaries with complex affix files, which were not supported in
     earlier versions. 
     </para>
