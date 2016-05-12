@@ -78,6 +78,24 @@ Lockfree Pin/UnpinBuffer backported from 9.6
  </listitem>
  </itemizedlist>
  </sect2>
+ <sect2>
+ <title>Upgrading from previous releases</title>
+ <para>When upgrading from previous releases of Postgres Pro or from
+ vanilla PostgreSQL 9.5.x, some catalog changes should be applied.
+ </para>
+ <para>If you use binary packages, and your database is in the default
+ location, this upgrade should be performed automatically. If you've
+ compiled Postgres Pro from source or create your database in
+ non-default location, running <literal>initdb</literal> manually, you
+ should run <literal>pgpro_upgrade</literal> script provided in this
+ distribution.
+ </para>
+ <para>Before running script, you should stop postgres service. Script
+ should be run as user, owning the database (typically postgres) and
+ PGDATA environment variable should be set to the directory where
+ database resides.
+ </para>
+ </sect2>
  </sect1>
  <sect1 id="release-pro-9-5-1-2">
  <title>Postgres Pro 9.5.1.2</title>
