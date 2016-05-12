@@ -108,7 +108,7 @@ Lockfree Pin/UnpinBuffer backported from 9.6
 
    <para>
     Major enhancements in <productname>Postgres Pro</> 9.5.1.2 over
-    <productname>PostgrePro</> 9.5.1.1 include:
+    <productname>Postgres Pro</> 9.5.1.1 include:
    </para>
 
    <!-- This list duplicates items below, but without authors or details-->
@@ -134,7 +134,7 @@ Lockfree Pin/UnpinBuffer backported from 9.6
    <title>Changes</title>
    <para>
     Below you will find a detailed account of the changes between
-    <productname>PostgrePro</productname> 9.5.1.2 and the previous minor
+    <productname>Postgres Pro</productname> 9.5.1.2 and the previous minor
     release.
    </para>
    <sect3><title>Additional Modules</title>
@@ -254,8 +254,8 @@ Lockfree Pin/UnpinBuffer backported from 9.6
 
    <para>
     Below you will find a detailed account of the changes between
-    <productname>PostgrePro</productname> 9.5 and the previous major
-    release.
+    <productname>Postgres Pro</productname> 9.5 and <productname>PostgreSQL 
+    </productname> 9.5.
    </para>
 
    <sect3>
