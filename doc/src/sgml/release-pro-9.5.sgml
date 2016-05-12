@@ -72,8 +72,8 @@ Lockfree Pin/UnpinBuffer backported from 9.6
  <literal>version()</> SQL function now returns <literal>PostgreSQL
  9.5.2</literal>, as in vanilla PostgreSQL, because some client frameworks
  such as <productname>SQL Alchemy</productname> are confused seeing
- PostgresPro here. Function <literal>pgpro_version</literal> is provided
- to report PostgresPro release.
+ Postgres Pro here. Function <literal>pgpro_version</literal> is provided
+ to report Postgres Pro release.
  </para>
  </listitem>
  </itemizedlist>
@@ -237,7 +237,7 @@ Lockfree Pin/UnpinBuffer backported from 9.6
 
   <sect2>
 
-  <title>Migration to PostgresPro 9.5</title>
+  <title>Migration to Postgres Pro 9.5</title>
    <para>
     A dump/restore using <xref linkend="app-pg-dumpall">, or use
     of <xref linkend="pgupgrade">, is required for those wishing to migrate
@@ -245,7 +245,7 @@ Lockfree Pin/UnpinBuffer backported from 9.6
    </para>
     <para>
     Dump/restore is not neccessary when migrating from PostgreSQL 9.5 to
-    PostgresPro 9.5.
+    Postgres Pro 9.5.
     </para>
   </sect2>
 
