@@ -130,6 +130,7 @@ CREATE EXTENSION <replaceable>module_name</> FROM unpackaged;
  &pgbuffercache;
  &pgcrypto;
  &pgfreespacemap;
+ &pgpathman;
  &pgprewarm;
  &pgrowlocks;
  &pgstatstatements;
