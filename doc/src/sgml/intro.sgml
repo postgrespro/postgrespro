@@ -158,7 +158,7 @@
   <title> Difference between <productname>&productname;</productname> and PostgreSQL</title>
 
   <para>
-	<productname>&productname;</productname> is the most actual PostgreSQL version with some additional patches applied and extensions added.
+    <productname>&productname;</productname> is the most actual PostgreSQL version with some additional patches applied and extensions added.
       Mostly, these are patches already accepted by the PostgreSQL community and committed into PostgreSQL. 
       Also there some patches and extensions developed by Postgres Professional.
       Users of <productname>&productname;</productname> thus have early access to some important features and fixes.
@@ -174,10 +174,10 @@
      <simpara>Covering indexes</simpara>
      <simpara><application>libicu</application> support on all platforms, providing platform-independent sort for various locales.</simpara>
      <simpara><application>pg_trgm</application> module supporting fuzzy string comparison and substring search.</simpara>
-     <simpara>Improved <application>pageinspect</applicaiton> module provides access to internal data storage structure.</simpara>
-     <simpara><application>sr_plan</applicaiton> module allows to save and restore query plans.</simpara>
-     <simpara><application>dump_stat</applicaiton> module allowing to save and restore database statistics when dumping/restoring the database. </simpara>
-     <simpara><application>jsquery</applicaiton> module provides a specific language for effective index-supported querying of JSONB data.</simpara>
+     <simpara>Improved <application>pageinspect</application> module provides access to internal data storage structure.</simpara>
+     <simpara><application>sr_plan</application> module allows to save and restore query plans.</simpara>
+     <simpara><application>dump_stat</application> module allowing to save and restore database statistics when dumping/restoring the database. </simpara>
+     <simpara><application>jsquery</application> module provides a specific language for effective index-supported querying of JSONB data.</simpara>
 
     </listitem>
    </itemizedlist>
