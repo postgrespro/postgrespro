@@ -168,17 +168,32 @@
    <itemizedlist spacing="compact">
     <listitem>
      <simpara>Performance improvement on multicore systems (buffer manager and locks optimization).</simpara>
+    </listitem>
+    <listitem>
      <simpara>Full text search improvements: phrase search, hunspell morphology, 
               some dictionaries are bundled with distribution and can be enabled by a single SQL statement, 
               <application>shared_ispell</application> allowing to store dictionaries in shared memory.</simpara>
+    </listitem>
+    <listitem>
      <simpara>Covering indexes.</simpara>
+    </listitem>
+    <listitem>
      <simpara><application>libicu</application> support on all platforms, providing platform-independent sort for various locales.</simpara>
+    </listitem>
+    <listitem>
      <simpara><application>pg_trgm</application> module supporting fuzzy string comparison and substring search.</simpara>
+    </listitem>
+    <listitem>
      <simpara>Improved <application>pageinspect</application> module provides access to internal data storage structure.</simpara>
+    </listitem>
+    <listitem>
      <simpara><application>sr_plan</application> module allows to save and restore query plans.</simpara>
+    </listitem>
+    <listitem>
      <simpara><application>dump_stat</application> module allowing to save and restore database statistics when dumping/restoring the database. </simpara>
+    </listitem>
+    <listitem>
      <simpara><application>jsquery</application> module provides a specific language for effective index-supported querying of JSONB data.</simpara>
-
     </listitem>
    </itemizedlist>
   </para>
