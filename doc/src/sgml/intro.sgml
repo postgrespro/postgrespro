@@ -171,7 +171,7 @@
      <simpara>Full text search improvements: phrase search, hunspell morphology, 
               some dictionaries are bundled with distribution and can be enabled by a single SQL statement, 
               <application>shared_ispell</application> allowing to store dictionaries in shared memory.</simpara>
-     <simpara>Covering indexes</simpara>
+     <simpara>Covering indexes.</simpara>
      <simpara><application>libicu</application> support on all platforms, providing platform-independent sort for various locales.</simpara>
      <simpara><application>pg_trgm</application> module supporting fuzzy string comparison and substring search.</simpara>
      <simpara>Improved <application>pageinspect</application> module provides access to internal data storage structure.</simpara>
