@@ -344,18 +344,15 @@ su - postgres
   <para>
    The <productname>&productname;</> &version; sources can be obtained from the
    download section of our
-   website: <ulink url="http://www.postgresql.org/download/"></ulink>.  You
-   should get a file named <filename>postgresql-&version;.tar.gz</filename>
-   or <filename>postgresql-&version;.tar.bz2</filename>. After
+   website: <ulink url="http://www.postgrespro.ru/download/latest"></ulink>.  You
+   should get a file named <filename>postgrespro-&version;.tar.bz2</filename> . After
    you have obtained the file, unpack it:
 <screen>
-<userinput>gunzip postgresql-&version;.tar.gz</userinput>
-<userinput>tar xf postgresql-&version;.tar</userinput>
+<userinput>bunzip2 postgrespro-&version;.tar.bz2</userinput>
+<userinput>tar xf postgrespro-&version;.tar</userinput>
 </screen>
-   (Use <command>bunzip2</command> instead of <command>gunzip</command> if you
-   have the <filename>.bz2</filename> file.)
    This will create a directory
-   <filename>postgresql-&version;</filename> under the current directory
+   <filename>postgrespro-&version;</filename> under the current directory
    with the <productname>&productname;</> sources.
    Change into that directory for the rest
    of the installation procedure.
