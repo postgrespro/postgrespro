@@ -27,6 +27,10 @@ because it starts postgres in single-user mode to perform upgrades.
 It is safe to invoke script multiple times, because it does check for
 features it is going to add.
 
+If script is invoked with **--check** argument, it doesn't do any
+changes in the database, just returns 0 if no changes is needed, 
+and 1 if base needs to be upgraded.
+
 HOW TO ADD NEW FEATURE
 ----------------------
 
@@ -43,4 +47,17 @@ create neccessary database object(s).
 which returns single boolean value (i.e. one column and one row). This
 value should be 'f' if feature is not found in the database and should
 be installed, and 't' if it already exists.
+
+Note that scirpts are invoked using postgres single-user mode, not using
+psql. So, each SQL statement should be in one line or line endings
+should be \ esaped.
+
+Last line of the script should contain newline at the end.
+
+Script naming convention
+------------------------
+
+Scripts are executed in the lexicographical order of their names.
+So, please start name of script with 3-digit number, next one to last
+used, followed by dash.
 

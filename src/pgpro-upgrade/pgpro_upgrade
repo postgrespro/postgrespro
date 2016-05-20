@@ -4,10 +4,14 @@
 # 3. sed 
 if [ -z "$PGDATA" ]; then
 	echo "PGDATA environment variable is not set. Stop." 1>&2
-	exit 1
+	exit 2
 fi
 PGBIN="`echo $0|sed 's![^/\\]*$!!'`"
-
+if [ "$1" = "--check" ]; then
+   check=1
+else
+   check=
+fi
 echo "$PGBIN"
 
 case "$PGBIN" in
@@ -38,17 +42,31 @@ if [ -z "$BASELIST" ]; then
 	exit 1
 fi
 
-echo "Upgrading databases $BASELIST"
+[ -z "$check" ]&& echo "Upgrading databases $BASELIST"
 
 #Search for upgrade scripts
+need_upgrade=0
 for i in "$DIR"/*.test; do
-	create="`echo "$i" |sed 's/\.test$/.sql/'`"
 	found=`< "$i"  "${PGBIN}postgres" --single template0 | 
 		sed -n 's/^[	 ]*1: [^ ]* = "\([ft]\)"[ 	].*$/\1/p'` 
 	if [ "$found" = "f" ]; then	
-		for base in $BASELIST; do
-			echo "Executing $create in $base"
-			< "$create"  "${PGBIN}postgres" --single "$base"
-		done
+		if [ -z "$check" ]; then
+			create="`echo "$i" |sed 's/\.test$/.sql/'`"
+			for base in $BASELIST; do
+				echo "Executing $create in $base"
+				< "$create"  "${PGBIN}postgres" --single "$base" >/dev/null
+
+			done
+		else 
+			need_upgrade=1
+		fi
 	fi
 done
+if [ -n "$check" ]; then
+	if [ $need_upgrade -eq 0 ]; then
+		echo "All Postgres Pro specific updates are appied" 1>&2
+	else
+		echo "Database needs upgrade"
+	fi
+	exit $need_upgrade
+fi
