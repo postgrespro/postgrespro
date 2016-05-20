@@ -23,7 +23,7 @@ case "$PGBIN" in
 ;;
 esac
 
-for dir in "$PGSHARE" /usr/pgsql-9.5/share /usr/share/postgresql/9.5 /usr/pgsql/9.5/share /usr/share/pgsql ; do
+for dir in "$PGSHARE" /usr/pgsql-9.5/share /usr/share/postgresql/9.5 /usr/pgsql/9.5/share /usr/share/pgsql /usr/share/postgrespro95  ; do
 	if [ -d "$dir/pgpro-upgrade" ]; then
 		DIR="$dir/pgpro-upgrade"
 		break
