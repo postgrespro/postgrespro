@@ -350,7 +350,7 @@
     expression that contains both NULL and non-null values will return false
     for both tests.
     This definition conforms to the SQL standard, and is a change from the
-    inconsistent behavior exhibited by <productname>&productname;</productname>
+    inconsistent behavior exhibited by <productname>PostgreSQL</productname>
     versions prior to 8.2.
    </para>
   </note>
@@ -14452,7 +14452,7 @@ AND
 
   <note>
    <para>
-    Prior to <productname>PosgreSQL</productname> 8.2, the
+    Prior to <productname>PostgreSQL</productname> 8.2, the
     <literal>&lt;</>, <literal>&lt;=</>, <literal>&gt;</> and <literal>&gt;=</>
     cases were not handled per SQL specification.  A comparison like
     <literal>ROW(a,b) &lt; ROW(c,d)</>
