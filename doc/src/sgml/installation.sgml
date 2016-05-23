@@ -2711,7 +2711,7 @@ PHSS_30849  s700_800 u2comp/be/plugin library Patch
 
     <para>
      By default, the &productname; man pages are installed into
-     <filename>/usr/local/pgsql/man</filename>.  By default, UnixWare
+     <filename>/usr/local/pgsql/share/man</filename>.  By default, UnixWare
      does not look there for man pages.  To be able to read them you
      need to modify the
      <varname>MANPATH</varname> variable

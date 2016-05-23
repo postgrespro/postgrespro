@@ -14961,7 +14961,7 @@ SELECT * FROM pg_ls_dir('.') WITH ORDINALITY AS t(ls,n);
       <row>
        <entry><literal><function>version()</function></literal></entry>
        <entry><type>text</type></entry>
-       <entry>PostgreSQL version information. See also <xref linkend="guc-server-version-num"> for a machine-readable version.</entry>
+       <entry><productname>PostgreSQL</productname> version information. See also <xref linkend="guc-server-version-num"> for a machine-readable version.</entry>
       </row>
 
       <row>
