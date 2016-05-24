@@ -81,7 +81,7 @@
   for Windows Desktop</productname> or those in the <productname>Windows SDK
   7.1</productname>, which are both free downloads from Microsoft.
  </para>
-  <para>>
+  <para>
   Both 32-bit and 64-bit builds are possible with the Microsoft Compiler suite.
   32-bit <productname>&productname;</productname> builds are possible with
   <productname>Visual Studio 2005</productname> to
