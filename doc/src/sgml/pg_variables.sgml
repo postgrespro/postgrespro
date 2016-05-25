@@ -388,6 +388,10 @@
           </tbody>
         </tgroup>
       </informaltable>
+      <para>
+        Note that <literal>pgv_stats()</literal> works only with the
+        PostgreSQL 9.6 and newer.
+      </para>
     </sect3>
   </sect2>
   <sect2 id="pg-variables-examples">
