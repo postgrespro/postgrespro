@@ -3,7 +3,7 @@
   <sect2 id="pg-varaibles-introduction">
     <title>Introduction</title>
     <para>
-      The <emphasis role="strong">pg_variables</emphasis> module
+      The <filename>pg_variables</filename> module
       provides functions to work with variables of various types.
       Created variables live only in the current user session.
     </para>
@@ -497,8 +497,7 @@ SELECT pgv_get_int('vars', 'int2');
 (1 row)
 </programlisting>
     <para>
-      Let's assume we have a <emphasis role="strong">tab</emphasis>
-      table:
+      Let's assume we have a <varname>tab</varname> table:
     </para>
     <programlisting>
 CREATE TABLE tab (id int, t varchar);
@@ -567,7 +566,7 @@ SELECT * FROM pgv_stats() order by package;
 (1 row)
 </programlisting>
     <para>
-      You can delete variables or hole packages:
+      You can delete variables or whole packages:
     </para>
     <programlisting>
 SELECT pgv_remove('vars', 'int1');

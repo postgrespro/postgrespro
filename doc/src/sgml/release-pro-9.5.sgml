@@ -1,7 +1,62 @@
 <!-- doc/src/sgml/release-pro-9.5.sgml -->
 <!-- See header comment in release.sgml about typical markup -->
- <sect1 id="release-pro-9-5-2-3">
- <title>Postgres Pro 9.5.2.3</title>
+<sect1 id="release-pro-9-5-3-1">
+<title>Postgres Pro 9.5.3.1</title>
+<note>
+<title>Release Date</title>
+<simpara>2016-05-12</simpara>
+</note>
+<sect2>
+<title>Overview</title>
+<para>This release is based on <productname>PostgreSQL</productname>
+9.5.3</para>
+<para>Major enhancement in the  <productname>Postgres Pro</productname>
+ 9.5.3.1 over <productname>Postgres Pro</productname> 9.5.2.1 include:
+ </para>
+ <itemizedlist>
+ <listitem><para>
+ Russian translation of documentation is included
+</para></listitem>
+<listitem><para>
+Postgres Pro own system of catalog upgrade is included. 
+</para></listitem>
+<listitem><para>
+Covering indexes ported from 9.6 and upgrade scripts are added. Fixed
+pg_dump of covering indexes.
+</para></listitem>
+<listitem><para>
+Phrase search is now compatible with upcoming 9.6 release
+</para></listitem>
+<listitem><para>
+Added pg_variables contrib module, which provides session-wide
+variables, similar with Oracle package variables
+</para></listitem>
+<listitem><para>
+Lockfree Pin/UnpinBuffer backported from 9.6
+</para></listitem>
+ </itemizedlist>
+</sect2>
+ <sect2>
+ <title>Upgrading from previous releases</title>
+ <para>When upgrading from previous releases of Postgres Pro or from
+ vanilla PostgreSQL 9.5.x, some catalog changes should be applied.
+ </para>
+ <para>If you use binary packages, and your database is in the default
+ location, this upgrade should be performed automatically. If you've
+ compiled Postgres Pro from source or create your database in
+ non-default location, running <literal>initdb</literal> manually, you
+ should run <literal>pgpro_upgrade</literal> script provided in this
+ distribution.
+ </para>
+ <para>Before running script, you should stop postgres service. Script
+ should be run as user, owning the database (typically postgres) and
+ PGDATA environment variable should be set to the directory where
+ database resides.
+ </para>
+ </sect2>
+</sect1>
+ <sect1 id="release-pro-9-5-2-1">
+ <title>Postgres Pro 9.5.2.1</title>
  <note>
   <title>Release Date</title>
   <simpara>2016-04-01</simpara>
@@ -12,14 +67,14 @@
  9.5.2.
  </para>
  <para>
- Note that PostgresPro doesn't suffer from abbreviated keys problem,
+ Note that Postgres Pro doesn't suffer from abbreviated keys problem,
  mentioned in the changes of upstream 9.5.2 release. When build with
- <literal>--with-icu</literal> option, PostgresPro doesn't use
+ <literal>--with-icu</literal> option, Postgres Pro doesn't use
  string comparation functions from system C library, and uses portable
  implementations from <productname>libicu</productname>.
  </para>
  <para>Major enhancement in the  <productname>Postgres Pro</productname>
- 9.5.2.3 over <productname>Postgres Pro</productname> 9.5.1.2 include:
+ 9.5.2.1 over <productname>Postgres Pro</productname> 9.5.1.2 include:
  </para>
  <itemizedlist>
  <listitem><para>Include pg_pathman module which provides functions for
@@ -35,8 +90,8 @@
  <literal>version()</> SQL function now returns <literal>PostgreSQL
  9.5.2</literal>, as in vanilla PostgreSQL, because some client frameworks
  such as <productname>SQL Alchemy</productname> are confused seeing
- PostgresPro here. Function <literal>pgpro_version</literal> is provided
- to report PostgresPro release.
+ Postgres Pro here. Function <literal>pgpro_version</literal> is provided
+ to report Postgres Pro release.
  </para>
  </listitem>
  </itemizedlist>
@@ -53,14 +108,14 @@
 
    <para>
     Major enhancements in <productname>Postgres Pro</> 9.5.1.2 over
-    <productname>PostgrePro</> 9.5.1.1 include:
+    <productname>Postgres Pro</> 9.5.1.1 include:
    </para>
 
    <!-- This list duplicates items below, but without authors or details-->
 
    <itemizedlist>
     <listitem><para>
-    Include jsquery module (query language for jsonb fields.
+    Include jsquery module (query language for jsonb fields).
     </para>
     </listitem>
     <listitem>
@@ -79,10 +134,10 @@
    <title>Changes</title>
    <para>
     Below you will find a detailed account of the changes between
-    <productname>PostgrePro</productname> 9.5.12 and the previous minor
+    <productname>Postgres Pro</productname> 9.5.1.2 and the previous minor
     release.
    </para>
-   <sect3><title>Additional modules</title>
+   <sect3><title>Additional Modules</title>
    <itemizedlist>
    <listitem>
    <para>
@@ -130,7 +185,7 @@
 
     <listitem>
      <para>
-       Scalability improvement for multicore/multeprocessor systems.
+       Scalability improvements for multicore/multeprocessor systems.
      </para>
     </listitem>
     <listitem>
@@ -146,7 +201,7 @@
     </listitem>
     <listitem>
     <para>
-    Speedup of two-phase commit
+    Speedup of two-phase commit.
     </para>
     </listitem>
     <listitem>
@@ -166,10 +221,10 @@
      </listitem>
     <listitem>
     <para>Some hunspell dictionaries for full-text search are bundled
-    with distribution</para>
+    with distribution.</para>
     </listitem>
     <listitem>
-    <para>Phrase search support in full text search</para>
+    <para>Phrase search support in full text search.</para>
     </listitem>
 
    </itemizedlist>
@@ -182,7 +237,7 @@
 
   <sect2>
 
-  <title>Migration to PostgresPro 9.5</title>
+  <title>Migration to Postgres Pro 9.5</title>
    <para>
     A dump/restore using <xref linkend="app-pg-dumpall">, or use
     of <xref linkend="pgupgrade">, is required for those wishing to migrate
@@ -190,7 +245,7 @@
    </para>
     <para>
     Dump/restore is not neccessary when migrating from PostgreSQL 9.5 to
-    PostgresPro 9.5.
+    Postgres Pro 9.5.
     </para>
   </sect2>
 
@@ -199,8 +254,8 @@
 
    <para>
     Below you will find a detailed account of the changes between
-    <productname>PostgrePro</productname> 9.5 and the previous major
-    release.
+    <productname>Postgres Pro</productname> 9.5 and <productname>PostgreSQL 
+    </productname> 9.5.
    </para>
 
    <sect3>
@@ -301,7 +356,7 @@ commit [90e649a7afac8c76]   Thu Dec 31 09:52:30 2015 +0300
      </para>
      <para>
       Reviewed by Michael Paquier, Jeff Janes and Andres Freund
-      Performance testing by Jesper Pedersen
+      Performance testing by Jesper Pedersen.
     </para>
     </listitem>
      </itemizedlist>
@@ -320,7 +375,7 @@ commit [90e649a7afac8c76]   Thu Dec 31 09:52:30 2015 +0300
     </listitem>
     <listitem>
     <para>
-    Improved hunspell dictionaries support.  Now it is possible to hunspell
+    Improved hunspell dictionaries support.  Now it is possible to use hunspell
     dictionaries with complex affix files, which were not supported in
     earlier versions. 
     </para>

@@ -7907,7 +7907,7 @@ testlibpq.o(.text+0xa4): undefined reference to `PQerrorMessage'
 /*
  * testlibpq.c
  *
- *      Test the C version of libpq, the &productname; frontend library.
+ *      Test the C version of libpq, the Postgres Pro frontend library.
  */
 #include <stdio.h>
 #include <stdlib.h>
