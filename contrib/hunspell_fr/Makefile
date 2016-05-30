@@ -1,7 +1,7 @@
 EXTENSION = hunspell_fr
-DATA = sql/hunspell_fr--1.0.sql
+DATA = hunspell_fr--1.0.sql
 
-DATA_TSEARCH = dict/fr.affix dict/fr.dict
+DATA_TSEARCH = fr.affix fr.dict
 
 REGRESS = hunspell_fr
 

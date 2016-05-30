@@ -1,11 +1,9 @@
 EXTENSION = hunspell_ru_ru
-DATA = sql/hunspell_ru_ru--1.0.sql
+DATA = hunspell_ru_ru--1.0.sql
 
-DATA_TSEARCH = dict/ru_ru.affix dict/ru_ru.dict
+DATA_TSEARCH = ru_ru.affix ru_ru.dict
 
 REGRESS = hunspell_ru_ru
-
-EXTRA_REGRESS_OPTS=--encoding=UTF8
 
 ifdef USE_PGXS
 PG_CONFIG = pg_config
