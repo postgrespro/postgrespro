@@ -255,7 +255,6 @@ static bool nonemptyReloptions(const char *reloptions);
 static void fmtReloptionsArray(Archive *fout, PQExpBuffer buffer,
 				   const char *reloptions, const char *prefix);
 static char *get_synchronized_snapshot(Archive *fout);
-static PGresult *ExecuteSqlQueryForSingleRow(Archive *fout, char *query);
 static void setupDumpWorker(Archive *AHX);
 
 
@@ -579,11 +578,20 @@ main(int argc, char **argv)
 	/* Custom and directory formats are compressed by default, others not */
 	if (compressLevel == -1)
 	{
+#ifdef HAVE_LIBZ
 		if (archiveFormat == archCustom || archiveFormat == archDirectory)
 			compressLevel = Z_DEFAULT_COMPRESSION;
 		else
+#endif
 			compressLevel = 0;
 	}
+
+#ifndef HAVE_LIBZ
+	if (compressLevel != 0)
+		write_msg(NULL, "WARNING: requested compression not available in this "
+				  "installation -- archive will be uncompressed\n");
+	compressLevel = 0;
+#endif
 
 	/*
 	 * On Windows we can only have at most MAXIMUM_WAIT_OBJECTS (= 64 usually)
@@ -638,23 +646,11 @@ main(int argc, char **argv)
 		dopt.no_security_labels = 1;
 
 	/*
-	 * When running against 9.0 or later, check if we are in recovery mode,
-	 * which means we are on a hot standby.
+	 * On hot standby slaves, never try to dump unlogged table data, since it
+	 * will just throw an error.
 	 */
-	if (fout->remoteVersion >= 90000)
-	{
-		PGresult   *res = ExecuteSqlQueryForSingleRow(fout, "SELECT pg_catalog.pg_is_in_recovery()");
-
-		if (strcmp(PQgetvalue(res, 0, 0), "t") == 0)
-		{
-			/*
-			 * On hot standby slaves, never try to dump unlogged table data,
-			 * since it will just throw an error.
-			 */
-			dopt.no_unlogged_table_data = true;
-		}
-		PQclear(res);
-	}
+	if (fout->isStandby)
+		dopt.no_unlogged_table_data = true;
 
 	/* Select the appropriate subquery to convert user IDs to names */
 	if (fout->remoteVersion >= 80100)
@@ -1079,7 +1075,16 @@ setup_connection(Archive *AH, const char *dumpencoding,
 	else if (AH->numWorkers > 1 &&
 			 AH->remoteVersion >= 90200 &&
 			 !dopt->no_synchronized_snapshots)
+	{
+		if (AH->isStandby)
+			exit_horribly(NULL,
+			 "Synchronized snapshots are not supported on standby servers.\n"
+						  "Run with --no-synchronized-snapshots instead if you do not need\n"
+						  "synchronized snapshots.\n");
+
+
 		AH->sync_snapshot_id = get_synchronized_snapshot(AH);
+	}
 }
 
 static void
@@ -5387,7 +5392,8 @@ getIndexes(Archive *fout, TableInfo tblinfo[], int numTables)
 				i_oid,
 				i_indexname,
 				i_indexdef,
-				i_indnkeys,
+				i_indnnkeyatts,
+				i_indnatts,
 				i_indkey,
 				i_indisclustered,
 				i_indisreplident,
@@ -5438,7 +5444,42 @@ getIndexes(Archive *fout, TableInfo tblinfo[], int numTables)
 		 * is not.
 		 */
 		resetPQExpBuffer(query);
-		if (fout->remoteVersion >= 90400)
+		if (fout->remoteVersion >= 90502)
+		{
+			/*
+			 * In PGPRO_9.5.2 we add INCLUDING columns functionality
+			 * that requires new fields to be added.
+			 * i.indnkeyatts is new, and besides we should use
+			 * i.indnatts instead of t.relnatts for index relations.
+			 *
+			 */
+			appendPQExpBuffer(query,
+							  "SELECT t.tableoid, t.oid, "
+							  "t.relname AS indexname, "
+					 "pg_catalog.pg_get_indexdef(i.indexrelid) AS indexdef, "
+							  "i.indnkeyatts AS indnkeyatts, "
+							  "i.indnatts AS indnatts, "
+							  "i.indkey, i.indisclustered, "
+							  "i.indisreplident, t.relpages, "
+							  "c.contype, c.conname, "
+							  "c.condeferrable, c.condeferred, "
+							  "c.tableoid AS contableoid, "
+							  "c.oid AS conoid, "
+				  "pg_catalog.pg_get_constraintdef(c.oid, false) AS condef, "
+							  "(SELECT spcname FROM pg_catalog.pg_tablespace s WHERE s.oid = t.reltablespace) AS tablespace, "
+							  "t.reloptions AS indreloptions "
+							  "FROM pg_catalog.pg_index i "
+					  "JOIN pg_catalog.pg_class t ON (t.oid = i.indexrelid) "
+							  "LEFT JOIN pg_catalog.pg_constraint c "
+							  "ON (i.indrelid = c.conrelid AND "
+							  "i.indexrelid = c.conindid AND "
+							  "c.contype IN ('p','u','x')) "
+							  "WHERE i.indrelid = '%u'::pg_catalog.oid "
+							  "AND i.indisvalid AND i.indisready "
+							  "ORDER BY indexname",
+							  tbinfo->dobj.catId.oid);
+		}
+		else if (fout->remoteVersion >= 90400)
 		{
 			/*
 			 * the test on indisready is necessary in 9.2, and harmless in
@@ -5448,6 +5489,8 @@ getIndexes(Archive *fout, TableInfo tblinfo[], int numTables)
 							  "SELECT t.tableoid, t.oid, "
 							  "t.relname AS indexname, "
 					 "pg_catalog.pg_get_indexdef(i.indexrelid) AS indexdef, "
+							  "NULL AS indnkeyatts, "
+							  "NULL AS indnatts, "
 							  "t.relnatts AS indnkeys, "
 							  "i.indkey, i.indisclustered, "
 							  "i.indisreplident, t.relpages, "
@@ -5479,6 +5522,8 @@ getIndexes(Archive *fout, TableInfo tblinfo[], int numTables)
 							  "SELECT t.tableoid, t.oid, "
 							  "t.relname AS indexname, "
 					 "pg_catalog.pg_get_indexdef(i.indexrelid) AS indexdef, "
+							  "NULL AS indnkeyatts, "
+							  "NULL AS indnatts, "
 							  "t.relnatts AS indnkeys, "
 							  "i.indkey, i.indisclustered, "
 							  "false AS indisreplident, t.relpages, "
@@ -5506,6 +5551,8 @@ getIndexes(Archive *fout, TableInfo tblinfo[], int numTables)
 							  "SELECT t.tableoid, t.oid, "
 							  "t.relname AS indexname, "
 					 "pg_catalog.pg_get_indexdef(i.indexrelid) AS indexdef, "
+							  "NULL AS indnkeyatts, "
+							  "NULL AS indnatts, "
 							  "t.relnatts AS indnkeys, "
 							  "i.indkey, i.indisclustered, "
 							  "false AS indisreplident, t.relpages, "
@@ -5536,6 +5583,8 @@ getIndexes(Archive *fout, TableInfo tblinfo[], int numTables)
 							  "SELECT t.tableoid, t.oid, "
 							  "t.relname AS indexname, "
 					 "pg_catalog.pg_get_indexdef(i.indexrelid) AS indexdef, "
+							  "NULL AS indnkeyatts, "
+							  "NULL AS indnatts, "
 							  "t.relnatts AS indnkeys, "
 							  "i.indkey, i.indisclustered, "
 							  "false AS indisreplident, t.relpages, "
@@ -5565,6 +5614,8 @@ getIndexes(Archive *fout, TableInfo tblinfo[], int numTables)
 							  "SELECT t.tableoid, t.oid, "
 							  "t.relname AS indexname, "
 					 "pg_catalog.pg_get_indexdef(i.indexrelid) AS indexdef, "
+							  "NULL AS indnkeyatts, "
+							  "NULL AS indnatts, "
 							  "t.relnatts AS indnkeys, "
 							  "i.indkey, i.indisclustered, "
 							  "false AS indisreplident, t.relpages, "
@@ -5594,6 +5645,8 @@ getIndexes(Archive *fout, TableInfo tblinfo[], int numTables)
 							  "SELECT t.tableoid, t.oid, "
 							  "t.relname AS indexname, "
 							  "pg_get_indexdef(i.indexrelid) AS indexdef, "
+							  "NULL AS indnkeyatts, "
+							  "NULL AS indnatts, "
 							  "t.relnatts AS indnkeys, "
 							  "i.indkey, false AS indisclustered, "
 							  "false AS indisreplident, t.relpages, "
@@ -5621,6 +5674,8 @@ getIndexes(Archive *fout, TableInfo tblinfo[], int numTables)
 							  "t.oid, "
 							  "t.relname AS indexname, "
 							  "pg_get_indexdef(i.indexrelid) AS indexdef, "
+							  "NULL AS indnkeyatts, "
+							  "NULL AS indnatts, "
 							  "t.relnatts AS indnkeys, "
 							  "i.indkey, false AS indisclustered, "
 							  "false AS indisreplident, t.relpages, "
@@ -5649,7 +5704,8 @@ getIndexes(Archive *fout, TableInfo tblinfo[], int numTables)
 		i_oid = PQfnumber(res, "oid");
 		i_indexname = PQfnumber(res, "indexname");
 		i_indexdef = PQfnumber(res, "indexdef");
-		i_indnkeys = PQfnumber(res, "indnkeys");
+		i_indnnkeyatts = PQfnumber(res, "indnkeyatts");
+		i_indnatts = PQfnumber(res, "indnatts");
 		i_indkey = PQfnumber(res, "indkey");
 		i_indisclustered = PQfnumber(res, "indisclustered");
 		i_indisreplident = PQfnumber(res, "indisreplident");
@@ -5679,7 +5735,8 @@ getIndexes(Archive *fout, TableInfo tblinfo[], int numTables)
 			indxinfo[j].dobj.namespace = tbinfo->dobj.namespace;
 			indxinfo[j].indextable = tbinfo;
 			indxinfo[j].indexdef = pg_strdup(PQgetvalue(res, j, i_indexdef));
-			indxinfo[j].indnkeys = atoi(PQgetvalue(res, j, i_indnkeys));
+			indxinfo[j].indnkeyattrs = atoi(PQgetvalue(res, j, i_indnnkeyatts));
+			indxinfo[j].indnattrs = atoi(PQgetvalue(res, j, i_indnatts));
 			indxinfo[j].tablespace = pg_strdup(PQgetvalue(res, j, i_tablespace));
 			indxinfo[j].indreloptions = pg_strdup(PQgetvalue(res, j, i_indreloptions));
 
@@ -11522,9 +11579,7 @@ dumpOpclass(Archive *fout, OpclassInfo *opcinfo)
 	appendPQExpBuffer(q, "FOR TYPE %s USING %s",
 					  opcintype,
 					  fmtId(amname));
-	if (strlen(opcfamilyname) > 0 &&
-		(strcmp(opcfamilyname, opcinfo->dobj.name) != 0 ||
-		 strcmp(opcfamilynsp, opcinfo->dobj.namespace->dobj.name) != 0))
+	if (strlen(opcfamilyname) > 0)
 	{
 		appendPQExpBufferStr(q, " FAMILY ");
 		if (strcmp(opcfamilynsp, opcinfo->dobj.namespace->dobj.name) != 0)
@@ -11808,15 +11863,6 @@ dumpOpfamily(Archive *fout, OpfamilyInfo *opfinfo)
 	if (!opfinfo->dobj.dump || dopt->dataOnly)
 		return;
 
-	/*
-	 * We want to dump the opfamily only if (1) it contains "loose" operators
-	 * or functions, or (2) it contains an opclass with a different name or
-	 * owner.  Otherwise it's sufficient to let it be created during creation
-	 * of the contained opclass, and not dumping it improves portability of
-	 * the dump.  Since we have to fetch the loose operators/funcs anyway, do
-	 * that first.
-	 */
-
 	query = createPQExpBuffer();
 	q = createPQExpBuffer();
 	delq = createPQExpBuffer();
@@ -11898,40 +11944,6 @@ dumpOpfamily(Archive *fout, OpfamilyInfo *opfinfo)
 					  opfinfo->dobj.catId.oid);
 
 	res_procs = ExecuteSqlQuery(fout, query->data, PGRES_TUPLES_OK);
-
-	if (PQntuples(res_ops) == 0 && PQntuples(res_procs) == 0)
-	{
-		/* No loose members, so check contained opclasses */
-		resetPQExpBuffer(query);
-
-		appendPQExpBuffer(query, "SELECT 1 "
-						  "FROM pg_catalog.pg_opclass c, pg_catalog.pg_opfamily f, pg_catalog.pg_depend "
-						  "WHERE f.oid = '%u'::pg_catalog.oid "
-			"AND refclassid = 'pg_catalog.pg_opfamily'::pg_catalog.regclass "
-						  "AND refobjid = f.oid "
-				"AND classid = 'pg_catalog.pg_opclass'::pg_catalog.regclass "
-						  "AND objid = c.oid "
-						  "AND (opcname != opfname OR opcnamespace != opfnamespace OR opcowner != opfowner) "
-						  "LIMIT 1",
-						  opfinfo->dobj.catId.oid);
-
-		res = ExecuteSqlQuery(fout, query->data, PGRES_TUPLES_OK);
-
-		if (PQntuples(res) == 0)
-		{
-			/* no need to dump it, so bail out */
-			PQclear(res);
-			PQclear(res_ops);
-			PQclear(res_procs);
-			destroyPQExpBuffer(query);
-			destroyPQExpBuffer(q);
-			destroyPQExpBuffer(delq);
-			destroyPQExpBuffer(labelq);
-			return;
-		}
-
-		PQclear(res);
-	}
 
 	/* Get additional fields from the pg_opfamily row */
 	resetPQExpBuffer(query);
@@ -14754,7 +14766,7 @@ dumpConstraint(Archive *fout, ConstraintInfo *coninfo)
 		{
 			appendPQExpBuffer(q, "%s (",
 						 coninfo->contype == 'p' ? "PRIMARY KEY" : "UNIQUE");
-			for (k = 0; k < indxinfo->indnkeys; k++)
+			for (k = 0; k < indxinfo->indnkeyattrs; k++)
 			{
 				int			indkey = (int) indxinfo->indkeys[k];
 				const char *attname;
@@ -14765,6 +14777,23 @@ dumpConstraint(Archive *fout, ConstraintInfo *coninfo)
 
 				appendPQExpBuffer(q, "%s%s",
 								  (k == 0) ? "" : ", ",
+								  fmtId(attname));
+			}
+
+			if (indxinfo->indnkeyattrs < indxinfo->indnattrs)
+				appendPQExpBuffer(q, ") INCLUDING (");
+
+			for (k = indxinfo->indnkeyattrs; k < indxinfo->indnattrs; k++)
+			{
+				int			indkey = (int) indxinfo->indkeys[k];
+				const char *attname;
+
+				if (indkey == InvalidAttrNumber)
+					break;
+				attname = getAttrName(indkey, tbinfo);
+
+				appendPQExpBuffer(q, "%s%s",
+								  (k == indxinfo->indnkeyattrs) ? "" : ", ",
 								  fmtId(attname));
 			}
 
@@ -16594,27 +16623,4 @@ fmtReloptionsArray(Archive *fout, PQExpBuffer buffer, const char *reloptions,
 
 	if (options)
 		free(options);
-}
-
-/*
- * Execute an SQL query and verify that we got exactly one row back.
- */
-static PGresult *
-ExecuteSqlQueryForSingleRow(Archive *fout, char *query)
-{
-	PGresult   *res;
-	int			ntups;
-
-	res = ExecuteSqlQuery(fout, query, PGRES_TUPLES_OK);
-
-	/* Expecting a single result only */
-	ntups = PQntuples(res);
-	if (ntups != 1)
-		exit_horribly(NULL,
-					  ngettext("query returned %d row instead of one: %s\n",
-							   "query returned %d rows instead of one: %s\n",
-							   ntups),
-					  ntups, query);
-
-	return res;
 }

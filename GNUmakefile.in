@@ -75,8 +75,11 @@ GNUmakefile: GNUmakefile.in $(top_builddir)/config.status
 
 
 ##########################################################################
-
+ifeq ($PGPRO_VERSION,)
 distdir	= postgrespro-$(VERSION)
+else
+distdir	= postgrespro-$(PGPRO_VERSION)
+endif
 dummy	= =install=
 garbage = =*  "#"*  ."#"*  *~*  *.orig  *.rej  core  postgresql-*
 
@@ -106,6 +109,7 @@ distdir:
 	$(MAKE) -C $(distdir)/doc/src/sgml/ INSTALL
 	cp $(distdir)/doc/src/sgml/INSTALL $(distdir)/
 	$(MAKE) -C $(distdir) distclean
+	$(MAKE) -C $(distdir)/contrib/pg_arman/doc pg_arman.1 XMLTO=/usr/bin/xmlto ASCIIDOC=/usr/bin/asciidoc
 	rm -f $(distdir)/README.git
 
 distcheck: dist

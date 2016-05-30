@@ -120,7 +120,7 @@ typedef enum
 {
 	CEOUC_WAIT,
 	CEOUC_NOWAIT,
-	CEOUC_LIVELOCK_PREVENTING_WAIT,
+	CEOUC_LIVELOCK_PREVENTING_WAIT
 } CEOUC_WAIT_MODE;
 
 static bool check_exclusion_or_unique_constraint(Relation heap, Relation index,
@@ -647,7 +647,7 @@ check_exclusion_or_unique_constraint(Relation heap, Relation index,
 	Oid		   *constr_procs;
 	uint16	   *constr_strats;
 	Oid		   *index_collations = index->rd_indcollation;
-	int			index_nkeyatts = index->rd_index->indnkeyatts;
+	int			indnkeyatts = IndexRelationGetNumberOfKeyAttributes(index);
 	IndexScanDesc index_scan;
 	HeapTuple	tup;
 	ScanKeyData scankeys[INDEX_MAX_KEYS];
@@ -674,7 +674,7 @@ check_exclusion_or_unique_constraint(Relation heap, Relation index,
 	 * If any of the input values are NULL, the constraint check is assumed to
 	 * pass (i.e., we assume the operators are strict).
 	 */
-	for (i = 0; i < index_nkeyatts; i++)
+	for (i = 0; i < indnkeyatts; i++)
 	{
 		if (isnull[i])
 			return true;
@@ -686,7 +686,7 @@ check_exclusion_or_unique_constraint(Relation heap, Relation index,
 	 */
 	InitDirtySnapshot(DirtySnapshot);
 
-	for (i = 0; i < index_nkeyatts; i++)
+	for (i = 0; i < indnkeyatts; i++)
 	{
 		ScanKeyEntryInitialize(&scankeys[i],
 							   0,
@@ -718,8 +718,8 @@ check_exclusion_or_unique_constraint(Relation heap, Relation index,
 retry:
 	conflict = false;
 	found_self = false;
-	index_scan = index_beginscan(heap, index, &DirtySnapshot, index_nkeyatts, 0);
-	index_rescan(index_scan, scankeys, index_nkeyatts, NULL, 0);
+	index_scan = index_beginscan(heap, index, &DirtySnapshot, indnkeyatts, 0);
+	index_rescan(index_scan, scankeys, indnkeyatts, NULL, 0);
 
 	while ((tup = index_getnext(index_scan,
 								ForwardScanDirection)) != NULL)
@@ -880,10 +880,10 @@ index_recheck_constraint(Relation index, Oid *constr_procs,
 						 Datum *existing_values, bool *existing_isnull,
 						 Datum *new_values)
 {
-	int			index_natts = index->rd_index->indnatts;
+	int			indnkeyatts = IndexRelationGetNumberOfKeyAttributes(index);
 	int			i;
 
-	for (i = 0; i < index_natts; i++)
+	for (i = 0; i < indnkeyatts; i++)
 	{
 		/* Assume the exclusion operators are strict */
 		if (existing_isnull[i])

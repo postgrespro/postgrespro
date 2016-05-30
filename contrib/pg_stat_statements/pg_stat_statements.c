@@ -496,7 +496,7 @@ pgss_shmem_startup(void)
 	info.hash = pgss_hash_fn;
 	info.match = pgss_match_fn;
 	pgss_hash = ShmemInitHash("pg_stat_statements hash",
-							  pgss_max,
+							  pgss_max, pgss_max,
 							  &info,
 							  HASH_ELEM | HASH_FUNCTION | HASH_COMPARE);
 

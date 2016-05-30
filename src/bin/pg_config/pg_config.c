@@ -382,6 +382,15 @@ show_version(bool all)
 	printf("PostgreSQL " PG_VERSION "\n");
 }
 
+#ifdef 	PGPRO_VERSION
+static void
+show_pgpro_version(bool all)
+{
+	if (all)
+		printf("PGPRO_VERSION = ");
+	printf("PostgresPro " PGPRO_VERSION "\n");
+}
+#endif
 
 /*
  * Table of known information items
@@ -418,6 +427,9 @@ static const InfoItem info_items[] = {
 	{"--ldflags_sl", show_ldflags_sl},
 	{"--libs", show_libs},
 	{"--version", show_version},
+#ifdef 	PGPRO_VERSION
+	{"--pgpro-version", show_pgpro_version},
+#endif
 	{NULL, NULL}
 };
 
@@ -454,9 +466,16 @@ help(void)
 	printf(_("  --ldflags_sl          show LDFLAGS_SL value used when PostgreSQL was built\n"));
 	printf(_("  --libs                show LIBS value used when PostgreSQL was built\n"));
 	printf(_("  --version             show the PostgreSQL version\n"));
+#ifdef 	PGPRO_VERSION
+	printf(_("  --pgpro-version       show the PostgresPRO version\n"));
+#endif
 	printf(_("  -?, --help            show this help, then exit\n"));
 	printf(_("\nWith no arguments, all known items are shown.\n\n"));
+#ifdef 	PGPRO_VERSION
+	printf(_("Report bugs to <bugs@postgrespro.ru>.\n"));
+#else
 	printf(_("Report bugs to <pgsql-bugs@postgresql.org>.\n"));
+#endif
 }
 
 static void

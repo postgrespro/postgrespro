@@ -27,19 +27,27 @@
 
 
 /*
- * State is:
- * 10 bit flags
- * 4 bit usage count
- * 18 bit refcount
+ * Buffer state is a single 32-bit variable where following data is combined.
+ *
+ * - 18 bits refcount
+ * - 4 bits usage count
+ * - 10 bits of flags
+ *
+ * Combining these values allows to perform some operations without locking
+ * the buffer header, by modifying them together with a CAS loop.
+ *
+ * The definition of buffer state components is below.
  */
 #define BUF_REFCOUNT_ONE 1
 #define BUF_REFCOUNT_MASK ((1U << 18) - 1)
-#define BUF_STATE_GET_REFCOUNT(state) ((state) & BUF_REFCOUNT_MASK)
 #define BUF_USAGECOUNT_MASK 0x003C0000U
 #define BUF_USAGECOUNT_ONE (1U << 18)
 #define BUF_USAGECOUNT_SHIFT 18
-#define BUF_STATE_GET_USAGECOUNT(state) (((state) & BUF_USAGECOUNT_MASK) >> BUF_USAGECOUNT_SHIFT)
 #define BUF_FLAG_MASK 0xFFC00000U
+
+/* Get refcount and usagecount from buffer state */
+#define BUF_STATE_GET_REFCOUNT(state) ((state) & BUF_REFCOUNT_MASK)
+#define BUF_STATE_GET_USAGECOUNT(state) (((state) & BUF_USAGECOUNT_MASK) >> BUF_USAGECOUNT_SHIFT)
 
 /*
  * Flags for buffer descriptors
@@ -127,18 +135,29 @@ typedef struct buftag
 /*
  *	BufferDesc -- shared descriptor/state data for a single shared buffer.
  *
- * Note: buf_hdr_lock must be held to examine or change the tag, flags,
- * usage_count, refcount, or wait_backend_pid fields.  buf_id field never
- * changes after initialization, so does not need locking.  freeNext is
- * protected by the buffer_strategy_lock not buf_hdr_lock.  The LWLocks can take
- * care of themselves.  The buf_hdr_lock is *not* used to control access to
- * the data in the buffer!
+ * Note: Buffer header lock (BM_LOCKED flag) must be held to examine or change
+ * the tag, state or wait_backend_pid fields.  In general, buffer header lock
+ * is a spinlock which is combined with flags, refcount and usagecount into
+ * single atomic variable.  This layout allow us to do some operations in a
+ * single atomic operation, without actually acquiring and releasing spinlock;
+ * for instance, increase or decrease refcount.  buf_id field never changes
+ * after initialization, so does not need locking.  freeNext is protected by
+ * the buffer_strategy_lock not buffer header lock.  The LWLock can take care
+ * of itself.  The buffer header lock is *not* used to control access to the
+ * data in the buffer!
+ *
+ * It's assumed that nobody changes the state field while buffer header lock
+ * is held.  Thus buffer header lock holder can do complex updates of the
+ * state variable in single write, simultaneously with lock release (cleaning
+ * BM_LOCKED flag).  On the other hand, updating of state without holding
+ * buffer header lock is restricted to CAS, which insure that BM_LOCKED flag
+ * is not set.  Atomic increment/decrement, OR/AND etc. are not allowed.
  *
  * An exception is that if we have the buffer pinned, its tag can't change
- * underneath us, so we can examine the tag without locking the spinlock.
+ * underneath us, so we can examine the tag without locking the buffer header.
  * Also, in places we do one-time reads of the flags without bothering to
- * lock the spinlock; this is generally for situations where we don't expect
- * the flag bit being tested to be changing.
+ * lock the buffer header; this is generally for situations where we don't
+ * expect the flag bit being tested to be changing.
  *
  * We can't physically remove items from a disk page if another backend has
  * the buffer pinned.  Hence, a backend may need to wait for all other pins
@@ -152,14 +171,12 @@ typedef struct buftag
 typedef struct BufferDesc
 {
 	BufferTag	tag;			/* ID of page contained in buffer */
+	int			buf_id;			/* buffer's index number (from 0) */
 
 	/* state of the tag, containing flags, refcount and usagecount */
 	pg_atomic_uint32 state;
 
-
 	int			wait_backend_pid;		/* backend PID of pin-count waiter */
-
-	int			buf_id;			/* buffer's index number (from 0) */
 	int			freeNext;		/* link in freelist chain */
 
 	LWLock	   *io_in_progress_lock;	/* to wait for I/O to complete */
@@ -208,10 +225,14 @@ typedef union BufferDescPadded
 
 /*
  * Functions for acquiring/releasing a shared buffer header's spinlock.  Do
- * not apply these to local buffers! FIXUP!
+ * not apply these to local buffers!
  */
-extern uint32 LockBufHdr(volatile BufferDesc *desc);
-extern void UnlockBufHdr(volatile BufferDesc *desc);
+extern uint32 LockBufHdr(BufferDesc *desc);
+#define UnlockBufHdr(desc, s)	\
+	do {	\
+		pg_atomic_write_u32(&(desc)->state, (s) & (~BM_LOCKED)); \
+		pg_write_barrier(); \
+	} while (0)
 
 
 /* in buf_init.c */
@@ -227,10 +248,10 @@ extern BufferDesc *LocalBufferDescriptors;
 
 /* freelist.c */
 extern BufferDesc *StrategyGetBuffer(BufferAccessStrategy strategy,
-											  uint32 *state);
-extern void StrategyFreeBuffer(volatile BufferDesc *buf);
+				  uint32 *buf_state);
+extern void StrategyFreeBuffer(BufferDesc *buf);
 extern bool StrategyRejectBuffer(BufferAccessStrategy strategy,
-					 volatile BufferDesc *buf);
+					 BufferDesc *buf);
 
 extern int	StrategySyncStart(uint32 *complete_passes, uint32 *num_buf_alloc);
 extern void StrategyNotifyBgWriter(int bgwprocno);

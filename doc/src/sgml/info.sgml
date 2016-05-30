@@ -13,7 +13,7 @@
     <term>Wiki</term>
     <listitem>
      <para>
-      The <productname>&productname;</productname> <ulink
+      The <productname>PostgreSQL</productname> <ulink
       url="http://wiki.postgresql.org">wiki</ulink> contains the project's <ulink
       url="http://wiki.postgresql.org/wiki/Frequently_Asked_Questions">FAQ</>
       (Frequently Asked Questions) list, <ulink
@@ -28,7 +28,7 @@
     <listitem>
      <para>
       The <productname>&productname;</productname>
-      <ulink url="http://www.postgresql.org">web site</ulink>
+      <ulink url="http://www.postgrespro.ru">web site</ulink>
       carries details on the latest release and other
       information to make your work or play with
       <productname>&productname;</productname> more productive.

@@ -498,7 +498,6 @@ addHLParsedLex(HeadlineParsedText *prs, TSQuery query, ParsedLex *lexs, TSLexeme
 
 	while (lexs)
 	{
-
 		if (lexs->type > 0)
 			hladdword(prs, lexs->lemm, lexs->lenlemm, lexs->type);
 

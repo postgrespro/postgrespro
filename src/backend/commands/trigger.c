@@ -480,6 +480,7 @@ CreateTrigger(CreateTrigStmt *stmt, const char *queryString,
 											  RelationGetRelid(rel),
 											  NULL,		/* no conkey */
 											  0,
+											  0,
 											  InvalidOid,		/* no domain */
 											  InvalidOid,		/* no index */
 											  InvalidOid,		/* no foreign key */
@@ -533,7 +534,7 @@ CreateTrigger(CreateTrigStmt *stmt, const char *queryString,
 	 * can skip this for internally generated triggers, since the name
 	 * modification above should be sufficient.
 	 *
-	 * NOTE that this is cool only because we have AccessExclusiveLock on the
+	 * NOTE that this is cool only because we have ShareRowExclusiveLock on the
 	 * relation, so the trigger set won't be changing underneath us.
 	 */
 	if (!isInternal)

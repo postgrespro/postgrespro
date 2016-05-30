@@ -344,18 +344,15 @@ su - postgres
   <para>
    The <productname>&productname;</> &version; sources can be obtained from the
    download section of our
-   website: <ulink url="http://www.postgresql.org/download/"></ulink>.  You
-   should get a file named <filename>postgresql-&version;.tar.gz</filename>
-   or <filename>postgresql-&version;.tar.bz2</filename>. After
+   website: <ulink url="http://www.postgrespro.ru/download/latest"></ulink>.  You
+   should get a file named <filename>postgrespro-&version;.tar.bz2</filename> . After
    you have obtained the file, unpack it:
 <screen>
-<userinput>gunzip postgresql-&version;.tar.gz</userinput>
-<userinput>tar xf postgresql-&version;.tar</userinput>
+<userinput>bunzip2 postgrespro-&version;.tar.bz2</userinput>
+<userinput>tar xf postgrespro-&version;.tar</userinput>
 </screen>
-   (Use <command>bunzip2</command> instead of <command>gunzip</command> if you
-   have the <filename>.bz2</filename> file.)
    This will create a directory
-   <filename>postgresql-&version;</filename> under the current directory
+   <filename>postgrespro-&version;</filename> under the current directory
    with the <productname>&productname;</> sources.
    Change into that directory for the rest
    of the installation procedure.
@@ -1579,7 +1576,7 @@ All of &productname; is successfully made. Ready to install.
     The standard installation provides all the header files needed for client
     application development as well as for server-side program
     development, such as custom functions or data types written in C.
-    (Prior to <productname>&productname;</> 8.0, a separate <literal>make
+    (Prior to <productname>PostgreSQL</> 8.0, a separate <literal>make
     install-all-headers</> command was needed for the latter, but this
     step has been folded into the standard install.)
    </para>
@@ -2714,7 +2711,7 @@ PHSS_30849  s700_800 u2comp/be/plugin library Patch
 
     <para>
      By default, the &productname; man pages are installed into
-     <filename>/usr/local/pgsql/man</filename>.  By default, UnixWare
+     <filename>/usr/local/pgsql/share/man</filename>.  By default, UnixWare
      does not look there for man pages.  To be able to read them you
      need to modify the
      <varname>MANPATH</varname> variable

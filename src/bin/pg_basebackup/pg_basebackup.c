@@ -239,6 +239,7 @@ usage(void)
 	  "                         (in kB/s, or use suffix \"k\" or \"M\")\n"));
 	printf(_("  -R, --write-recovery-conf\n"
 			 "                         write recovery.conf after backup\n"));
+	printf(_("  -S, --slot=SLOTNAME    replication slot to use\n"));
 	printf(_("  -T, --tablespace-mapping=OLDDIR=NEWDIR\n"
 	  "                         relocate tablespace in OLDDIR to NEWDIR\n"));
 	printf(_("  -x, --xlog             include required WAL files in backup (fetch mode)\n"));
@@ -1526,6 +1527,13 @@ GenerateRecoveryConf(PGconn *conn)
 	appendPQExpBuffer(recoveryconfcontents, "primary_conninfo = '%s'\n", escaped);
 	free(escaped);
 
+	if (replication_slot)
+	{
+		escaped = escape_quotes(replication_slot);
+		appendPQExpBuffer(recoveryconfcontents, "primary_slot_name = '%s'\n", replication_slot);
+		free(escaped);
+	}
+
 	if (PQExpBufferBroken(recoveryconfcontents) ||
 		PQExpBufferDataBroken(conninfo_buf))
 	{
@@ -1812,6 +1820,11 @@ BaseBackup(void)
 		int			r;
 #else
 		DWORD		status;
+		/*
+		 * get a pointer sized version of bgchild to avoid warnings about
+		 * casting to a different size on WIN64.
+		 */
+		intptr_t	bgchild_handle = bgchild;
 		uint32		hi,
 					lo;
 #endif
@@ -1874,7 +1887,7 @@ BaseBackup(void)
 		InterlockedIncrement(&has_xlogendptr);
 
 		/* First wait for the thread to exit */
-		if (WaitForSingleObjectEx((HANDLE) bgchild, INFINITE, FALSE) !=
+		if (WaitForSingleObjectEx((HANDLE) bgchild_handle, INFINITE, FALSE) !=
 			WAIT_OBJECT_0)
 		{
 			_dosmaperr(GetLastError());
@@ -1882,7 +1895,7 @@ BaseBackup(void)
 					progname, strerror(errno));
 			disconnect_and_exit(1);
 		}
-		if (GetExitCodeThread((HANDLE) bgchild, &status) == 0)
+		if (GetExitCodeThread((HANDLE) bgchild_handle, &status) == 0)
 		{
 			_dosmaperr(GetLastError());
 			fprintf(stderr, _("%s: could not get child thread exit status: %s\n"),
@@ -1924,6 +1937,7 @@ main(int argc, char **argv)
 		{"checkpoint", required_argument, NULL, 'c'},
 		{"max-rate", required_argument, NULL, 'r'},
 		{"write-recovery-conf", no_argument, NULL, 'R'},
+		{"slot", required_argument, NULL, 'S'},
 		{"tablespace-mapping", required_argument, NULL, 'T'},
 		{"xlog", no_argument, NULL, 'x'},
 		{"xlog-method", required_argument, NULL, 'X'},
@@ -1964,7 +1978,7 @@ main(int argc, char **argv)
 		}
 	}
 
-	while ((c = getopt_long(argc, argv, "D:F:r:RT:xX:l:zZ:d:c:h:p:U:s:wWvP",
+	while ((c = getopt_long(argc, argv, "D:F:r:RT:xX:l:zZ:d:c:h:p:U:s:S:wWvP",
 							long_options, &option_index)) != -1)
 	{
 		switch (c)
@@ -1990,6 +2004,9 @@ main(int argc, char **argv)
 				break;
 			case 'R':
 				writerecoveryconf = true;
+				break;
+			case 'S':
+				replication_slot = pg_strdup(optarg);
 				break;
 			case 'T':
 				tablespace_list_append(optarg);
@@ -2149,6 +2166,16 @@ main(int argc, char **argv)
 	{
 		fprintf(stderr,
 				_("%s: WAL streaming can only be used in plain mode\n"),
+				progname);
+		fprintf(stderr, _("Try \"%s --help\" for more information.\n"),
+				progname);
+		exit(1);
+	}
+
+	if (replication_slot && !streamwal)
+	{
+		fprintf(stderr,
+				_("%s: replication slots can only be used with WAL streaming\n"),
 				progname);
 		fprintf(stderr, _("Try \"%s --help\" for more information.\n"),
 				progname);

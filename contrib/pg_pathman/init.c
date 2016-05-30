@@ -265,7 +265,7 @@ create_relations_hashtable()
 	if (relations != NULL)
 		hash_destroy(relations);
 
-	relations = ShmemInitHash("Partitioning relation info", 1024, &ctl, HASH_ELEM | HASH_BLOBS);
+	relations = ShmemInitHash("Partitioning relation info", 1024, 1024, &ctl, HASH_ELEM | HASH_BLOBS);
 }
 
 /*
@@ -564,7 +564,7 @@ create_range_restrictions_hashtable()
 	ctl.keysize = sizeof(RelationKey);
 	ctl.entrysize = sizeof(RangeRelation);
 	range_restrictions = ShmemInitHash("pg_pathman range restrictions",
-									   1024, &ctl, HASH_ELEM | HASH_BLOBS);
+									   1024, 1024, &ctl, HASH_ELEM | HASH_BLOBS);
 }
 
 /*

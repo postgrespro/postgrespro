@@ -262,7 +262,7 @@ mcelem_tsquery_selec(TSQuery query, Datum *mcelem, int nmcelem,
 /*
  * Traverse the tsquery in preorder, calculating selectivity as:
  *
- *	 selec(left_oper) * selec(right_oper) in AND nodes,
+ *	 selec(left_oper) * selec(right_oper) in AND & PHRASE nodes,
  *
  *	 selec(left_oper) + selec(right_oper) -
  *		selec(left_oper) * selec(right_oper) in OR nodes,

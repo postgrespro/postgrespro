@@ -21,8 +21,7 @@ command_ok(
 		"$tempdir/data" ],
 	'configure authentication');
 open CONF, ">>$tempdir/data/postgresql.conf";
-print CONF "fsync = off\n";
-if (! $windows_os)
+if ($Config{osname} ne "MSWin32")
 {
 	print CONF "listen_addresses = ''\n";
 	print CONF "unix_socket_directories = '$tempdir_short'\n";

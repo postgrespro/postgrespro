@@ -46,7 +46,8 @@ my $contrib_extrasource = {
 
 my @contrib_excludes = (
 	'commit_ts',      'hstore_plperl', 'hstore_plpython', 'intagg',
-	'ltree_plpython', 'pgcrypto',      'sepgsql',         'brin');
+	'ltree_plpython', 'pgcrypto',      'sepgsql',         'brin',
+	'pg_arman');
 
 # Set of variables for frontend modules
 my $frontend_defines = { 'initdb' => 'FRONTEND' };
@@ -577,8 +578,8 @@ sub mkvcbuild
 		}
 		$plperl->AddReference($postgres);
 		my @perl_libs =
-		  grep { /perl\d+.lib$/ }
-		  glob($solution->{options}->{perl} . '\lib\CORE\perl*.lib');
+		  grep { /perl\d+\.(lib|a)$/ }
+		  glob($solution->{options}->{perl} . '\lib\CORE\*.*');
 		if (@perl_libs == 1)
 		{
 			$plperl->AddLibrary($perl_libs[0]);

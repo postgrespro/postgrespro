@@ -222,8 +222,12 @@ recovery_target_timeline='latest'
 				   '-l', "$log_path/standby.log",
 				   '-o', "-p $port_standby", 'start');
 
-	# The standby may have WAL to apply before it matches the primary.  That
-	# is fine, because no test examines the standby before promotion.
+	# Wait until the standby has caught up with the primary, by polling
+	# pg_stat_replication.
+	my $caughtup_query =
+"SELECT pg_current_xlog_location() = replay_location FROM pg_stat_replication WHERE application_name = 'rewind_standby';";
+	poll_query_until($caughtup_query, $connstr_master)
+	  or die "Timed out while waiting for standby to catch up";
 }
 
 sub promote_standby

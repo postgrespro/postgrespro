@@ -3,7 +3,7 @@ use warnings;
 use Cwd;
 use Config;
 use TestLib;
-use Test::More tests => 46;
+use Test::More tests => 51;
 
 program_help_ok('pg_basebackup');
 program_version_ok('pg_basebackup');
@@ -92,7 +92,7 @@ unlink "$tempdir/pgdata/$superlongname";
 # The following tests test symlinks. Windows doesn't have symlinks, so
 # skip on Windows.
 SKIP: {
-    skip "symlinks not supported on Windows", 10 if ($windows_os);
+    skip "symlinks not supported on Windows", 10 if ($Config{osname} eq "MSWin32");
 
 	# Create a temporary directory in the system location and symlink it
 	# to our physical temp location.  That way we can use shorter names
@@ -169,3 +169,17 @@ command_fails([ 'pg_basebackup', '-D', "$tempdir/fail", '-S', 'slot1' ],
 	'pg_basebackup with replication slot fails without -X stream');
 command_fails([ 'pg_basebackup', '-D', "$tempdir/backupxs_sl_fail", '-X', 'stream', '-S', 'slot1' ],
 	'pg_basebackup fails with nonexistent replication slot');
+
+psql 'postgres', q{SELECT * FROM pg_create_physical_replication_slot('slot1')};
+my $lsn = psql 'postgres', q{SELECT restart_lsn FROM pg_replication_slots WHERE slot_name = 'slot1'};
+is($lsn, '', 'restart LSN of new slot is null');
+command_ok([ 'pg_basebackup', '-D', "$tempdir/backupxs_sl", '-X', 'stream', '-S', 'slot1' ],
+	'pg_basebackup -X stream with replication slot runs');
+$lsn = psql 'postgres', q{SELECT restart_lsn FROM pg_replication_slots WHERE slot_name = 'slot1'};
+like($lsn, qr!^0/[0-9A-Z]{7,8}$!, 'restart LSN of slot has advanced');
+
+command_ok([ 'pg_basebackup', '-D', "$tempdir/backupxs_sl_R", '-X', 'stream', '-S', 'slot1', '-R' ],
+	'pg_basebackup with replication slot and -R runs');
+like(slurp_file("$tempdir/backupxs_sl_R/recovery.conf"),
+	 qr/^primary_slot_name = 'slot1'$/m,
+	 'recovery.conf sets primary_slot_name');

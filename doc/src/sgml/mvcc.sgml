@@ -536,7 +536,7 @@ ERROR:  could not serialize access due to concurrent update
 
    <note>
     <para>
-     Prior to <productname>&productname;</productname> version 9.1, a request
+     Prior to <productname>PostgreSQL</productname> version 9.1, a request
      for the Serializable transaction isolation level provided exactly the
      same behavior described here.  To retain the legacy Serializable
      behavior, Repeatable Read should now be requested.

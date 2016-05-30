@@ -113,7 +113,7 @@ typedef struct ExecPhraseData
 } ExecPhraseData;
 
 extern bool TS_execute(QueryItem *curitem, void *checkval, bool calcnot,
-		   bool (*chkcond) (void *checkval, QueryOperand *val, ExecPhraseData *data));
+		   bool (*chkcond) (void *, QueryOperand *, ExecPhraseData *));
 extern bool tsquery_requires_match(QueryItem *curitem);
 
 /*

@@ -350,7 +350,7 @@
     expression that contains both NULL and non-null values will return false
     for both tests.
     This definition conforms to the SQL standard, and is a change from the
-    inconsistent behavior exhibited by <productname>&productname;</productname>
+    inconsistent behavior exhibited by <productname>PostgreSQL</productname>
     versions prior to 8.2.
    </para>
   </note>
@@ -8962,10 +8962,10 @@ CREATE TYPE rainbow AS ENUM ('red', 'orange', 'yellow', 'green', 'blue', 'purple
         <entry><literal>!'cat'</literal></entry>
        </row>
        <row>
-        <entry> <literal>??</literal> </entry>
+        <entry> <literal>&lt;-&gt;</literal> </entry>
         <entry><type>tsquery</> followed by <type>tsquery</></entry>
-        <entry><literal>to_tsquery('fat') ?? to_tsquery('rat')</literal></entry>
-        <entry><literal>'fat' ? 'rat'</literal></entry>
+        <entry><literal>to_tsquery('fat') &lt;-&gt; to_tsquery('rat')</literal></entry>
+        <entry><literal>'fat' &lt;-&gt; 'rat'</literal></entry>
        </row>
        <row>
         <entry> <literal>@&gt;</literal> </entry>
@@ -9069,7 +9069,7 @@ CREATE TYPE rainbow AS ENUM ('red', 'orange', 'yellow', 'green', 'blue', 'purple
         <entry><type>tsquery</type></entry>
         <entry>produce <type>tsquery</> ignoring punctuation</entry>
         <entry><literal>phraseto_tsquery('english', 'The Fat Rats')</literal></entry>
-        <entry><literal>'fat' ? 'rat'</literal></entry>
+        <entry><literal>'fat' &lt;-&gt; 'rat'</literal></entry>
        </row>
        <row>
         <entry>
@@ -9203,9 +9203,9 @@ CREATE TYPE rainbow AS ENUM ('red', 'orange', 'yellow', 'green', 'blue', 'purple
          <literal><function>tsquery_phrase(<replaceable class="PARAMETER">query1</replaceable> <type>tsquery</>, <replaceable class="PARAMETER">query2</replaceable> <type>tsquery</>)</function></literal>
         </entry>
         <entry><type>tsquery</type></entry>
-        <entry>implementation of <literal>??</> (FOLLOWED BY) operator</entry>
+        <entry>implementation of <literal>&lt;-&gt;</> (FOLLOWED BY) operator</entry>
         <entry><literal>tsquery_phrase(to_tsquery('fat'), to_tsquery('cat'))</literal></entry>
-        <entry><literal>'fat' ? 'cat'</literal></entry>
+        <entry><literal>'fat' &lt;-&gt; 'cat'</literal></entry>
        </row>
        <row>
         <entry>
@@ -9214,7 +9214,7 @@ CREATE TYPE rainbow AS ENUM ('red', 'orange', 'yellow', 'green', 'blue', 'purple
         <entry><type>tsquery</type></entry>
         <entry>phrase-concatenate with distance</entry>
         <entry><literal>tsquery_phrase(to_tsquery('fat'), to_tsquery('cat'), 10)</literal></entry>
-        <entry><literal>'fat' ?[10] 'cat'</literal></entry>
+        <entry><literal>'fat' &lt;10&gt; 'cat'</literal></entry>
        </row>
        <row>
         <entry>
@@ -11234,13 +11234,19 @@ nextval('foo'::text)      <lineannotation><literal>foo</literal> is looked up at
 
        <important>
         <para>
-         To avoid blocking concurrent transactions that obtain numbers from the
-         same sequence, a <function>nextval</function> operation is never
+         To avoid blocking concurrent transactions that obtain numbers from
+         the same sequence, a <function>nextval</function> operation is never
          rolled back; that is, once a value has been fetched it is considered
-         used, even if the transaction that did the
-         <function>nextval</function> later aborts.  This means that aborted
-         transactions might leave unused <quote>holes</quote> in the sequence
-         of assigned values.
+         used and will not be returned again.  This is true even if the
+         surrounding transaction later aborts, or if the calling query ends
+         up not using the value.  For example an <command>INSERT</> with
+         an <literal>ON CONFLICT</> clause will compute the to-be-inserted
+         tuple, including doing any required <function>nextval</function>
+         calls, before detecting any conflict that would cause it to follow
+         the <literal>ON CONFLICT</> rule instead.  Such cases will leave
+         unused <quote>holes</quote> in the sequence of assigned values.
+         Thus, <productname>PostgreSQL</> sequence objects <emphasis>cannot
+         be used to obtain <quote>gapless</> sequences</emphasis>.
         </para>
        </important>
 
@@ -11269,8 +11275,8 @@ nextval('foo'::text)      <lineannotation><literal>foo</literal> is looked up at
         Return the value most recently returned by
         <function>nextval</> in the current session. This function is
         identical to <function>currval</function>, except that instead
-        of taking the sequence name as an argument it fetches the
-        value of the last sequence used by <function>nextval</function>
+        of taking the sequence name as an argument it refers to whichever
+        sequence <function>nextval</function> was most recently applied to
         in the current session. It is an error to call
         <function>lastval</function> if <function>nextval</function>
         has not yet been called in the current session.
@@ -14446,7 +14452,7 @@ AND
 
   <note>
    <para>
-    Prior to <productname>&productname;</productname> 8.2, the
+    Prior to <productname>PostgreSQL</productname> 8.2, the
     <literal>&lt;</>, <literal>&lt;=</>, <literal>&gt;</> and <literal>&gt;=</>
     cases were not handled per SQL specification.  A comparison like
     <literal>ROW(a,b) &lt; ROW(c,d)</>
@@ -14955,7 +14961,13 @@ SELECT * FROM pg_ls_dir('.') WITH ORDINALITY AS t(ls,n);
       <row>
        <entry><literal><function>version()</function></literal></entry>
        <entry><type>text</type></entry>
-       <entry><productname>&productname;</> version information. See also <xref linkend="guc-server-version-num"> for a machine-readable version.</entry>
+       <entry><productname>PostgreSQL</productname> version information. See also <xref linkend="guc-server-version-num"> for a machine-readable version.</entry>
+      </row>
+
+      <row>
+       <entry><literal><function>pgpro_version()</function></literal></entry>
+       <entry><type>text</type></entry>
+       <entry><productname>&productname;</> version information.</entry>
       </row>
      </tbody>
     </tgroup>
