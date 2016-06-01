@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS @extschema@.pathman_config (
 	parttype		INTEGER,
 	range_interval	TEXT
 );
-
+SELECT pg_catalog.pg_extension_config_dump('@extschema@.pathman_config', '');
 
 CREATE OR REPLACE FUNCTION @extschema@.on_create_partitions(relid OID)
 RETURNS VOID AS 'pg_pathman', 'on_partitions_created' LANGUAGE C STRICT;
@@ -80,16 +80,17 @@ RETURNS BOOLEAN AS 'pg_pathman', 'check_overlap' LANGUAGE C STRICT;
  * Copy rows to partitions
  */
 CREATE OR REPLACE FUNCTION @extschema@.partition_data(
-	p_parent text
+	p_parent regclass
 	, p_invalidate_cache_on_error BOOLEAN DEFAULT FALSE
 	, OUT p_total BIGINT)
 AS
 $$
 DECLARE
+	relname TEXT;
 	rec RECORD;
 	cnt BIGINT := 0;
 BEGIN
-	p_parent := @extschema@.validate_relname(p_parent);
+	relname := @extschema@.validate_relname(p_parent);
 
 	p_total := 0;
 
@@ -99,10 +100,9 @@ BEGIN
 				WITH part_data AS (
 					DELETE FROM ONLY %s RETURNING *)
 				INSERT INTO %s SELECT * FROM part_data'
-				, p_parent
-				, p_parent);
+				, relname
+				, relname);
 	GET DIAGNOSTICS p_total = ROW_COUNT;
-	-- RAISE NOTICE '% rows have been copied', p_total;
 	RETURN;
 
 -- EXCEPTION WHEN others THEN
@@ -119,11 +119,18 @@ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION @extschema@.disable_partitioning(IN relation TEXT)
 RETURNS VOID AS
 $$
+DECLARE
+	parttype INTEGER;
 BEGIN
 	relation := @extschema@.validate_relname(relation);
+	parttype := parttype FROM pathman_config WHERE relname = relation;
 
 	DELETE FROM @extschema@.pathman_config WHERE relname = relation;
-	EXECUTE format('DROP FUNCTION IF EXISTS %s_insert_trigger_func() CASCADE', relation);
+	IF parttype = 1 THEN
+		PERFORM @extschema@.drop_hash_triggers(relation);
+	ELSIF parttype = 2 THEN
+		PERFORM @extschema@.drop_range_triggers(relation);
+	END IF;
 
 	/* Notify backend about changes */
 	PERFORM on_remove_partitions(relation::regclass::integer);
@@ -136,7 +143,7 @@ LANGUAGE plpgsql;
  * Returns attribute type name for relation
  */
 CREATE OR REPLACE FUNCTION @extschema@.get_attribute_type_name(
-	p_relation TEXT
+	p_relation REGCLASS
 	, p_attname TEXT
 	, OUT p_atttype TEXT)
 RETURNS TEXT AS
@@ -144,7 +151,7 @@ $$
 BEGIN
 	SELECT typname::TEXT INTO p_atttype
 	FROM pg_type JOIN pg_attribute on atttypid = "oid"
-	WHERE attrelid = p_relation::regclass::oid and attname = lower(p_attname);
+	WHERE attrelid = p_relation::oid and attname = lower(p_attname);
 END
 $$
 LANGUAGE plpgsql;
@@ -154,7 +161,7 @@ LANGUAGE plpgsql;
  * Checks if attribute is nullable
  */
 CREATE OR REPLACE FUNCTION @extschema@.is_attribute_nullable(
-	p_relation TEXT
+	p_relation REGCLASS
 	, p_attname TEXT
 	, OUT p_nullable BOOLEAN)
 RETURNS BOOLEAN AS
@@ -162,7 +169,7 @@ $$
 BEGIN
 	SELECT NOT attnotnull INTO p_nullable
 	FROM pg_type JOIN pg_attribute on atttypid = "oid"
-	WHERE attrelid = p_relation::regclass::oid and attname = lower(p_attname);
+	WHERE attrelid = p_relation::oid and attname = lower(p_attname);
 END
 $$
 LANGUAGE plpgsql;
@@ -172,7 +179,7 @@ LANGUAGE plpgsql;
  * Aggregates several common relation checks before partitioning. Suitable for every partitioning type.
  */
 CREATE OR REPLACE FUNCTION @extschema@.common_relation_checks(
-	p_relation TEXT
+	p_relation REGCLASS
 	, p_attribute TEXT)
 RETURNS BOOLEAN AS
 $$
@@ -180,7 +187,7 @@ DECLARE
 	v_rec RECORD;
 	is_referenced BOOLEAN;
 BEGIN
-	IF EXISTS (SELECT * FROM @extschema@.pathman_config WHERE relname = p_relation) THEN
+	IF EXISTS (SELECT * FROM @extschema@.pathman_config WHERE relname::regclass = p_relation) THEN
 		RAISE EXCEPTION 'Relation "%" has already been partitioned', p_relation;
 	END IF;
 
@@ -205,15 +212,38 @@ END
 $$
 LANGUAGE plpgsql;
 
+/*
+ * Returns relname without quotes or something
+ */
+CREATE OR REPLACE FUNCTION @extschema@.get_plain_schema_and_relname(cls regclass, OUT schema TEXT, OUT relname TEXT)
+AS
+$$
+BEGIN
+	SELECT relnamespace::regnamespace, pg_class.relname FROM pg_class WHERE oid = cls::oid
+	INTO schema, relname;
+END
+$$
+LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE FUNCTION @extschema@.get_plain_relname(cls regclass)
+RETURNS TEXT AS
+$$
+BEGIN
+	RETURN relname FROM pg_class WHERE oid = cls::oid;
+END
+$$
+LANGUAGE plpgsql;
+
 
 /*
  * Validates relation name. It must be schema qualified
  */
-CREATE OR REPLACE FUNCTION @extschema@.validate_relname(relname TEXT)
+CREATE OR REPLACE FUNCTION @extschema@.validate_relname(cls regclass)
 RETURNS TEXT AS
 $$
 BEGIN
-	RETURN @extschema@.get_schema_qualified_name(relname::regclass, '.');
+	RETURN @extschema@.get_schema_qualified_name(cls, '.');
 END
 $$
 LANGUAGE plpgsql;
@@ -224,11 +254,12 @@ LANGUAGE plpgsql;
  */
 CREATE OR REPLACE FUNCTION @extschema@.get_schema_qualified_name(
 	cls REGCLASS
-	, delimiter TEXT DEFAULT '_')
+	, delimiter TEXT DEFAULT '_'
+	, suffix TEXT DEFAULT '')
 RETURNS TEXT AS
 $$
 BEGIN
-	RETURN relnamespace::regnamespace || delimiter || relname FROM pg_class WHERE oid = cls::oid;
+	RETURN relnamespace::regnamespace || delimiter || quote_ident(relname || suffix) FROM pg_class WHERE oid = cls::oid;
 END
 $$
 LANGUAGE plpgsql;

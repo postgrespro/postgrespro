@@ -18,6 +18,12 @@
 #include "storage/dsm.h"
 #include "storage/lwlock.h"
 
+#include "nodes/bitmapset.h"
+
+/* Check PostgreSQL version */
+#if PG_VERSION_NUM < 90500
+	#error "You are trying to build pg_pathman with PostgreSQL version lower than 9.5.  Please, check you environment."
+#endif
 
 #define ALL NIL
 #define INITIAL_BLOCKS_COUNT 8192
@@ -115,7 +121,8 @@ typedef struct PathmanState
 	DsmArray	databases;
 } PathmanState;
 
-PathmanState *pmstate;
+extern bool pg_pathman_enable;
+extern PathmanState *pmstate;
 
 #define PATHMAN_GET_DATUM(value, by_val) ( (by_val) ? (value) : PointerGetDatum(&value) )
 
@@ -152,6 +159,7 @@ int irange_list_length(List *rangeset);
 bool irange_list_find(List *rangeset, int index, bool *lossy);
 
 /* Dynamic shared memory functions */
+Size get_dsm_shared_size(void);
 void init_dsm_config(void);
 bool init_dsm_segment(size_t blocks_count, size_t block_size);
 void init_dsm_table(size_t block_size, size_t start, size_t end);
@@ -167,6 +175,7 @@ HTAB *range_restrictions;
 bool initialization_needed;
 
 /* initialization functions */
+Size pathman_memsize(void);
 void init_shmem_config(void);
 void load_config(void);
 void create_relations_hashtable(void);
@@ -184,5 +193,7 @@ char *get_extension_schema(void);
 FmgrInfo *get_cmp_func(Oid type1, Oid type2);
 Oid create_partitions_bg_worker(Oid relid, Datum value, Oid value_type, bool *crashed);
 Oid create_partitions(Oid relid, Datum value, Oid value_type, bool *crashed);
+
+char *bms_print(Bitmapset *bms);
 
 #endif   /* PATHMAN_H */
