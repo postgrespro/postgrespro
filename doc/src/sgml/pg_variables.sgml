@@ -150,7 +150,7 @@
         </tgroup>
       </informaltable>
     </sect3>
-    <sect3 id="pg-variables-timestamp-with-timezone-variables">
+    <sect3 id="pg-variables-timestamptz-variables">
       <title>Timestamp with timezone variables</title>
       <informaltable>
         <tgroup cols="2">
@@ -393,91 +393,6 @@
         PostgreSQL 9.6 and newer.
       </para>
     </sect3>
-  </sect2>
-  <sect2 id="pg-variables-error-messages">
-    <title>Error messages</title>
-    <itemizedlist spacing="compact">
-      <listitem>
-        <para>
-          &quot;array argument can not be NULL&quot;
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          &quot;could not identify a hash function for type %s&quot;
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          &quot;could not identify a matching function for type %s&quot;
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          &quot;function returning record called in context that cannot
-          accept type record&quot;
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          &quot;name &quot;%s&quot; is too long&quot;
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          &quot;new record structure differs from variable
-          &quot;%s&quot; structure&quot;
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          &quot;package name can not be NULL&quot;
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          &quot;record argument can not be NULL&quot;
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          &quot;requested value type differs from variable
-          &quot;%s&quot; key type&quot;
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          &quot;searching for elements in multidimensional arrays is not
-          supported&quot;
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          &quot;there is a record in the variable &quot;%s&quot; with
-          same key&quot;
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          &quot;unrecognized package &quot;%s&quot;&quot;
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          &quot;unrecognized variable &quot;%s&quot;&quot;
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          &quot;variable &quot;%s&quot; requires %s value&quot;
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          &quot;variable name can not be NULL&quot;
-        </para>
-      </listitem>
-    </itemizedlist>
   </sect2>
   <sect2 id="pg-variables-examples">
     <title>Examples</title>
