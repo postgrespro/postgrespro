@@ -21,6 +21,8 @@
 #include "utils/pg_crc.h"
 #include "parray.h"
 #include "datapagemap.h"
+#include "storage/bufpage.h"
+#include "storage/block.h"
 
 /* Query to fetch current transaction ID */
 #define TXID_CURRENT_SQL	"SELECT txid_current();"
@@ -55,7 +57,9 @@ typedef struct pgFile
 	pg_crc32 crc;			/* CRC value of the file, regular file only */
 	char   *linked;			/* path of the linked file */
 	bool	is_datafile;	/* true if the file is PostgreSQL data file */
-	char	*path; 		/* path of the file */
+	char	*path;			/* path of the file */
+	char	*ptrack_path;
+	int		segno;			/* Segment number for ptrack */
 	datapagemap_t pagemap;
 } pgFile;
 
@@ -78,6 +82,9 @@ typedef struct pgBackupRange
 	 (tm.tm_mon >= 0 && tm.tm_mon <= 11) && 	/* range check for tm_mon (0-23)  */ \
 	 (tm.tm_year + 1900 >= 1900)) 			/* range check for tm_year(70-)    */
 
+/* Effective data size */
+#define MAPSIZE (BLCKSZ - MAXALIGN(SizeOfPageHeaderData))
+
 /* Backup status */
 /* XXX re-order ? */
 typedef enum BackupStatus
@@ -96,6 +103,7 @@ typedef enum BackupMode
 {
 	BACKUP_MODE_INVALID,
 	BACKUP_MODE_DIFF_PAGE,		/* differential page backup */
+	BACKUP_MODE_DIFF_PTRACK,	/* differential page backup with ptrack system*/
 	BACKUP_MODE_FULL			/* full backup */
 } BackupMode;
 
@@ -161,6 +169,11 @@ typedef struct pgRecoveryTarget
 	bool		recovery_target_inclusive;
 } pgRecoveryTarget;
 
+typedef union DataPage
+{
+	PageHeaderData	page_data;
+	char			data[BLCKSZ];
+} DataPage;
 
 /*
  * return pointer that exceeds the length of prefix from character string.
@@ -193,6 +206,9 @@ extern const char *pgdata_exclude[];
 /* backup file list from non-snapshot */
 extern parray *backup_files_list;
 
+extern int num_threads;
+extern bool stream_wal;
+
 /* in backup.c */
 extern int do_backup(pgBackupOption bkupopt);
 extern BackupMode parse_backup_mode(const char *value);
@@ -220,7 +236,8 @@ extern void pgBackupDelete(int keep_generations, int keep_days);
 /* in fetch.c */
 extern char *slurpFile(const char *datadir,
 					   const char *path,
-					   size_t *filesize);
+					   size_t *filesize,
+					   bool safe);
 
 /* in validate.c */
 extern int do_validate(pgBackupRange *range);
@@ -275,17 +292,20 @@ extern void restore_data_file(const char *from_root, const char *to_root,
 extern bool copy_file(const char *from_root, const char *to_root,
 					  pgFile *file);
 
+extern bool calc_file(pgFile *file);
+
 /* parsexlog.c */
 extern void extractPageMap(const char *datadir, XLogRecPtr startpoint,
 						   TimeLineID tli, XLogRecPtr endpoint);
 
 /* in util.c */
-extern TimeLineID get_current_timeline(void);
+extern TimeLineID get_current_timeline(bool safe);
 extern void sanityChecks(void);
 extern void time2iso(char *buf, size_t len, time_t time);
 extern const char *status2str(BackupStatus status);
 extern void remove_trailing_space(char *buf, int comment_mark);
 extern void remove_not_digit(char *buf, size_t len, const char *str);
+extern XLogRecPtr get_last_ptrack_lsn(void);
 
 /* in status.c */
 extern bool is_pg_running(void);

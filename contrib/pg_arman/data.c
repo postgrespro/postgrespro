@@ -18,12 +18,6 @@
 #include "storage/block.h"
 #include "storage/bufpage.h"
 
-typedef union DataPage
-{
-	PageHeaderData	page_data;
-	char			data[BLCKSZ];
-} DataPage;
-
 typedef struct BackupPageHeader
 {
 	BlockNumber	block;			/* block number */
@@ -184,7 +178,6 @@ backup_data_file(const char *from_root, const char *to_root,
 	else
 	{
 		datapagemap_iterator_t *iter;
-
 		iter = datapagemap_iterate(&file->pagemap);
 		while (datapagemap_next(iter, &blknum))
 		{
@@ -220,12 +213,12 @@ backup_data_file(const char *from_root, const char *to_root,
 				return copy_file(from_root, to_root, file);
 			}
 
-			file->read_size += read_len;
-
 			/* if the page has not been modified since last backup, skip it */
 			if (lsn && !XLogRecPtrIsInvalid(page_lsn) && page_lsn < *lsn)
 				continue;
 
+			file->read_size += read_len;
+			
 			upper_offset = header.hole_offset + header.hole_length;
 			upper_length = BLCKSZ - upper_offset;
 
@@ -250,6 +243,13 @@ backup_data_file(const char *from_root, const char *to_root,
 			file->write_size += sizeof(header) + read_len - header.hole_length;
 		}
 		pg_free(iter);
+		/*
+		 * If we have pagemap then file can't be a zero size.
+		 * Otherwise, we will clear the last file.
+		 * Increase read_size to delete after.
+		 */
+		if (file->read_size == 0)
+			file->read_size++;
 	}
 
 	/*
@@ -366,11 +366,6 @@ restore_data_file(const char *from_root,
 			}
 		}
 
-		elog(LOG, "header block: %i, blknum: %i, hole_offset: %i, BLCKSZ:%i",
-				header.block,
-				blknum,
-				header.hole_offset,
-				BLCKSZ);
 		if (header.block < blknum || header.hole_offset > BLCKSZ ||
 			(int) header.hole_offset + (int) header.hole_length > BLCKSZ)
 		{
@@ -544,6 +539,74 @@ copy_file(const char *from_root, const char *to_root, pgFile *file)
 
 	if (check)
 		remove(to_path);
+
+	return true;
+}
+
+bool
+calc_file(pgFile *file)
+{
+	FILE	   *in;
+	size_t		read_len = 0;
+	int			errno_tmp;
+	char		buf[8192];
+	struct stat	st;
+	pg_crc32	crc;
+
+	INIT_CRC32C(crc);
+
+	/* reset size summary */
+	file->read_size = 0;
+	file->write_size = 0;
+
+	/* open backup mode file for read */
+	in = fopen(file->path, "r");
+	if (in == NULL)
+	{
+		FIN_CRC32C(crc);
+		file->crc = crc;
+
+		/* maybe deleted, it's not error */
+		if (errno == ENOENT)
+			return false;
+
+		elog(ERROR, "cannot open source file \"%s\": %s", file->path,
+			 strerror(errno));
+	}
+
+	/* stat source file to change mode of destination file */
+	if (fstat(fileno(in), &st) == -1)
+	{
+		fclose(in);
+		elog(ERROR, "cannot stat \"%s\": %s", file->path,
+			 strerror(errno));
+	}
+
+	for (;;)
+	{
+		if ((read_len = fread(buf, 1, sizeof(buf), in)) != sizeof(buf))
+			break;
+
+		/* update CRC */
+		COMP_CRC32C(crc, buf, read_len);
+
+		file->write_size += sizeof(buf);
+		file->read_size += sizeof(buf);
+	}
+
+	errno_tmp = errno;
+	if (!feof(in))
+	{
+		fclose(in);
+		elog(ERROR, "cannot read backup mode file \"%s\": %s",
+			 file->path, strerror(errno_tmp));
+	}
+
+	/* finish CRC calculation and store into pgFile */
+	FIN_CRC32C(crc);
+	file->crc = crc;
+
+	fclose(in);
 
 	return true;
 }
