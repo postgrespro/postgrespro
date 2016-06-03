@@ -21,8 +21,6 @@ OBJS = backup.o \
 	pgut/pgut.o \
 	pgut/pgut-port.o
 
-DOCS = doc/pg_arman.txt
-
 EXTRA_CLEAN = datapagemap.c datapagemap.h xlogreader.c
 
 REGRESS = init option show delete backup restore
