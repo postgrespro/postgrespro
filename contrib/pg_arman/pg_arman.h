@@ -12,6 +12,8 @@
 #include "postgres_fe.h"
 
 #include <limits.h>
+#include <sys/stat.h>
+
 #include "libpq-fe.h"
 
 #include "pgut/pgut.h"
