@@ -93,7 +93,7 @@ EOF
 function get_time_last_backup()
 {
 	set name_os = `uname`
-	if [ "$name_os" -n "SunOS" ]
+	if [ "$name_os" == "SunOS" ]
 	then
 		pg_arman -B ${BACKUP_PATH} show | gtail -n +4 | head -n 1 | awk '{print($1, $2)}'
 	else
