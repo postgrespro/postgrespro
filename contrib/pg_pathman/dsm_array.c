@@ -28,7 +28,13 @@ typedef struct DsmConfig
 
 static DsmConfig *dsm_cfg = NULL;
 
-typedef int BlockHeader;
+/*
+ * Block header
+ *
+ * Its size must be 4 bytes for 32bit and 8 bytes for 64bit. Otherwise it could
+ * screw up an alignment (for example on Sparc9)
+ */
+typedef uintptr_t BlockHeader;
 typedef BlockHeader* BlockHeaderPtr;
 
 #define FREE_BIT 0x80000000
@@ -42,6 +48,16 @@ typedef BlockHeader* BlockHeaderPtr;
 	((*header) & ~FREE_BIT)
 #define set_length(header, length) \
 	((length) | ((*header) & FREE_BIT))
+
+/*
+ * Amount of memory that need to be requested in shared memory to store dsm
+ * config
+ */
+Size
+get_dsm_shared_size()
+{
+	return (Size) MAXALIGN(sizeof(DsmConfig));
+}
 
 /*
  * Initialize dsm config for arrays

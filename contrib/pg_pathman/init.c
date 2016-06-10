@@ -21,6 +21,7 @@
 #include "utils/lsyscache.h"
 #include "utils/bytea.h"
 #include "utils/snapmgr.h"
+#include "optimizer/clauses.h"
 
 
 HTAB   *relations = NULL;
@@ -32,7 +33,17 @@ static bool globalByVal;
 
 static bool validate_range_constraint(Expr *, PartRelationInfo *, Datum *, Datum *);
 static bool validate_hash_constraint(Expr *expr, PartRelationInfo *prel, int *hash);
+static bool read_opexpr_const(OpExpr *opexpr, int varattno, Datum *val);
 static int cmp_range_entries(const void *p1, const void *p2);
+
+Size
+pathman_memsize()
+{
+	Size size;
+
+	size = get_dsm_shared_size() + MAXALIGN(sizeof(PathmanState));
+	return size;
+}
 
 void
 init_shmem_config()
@@ -163,11 +174,11 @@ load_relations_hashtable(bool reinitialize)
 	ListCell   *lc;
 	char	   *schema;
 	PartRelationInfo *prel;
-	char		sql[] = "SELECT pg_class.relfilenode, pg_attribute.attnum, cfg.parttype, pg_attribute.atttypid "
+	char		sql[] = "SELECT pg_class.oid, pg_attribute.attnum, cfg.parttype, pg_attribute.atttypid "
 						"FROM %s.pathman_config as cfg "
-						"JOIN pg_class ON pg_class.relfilenode = cfg.relname::regclass::oid "
-						"JOIN pg_attribute ON pg_attribute.attname = cfg.attname "
-						"AND attrelid = pg_class.relfilenode";
+						"JOIN pg_class ON pg_class.oid = cfg.relname::regclass::oid "
+						"JOIN pg_attribute ON pg_attribute.attname = lower(cfg.attname) "
+						"AND attrelid = pg_class.oid";
 	char *query;
 
 	SPI_connect();
@@ -263,8 +274,8 @@ create_relations_hashtable()
 void
 load_check_constraints(Oid parent_oid, Snapshot snapshot)
 {
-	PartRelationInfo *prel;
-	RangeRelation *rangerel;
+	PartRelationInfo *prel = NULL;
+	RangeRelation *rangerel = NULL;
 	SPIPlanPtr plan;
 	bool	found;
 	int		ret,
@@ -295,7 +306,7 @@ load_check_constraints(Oid parent_oid, Snapshot snapshot)
 	{
 		SPITupleTable *tuptable = SPI_tuptable;
 		Oid *children;
-		RangeEntry *ranges;
+		RangeEntry *ranges = NULL;
 		Datum min;
 		Datum max;
 		int hash;
@@ -387,8 +398,7 @@ load_check_constraints(Oid parent_oid, Snapshot snapshot)
 			bool byVal = rangerel->by_val;
 
 			/* Sort ascending */
-			tce = lookup_type_cache(prel->atttype,
-				TYPECACHE_CMP_PROC | TYPECACHE_CMP_PROC_FINFO);
+			tce = lookup_type_cache(prel->atttype, TYPECACHE_CMP_PROC | TYPECACHE_CMP_PROC_FINFO);
 			qsort_type_cmp_func = &tce->cmp_proc_finfo;
 			globalByVal = byVal;
 			qsort(ranges, proc, sizeof(RangeEntry), cmp_range_entries);
@@ -444,45 +454,48 @@ validate_range_constraint(Expr *expr, PartRelationInfo *prel, Datum *min, Datum 
 	OpExpr *opexpr;
 
 	/* it should be an AND operator on top */
-	if ( !(IsA(expr, BoolExpr) && boolexpr->boolop == AND_EXPR) )
+	if (!and_clause((Node *) expr))
 		return false;
 
-	/* and it should have exactly two operands */
-	if (list_length(boolexpr->args) != 2)
-		return false;
-
-	tce = lookup_type_cache(prel->atttype, TYPECACHE_EQ_OPR | TYPECACHE_LT_OPR | TYPECACHE_GT_OPR);
+	tce = lookup_type_cache(prel->atttype, TYPECACHE_BTREE_OPFAMILY);
 
 	/* check that left operand is >= operator */
 	opexpr = (OpExpr *) linitial(boolexpr->args);
 	if (get_op_opfamily_strategy(opexpr->opno, tce->btree_opf) == BTGreaterEqualStrategyNumber)
 	{
-		Node *left = linitial(opexpr->args);
-		Node *right = lsecond(opexpr->args);
-		if ( !IsA(left, Var) || !IsA(right, Const) )
+		if (!read_opexpr_const(opexpr, prel->attnum, min))
 			return false;
-		if ( ((Var*) left)->varattno != prel->attnum )
-			return false;
-		*min = ((Const*) right)->constvalue;
 	}
 	else
 		return false;
 
-	/* TODO: rewrite this */
 	/* check that right operand is < operator */
 	opexpr = (OpExpr *) lsecond(boolexpr->args);
 	if (get_op_opfamily_strategy(opexpr->opno, tce->btree_opf) == BTLessStrategyNumber)
 	{
-		Node *left = linitial(opexpr->args);
-		Node *right = lsecond(opexpr->args);
-		if ( !IsA(left, Var) || !IsA(right, Const) )
+		if (!read_opexpr_const(opexpr, prel->attnum, max))
 			return false;
-		if ( ((Var*) left)->varattno != prel->attnum )
-			return false;
-		*max = ((Const*) right)->constvalue;
 	}
 	else
 		return false;
+
+	return true;
+}
+
+/*
+ * Reads const value from expressions of kind: VAR >= CONST or VAR < CONST
+ */
+static bool
+read_opexpr_const(OpExpr *opexpr, int varattno, Datum *val)
+{
+	Node *left = linitial(opexpr->args);
+	Node *right = lsecond(opexpr->args);
+
+	if ( !IsA(left, Var) || !IsA(right, Const) )
+		return false;
+	if ( ((Var*) left)->varattno != varattno )
+		return false;
+	*val = ((Const*) right)->constvalue;
 
 	return true;
 }
@@ -503,7 +516,7 @@ validate_hash_constraint(Expr *expr, PartRelationInfo *prel, int *hash)
 	eqexpr = (OpExpr *) expr;
 
 	/* Is this an equality operator? */
-	tce = lookup_type_cache(prel->atttype, TYPECACHE_EQ_OPR);
+	tce = lookup_type_cache(prel->atttype, TYPECACHE_BTREE_OPFAMILY);
 	if (get_op_opfamily_strategy(eqexpr->opno, tce->btree_opf) != BTEqualStrategyNumber)
 		return false;
 
