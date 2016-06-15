@@ -13,8 +13,17 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <pthread.h>
 
 #include "catalog/pg_control.h"
+
+typedef struct
+{
+	parray *files;
+	pgBackup *backup;
+	unsigned int start_file_idx;
+	unsigned int end_file_idx;
+} restore_files_args;
 
 static void backup_online_files(bool re_recovery);
 static void restore_database(pgBackup *backup);
@@ -35,6 +44,8 @@ static void print_backup_lsn(const pgBackup *backup);
 static void search_next_wal(const char *path,
 							XLogRecPtr *need_lsn,
 							parray *timelines);
+static void restore_files(void *arg);
+
 
 int
 do_restore(const char *target_time,
@@ -87,7 +98,7 @@ do_restore(const char *target_time,
 	if (!backups)
 		elog(ERROR, "cannot process any more.");
 
-	cur_tli = get_current_timeline();
+	cur_tli = get_current_timeline(true);
 	backup_tli = get_fullbackup_timeline(backups, rt);
 
 	/* determine target timeline */
@@ -166,7 +177,8 @@ base_backup_found:
 			continue;
 
 		/* use database backup only */
-		if (backup->backup_mode != BACKUP_MODE_DIFF_PAGE)
+		if (backup->backup_mode != BACKUP_MODE_DIFF_PAGE &&
+			backup->backup_mode != BACKUP_MODE_DIFF_PTRACK)
 			continue;
 
 		/* is the backup is necessary for restore to target timeline ? */
@@ -196,7 +208,8 @@ base_backup_found:
 	}
 
 	/* create recovery.conf */
-	create_recovery_conf(target_time, target_xid, target_inclusive, target_tli);
+	if (!stream_wal)
+		create_recovery_conf(target_time, target_xid, target_inclusive, target_tli);
 
 	/* release catalog lock */
 	catalog_unlock();
@@ -229,6 +242,8 @@ restore_database(pgBackup *backup)
 	int		ret;
 	parray *files;
 	int		i;
+	pthread_t	restore_threads[num_threads];
+	restore_files_args *restore_threads_args[num_threads];
 
 	/* confirm block size compatibility */
 	if (backup->block_size != BLCKSZ)
@@ -299,46 +314,36 @@ restore_database(pgBackup *backup)
 			pgFileFree(parray_remove(files, i));
 	}
 
+	if (num_threads < 1)
+		num_threads = 1;
+
 	/* restore files into $PGDATA */
-	for (i = 0; i < parray_num(files); i++)
+	for (i = 0; i < num_threads; i++)
 	{
-		char from_root[MAXPGPATH];
-		pgFile *file = (pgFile *) parray_get(files, i);
+		restore_files_args *arg = pg_malloc(sizeof(restore_files_args));
+		arg->files = files;
+		arg->backup = backup;
+		arg->start_file_idx = i * (parray_num(files)/num_threads);
+		if (i == num_threads - 1)
+			arg->end_file_idx = parray_num(files);
+		else
+			arg->end_file_idx =  (i + 1) * (parray_num(files)/num_threads);
 
-		pgBackupGetPath(backup, from_root, lengthof(from_root), DATABASE_DIR);
+		if (verbose)
+			elog(WARNING, "Start thread for start_file_idx:%i end_file_idx:%i num:%li",
+				arg->start_file_idx,
+				arg->end_file_idx,
+				parray_num(files));
 
-		/* check for interrupt */
-		if (interrupted)
-			elog(ERROR, "interrupted during restore database");
+		restore_threads_args[i] = arg;
+		pthread_create(&restore_threads[i], NULL, (void *(*)(void *)) restore_files, arg);
+	}
 
-		/* print progress */
-		if (!check)
-			elog(LOG, "(%d/%lu) %s ", i + 1, (unsigned long) parray_num(files),
-				file->path + strlen(from_root) + 1);
-
-		/* directories are created with mkdirs.sh */
-		if (S_ISDIR(file->mode))
-		{
-			if (!check)
-				elog(LOG, "directory, skip");
-			continue;
-		}
-
-		/* not backed up */
-		if (file->write_size == BYTES_INVALID)
-		{
-			if (!check)
-				elog(LOG, "not backed up, skip");
-			continue;
-		}
-
-		/* restore file */
-		if (!check)
-			restore_data_file(from_root, pgdata, file);
-
-		/* print size of restored file */
-		if (!check)
-			elog(LOG, "restored %lu\n", (unsigned long) file->write_size);
+	/* Wait theads */
+	for (i = 0; i < num_threads; i++)
+	{
+		pthread_join(restore_threads[i], NULL);
+		pg_free(restore_threads_args[i]);
 	}
 
 	/* Delete files which are not in file list. */
@@ -391,6 +396,56 @@ restore_database(pgBackup *backup)
 
 
 static void
+restore_files(void *arg)
+{
+	int i;
+
+	restore_files_args *arguments = (restore_files_args *)arg;
+
+	/* restore files into $PGDATA */
+	for (i = arguments->start_file_idx; i < arguments->end_file_idx; i++)
+	{
+		char from_root[MAXPGPATH];
+		pgFile *file = (pgFile *) parray_get(arguments->files, i);
+
+		pgBackupGetPath(arguments->backup, from_root, lengthof(from_root), DATABASE_DIR);
+
+		/* check for interrupt */
+		if (interrupted)
+			elog(ERROR, "interrupted during restore database");
+
+		/* print progress */
+		if (!check)
+			elog(LOG, "(%d/%lu) %s ", i + 1, (unsigned long) parray_num(arguments->files),
+				file->path + strlen(from_root) + 1);
+
+		/* directories are created with mkdirs.sh */
+		if (S_ISDIR(file->mode))
+		{
+			if (!check)
+				elog(LOG, "directory, skip");
+			continue;
+		}
+
+		/* not backed up */
+		if (file->write_size == BYTES_INVALID)
+		{
+			if (!check)
+				elog(LOG, "not backed up, skip");
+			continue;
+		}
+
+		/* restore file */
+		if (!check)
+			restore_data_file(from_root, pgdata, file);
+
+		/* print size of restored file */
+		if (!check)
+			elog(LOG, "restored %lu\n", (unsigned long) file->write_size);
+	}
+}
+
+static void
 create_recovery_conf(const char *target_time,
 					 const char *target_xid,
 					 const char *target_inclusive,
@@ -416,12 +471,14 @@ create_recovery_conf(const char *target_time,
 		fprintf(fp, "# recovery.conf generated by pg_arman %s\n",
 			PROGRAM_VERSION);
 		fprintf(fp, "restore_command = 'cp %s/%%f %%p'\n", arclog_path);
+
 		if (target_time)
 			fprintf(fp, "recovery_target_time = '%s'\n", target_time);
 		if (target_xid)
 			fprintf(fp, "recovery_target_xid = '%s'\n", target_xid);
 		if (target_inclusive)
 			fprintf(fp, "recovery_target_inclusive = '%s'\n", target_inclusive);
+		/*fprintf(fp, "recovery_target = 'immediate'\n");*/
 		fprintf(fp, "recovery_target_timeline = '%u'\n", target_tli);
 
 		fclose(fp);

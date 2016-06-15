@@ -3143,6 +3143,12 @@ DATA(insert OID = 3814 ( pg_backup_start_time		PGNSP PGUID 12 1 0 0 0 f f f f t 
 DESCR("start time of an online backup");
 DATA(insert OID = 2848 ( pg_switch_xlog			PGNSP PGUID 12 1 0 0 0 f f f f t f v 0 0 3220 "" _null_ _null_ _null_ _null_ _null_ pg_switch_xlog _null_ _null_ _null_ ));
 DESCR("switch to new xlog file");
+DATA(insert OID = 6016 ( pg_ptrack_clear		PGNSP PGUID 12 1 0 0 0 f f f f t f v 0 0 2278 "" _null_ _null_ _null_ _null_ _null_ pg_ptrack_clear _null_ _null_ _null_ ));
+DESCR("clear ptrack fork files");
+DATA(insert OID = 6017 ( pg_ptrack_test		PGNSP PGUID 12 1 0 0 0 f f f f t f v 1 0 1007 "26" _null_ _null_ _null_ _null_ _null_ pg_ptrack_test _null_ _null_ _null_ ));
+DESCR("test ptrack fork relation");
+DATA(insert OID = 6018 ( pg_ptrack_get_and_clear		PGNSP PGUID 12 1 0 0 0 f f f f t f v 2 0 17 "26 26" _null_ _null_ _null_ _null_ _null_ pg_ptrack_get_and_clear _null_ _null_ _null_ ));
+DESCR("get ptrack file as bytea and clear him");
 DATA(insert OID = 3098 ( pg_create_restore_point	PGNSP PGUID 12 1 0 0 0 f f f f t f v 1 0 3220 "25" _null_ _null_ _null_ _null_ _null_ pg_create_restore_point _null_ _null_ _null_ ));
 DESCR("create a named restore point");
 DATA(insert OID = 2849 ( pg_current_xlog_location	PGNSP PGUID 12 1 0 0 0 f f f f t f v 0 0 3220 "" _null_ _null_ _null_ _null_ _null_ pg_current_xlog_location _null_ _null_ _null_ ));
