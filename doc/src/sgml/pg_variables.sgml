@@ -1,5 +1,5 @@
 <sect1 id="pg-variables">
-  <title>pg_variables - session variables with various types</title>
+  <title>pg_variables</title>
   <sect2 id="pg-varaibles-introduction">
     <title>Introduction</title>
     <para>
