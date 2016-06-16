@@ -109,7 +109,7 @@ distdir:
 	$(MAKE) -C $(distdir)/doc/src/sgml/ INSTALL
 	cp $(distdir)/doc/src/sgml/INSTALL $(distdir)/
 	$(MAKE) -C $(distdir) distclean
-	$(MAKE) -C $(distdir)/contrib/pg_arman/doc pg_arman.1 XMLTO=/usr/bin/xmlto ASCIIDOC=/usr/bin/asciidoc
+	cd $(distdir)/contrib/pg_arman/doc; $(PANDOC) -o pg_arman.1 -t man -s pg_arman.md 
 	rm -f $(distdir)/README.git
 
 distcheck: dist

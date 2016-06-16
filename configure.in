@@ -2134,7 +2134,7 @@ AC_CHECK_PROGS(DBTOEPUB, dbtoepub)
 AC_CHECK_PROGS(XMLLINT, xmllint)
 AC_CHECK_PROGS(XSLTPROC, xsltproc)
 AC_CHECK_PROGS(OSX, [osx sgml2xml sx])
-
+AC_CHECK_PROGS(PANDOC, pandoc)
 #
 # Check for test tools
 #
