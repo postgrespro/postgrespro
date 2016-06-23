@@ -76,7 +76,6 @@ _check_database_version(ArchiveHandle *AH)
 	/* Check if we use pgpro or vanilla postgres */
 	res = ExecuteSqlQueryForSingleRow((Archive *) AH, "SELECT exists(SELECT * FROM pg_proc WHERE proname = 'pgpro_version');");
 	AH->public.isPgpro = (strcmp(PQgetvalue(res, 0, 0), "t") == 0);
-	write_msg(NULL, "isPgpro = %s\n", PQgetvalue(res, 0, 0));
 	PQclear(res);
 }
 
