@@ -1,5 +1,28 @@
 <!-- doc/src/sgml/release-pro-9.5.sgml -->
 <!-- See header comment in release.sgml about typical markup -->
+<sect1 id="release-pro-9-5-3-2">
+<title>Postgres Pro 9.5.3.2</title>
+<note>
+<title>Release Date</title>
+<simpara>2016-06-27</simpara>
+</note>
+<sect2>
+<title>Overview</title>
+<para>This release is based on <productname>PostgreSQL</productname>
+9.5.3</para>
+<para>Major enhancement over the <productname>PostgresPro</productname>
+9.5.3.1 include:</para>
+<itemizedlist>
+<listitem><para>New version of pg_arman (Unix only) with enhanced
+incremental backup capabilites</para></listitem>
+<listitem><para>Various fixes and improvements in the
+pg_pathman</para></listitem>
+<listitem><para>Fixed problem with dumping of vanilla
+<productname>PostgreSQL</productname> database with
+<productname>PostgresPro</productname> pg_dump utility</para></listitem>
+</itemizedlist>
+</sect2>
+</sect1>
 <sect1 id="release-pro-9-5-3-1">
 <title>Postgres Pro 9.5.3.1</title>
 <note>
