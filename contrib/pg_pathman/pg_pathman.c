@@ -150,15 +150,13 @@ bms_print(Bitmapset *bms)
 void
 _PG_init(void)
 {
-#ifndef WIN32
-	if (IsUnderPostmaster)
+	if (!process_shared_preload_libraries_in_progress)
 	{
 		elog(ERROR, "Pathman module must be initialized in postmaster. "
 					"Put the following line to configuration file: "
 					"shared_preload_libraries='pg_pathman'");
 	        initialization_needed = false;
 	}
-#endif
 
 	/* Request additional shared resources */
 	RequestAddinShmemSpace(pathman_memsize());
