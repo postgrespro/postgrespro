@@ -344,6 +344,57 @@ text @@ text
     The form <type>text</type> <literal>@@</literal> <type>text</type>
     is equivalent to <literal>to_tsvector(x) @@ plainto_tsquery(y)</literal>.
    </para>
+
+   <para>
+    Within a <type>tsquery</>, the <literal>&amp;</literal> (AND) operator
+    specifies that both its arguments must appear in the document to have a
+    match.  Similarly, the <literal>|</literal> (OR) operator specifies that
+    at least one of its arguments must appear, while the <literal>!</> (NOT)
+    operator specifies that its argument must <emphasis>not</> appear in
+    order to have a match.  Parentheses can be used to control nesting of
+    these operators.
+   </para>
+
+   <para>
+    Searching for phrases is possible with the help of
+    the <literal>&lt;-&gt;</> (FOLLOWED BY) <type>tsquery</> operator, which
+    matches only if its arguments have matches that are adjacent and in the
+    given order.  For example:
+
+<programlisting>
+SELECT to_tsvector('fatal error') @@ to_tsquery('fatal &lt;-&gt; error');
+ ?column? 
+----------
+ t
+
+SELECT to_tsvector('error is not fatal') @@ to_tsquery('fatal &lt;-&gt; error');
+ ?column? 
+----------
+ f
+</programlisting>
+
+    There is a more general version of the FOLLOWED BY operator having the
+    form <literal>&lt;<replaceable>N</>&gt;</literal>,
+    where <replaceable>N</> is an integer standing for the exact distance
+    allowed between the matching lexemes.  <literal>&lt;1&gt;</literal> is
+    the same as <literal>&lt;-&gt;</>, while <literal>&lt;2&gt;</literal>
+    allows one other lexeme to appear between the matches, and so
+    on.  The <literal>phraseto_tsquery</> function makes use of this
+    operator to construct a <literal>tsquery</> that can match a multi-word
+    phrase when some of the words are stop words.  For example:
+
+<programlisting>
+SELECT phraseto_tsquery('cats ate rats');
+       phraseto_tsquery        
+-------------------------------
+ ( 'cat' &lt;-&gt; 'ate' ) &lt;-&gt; 'rat'
+
+SELECT phraseto_tsquery('the cats ate the rats');
+       phraseto_tsquery        
+-------------------------------
+ ( 'cat' &lt;-&gt; 'ate' ) &lt;2&gt; 'rat'
+</programlisting>
+   </para>
   </sect2>
 
   <sect2 id="textsearch-intro-configurations">
@@ -1501,8 +1552,11 @@ SELECT to_tsquery('fat') &lt;-&gt; to_tsquery('cat | rat');
 
      <listitem>
       <para>
-       Returns the distanced phrase-concatenation of the two given queries.
-       This function lies in the implementation of the <literal>&lt;-&gt;</> operator.
+       Returns a query that searches for a match to the first given query
+       followed by a match to the second given query at a distance of at
+       <replaceable>distance</replaceable> lexemes, using
+       the <literal>&lt;<replaceable>N</>&gt;</literal>
+       <type>tsquery</> operator.  For example:
 
 <screen>
 SELECT tsquery_phrase(to_tsquery('fat'), to_tsquery('cat'), 10);
