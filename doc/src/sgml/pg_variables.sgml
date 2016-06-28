@@ -7,9 +7,69 @@
       provides functions to work with variables of various types.
       Created variables live only in the current user session.
     </para>
+
+    <para>
+      Note that the module does not support transactions and savepoints. For
+      example:
+    </para>
+<programlisting>
+SELECT pgv_set_int('vars', 'int1', 101);
+BEGIN;
+SELECT pgv_set_int('vars', 'int2', 102);
+ROLLBACK;
+
+SELECT * FROM pgv_list() order by package, name;
+ package | name
+---------+------
+ vars    | int1
+ vars    | int2
+(2 rows)
+</programlisting>
   </sect2>
+
   <sect2 id="pg-variables-functions">
     <title>Module functions</title>
+
+    <para>
+      The functions provided by the <filename>pg_variables</filename> module are
+      shown in the tables below. The module supports the following scalar and
+      record types.
+    </para>
+
+    <para>
+      To use <function>pgv_get_()</> functions required package and variable
+      must exists. It is necessary to set variable with <function>pgv_set_()</>
+      functions to use <function>pgv_get_()</> functions.
+    </para>
+
+    <para>
+      If a package does not exists you will get the following error:
+    </para>
+
+<programlisting>
+SELECT pgv_get_int('vars', 'int1');
+ERROR:  unrecognized package "vars"
+</programlisting>
+
+    <para>
+      If a variable does not exists you will get the following error:
+    </para>
+
+<programlisting>
+SELECT pgv_get_int('vars', 'int1');
+ERROR:  unrecognized variable "int1"
+</programlisting>
+
+    <para>
+      <function>pgv_get_()</> functions check the variable type. If the variable
+      type does not match with the function type the error will be raised:
+    </para>
+
+<programlisting>
+SELECT pgv_get_text('vars', 'int1');
+ERROR:  variable "int1" requires "integer" value
+</programlisting>
+
     <sect3 id="pg-variables-integer-variables">
       <title>Integer variables</title>
       <informaltable>
@@ -257,6 +317,25 @@
     </sect3>
     <sect3 id="pg-variables-records">
       <title>Records</title>
+
+      <para>
+        The following functions are provided by the module to work with
+        collections of record types.
+      </para>
+
+      <para>
+        To use <function>pgv_update()</>, <function>pgv_delete()</> and
+        <function>pgv_select()</> functions required package and variable must
+        exists. Otherwise the error will be raised. It is necessary to set
+        variable with <function>pgv_insert()</> function to use these functions.
+      </para>
+
+      <para>
+        <function>pgv_update()</>, <function>pgv_delete()</> and
+        <function>pgv_select()</> functions check the variable type. If the
+        variable type does not record type the error will be raised.
+      </para>
+
       <informaltable>
         <tgroup cols="2">
           <thead>
@@ -266,6 +345,9 @@
               </entry>
               <entry>
                 Returns
+              </entry>
+              <entry>
+                Description
               </entry>
             </row>
           </thead>
@@ -277,6 +359,13 @@
               <entry>
                 <literal>void</literal>
               </entry>
+              <entry>
+                Inserts a record to the variable collection. If package and
+                variable do not exists they will be created. The first column
+                of <literal>r</> will be a primary key. If exists a record with the same
+                primary key the error will be raised. If this variable
+                collection has other structure the error will be raised.
+              </entry>
             </row>
             <row>
               <entry>
@@ -284,6 +373,12 @@
               </entry>
               <entry>
                 <literal>boolean</literal>
+              </entry>
+              <entry>
+                Updates a record with the corresponding primary key (the first
+                column of <literal>r</> is a primary key). Returns
+                <literal>true</> if a record was found. If this variable
+                collection has other structure the error will be raised.
               </entry>
             </row>
             <row>
@@ -293,6 +388,11 @@
               <entry>
                 <literal>boolean</literal>
               </entry>
+              <entry>
+                Deletes a record with the corresponding primary key (the first
+                column of <literal>r</> is a primary key). Returns
+                <literal>true</> if a record was found.
+              </entry>
             </row>
             <row>
               <entry>
@@ -300,6 +400,9 @@
               </entry>
               <entry>
                 <literal>set of record</literal>
+              </entry>
+              <entry>
+                Returns the variable collection records.
               </entry>
             </row>
             <row>
@@ -309,6 +412,10 @@
               <entry>
                 <literal>record</literal>
               </entry>
+              <entry>
+                Returns the record with the corresponding primary key (the first
+                column of <literal>r</> is a primary key).
+              </entry>
             </row>
             <row>
               <entry>
@@ -316,6 +423,11 @@
               </entry>
               <entry>
                 <literal>set of record</literal>
+              </entry>
+              <entry>
+                Returns the variable collection records with the corresponding
+                primary keys (the first column of <literal>r</> is a primary
+                key).
               </entry>
             </row>
           </tbody>
@@ -334,6 +446,9 @@
               <entry>
                 Returns
               </entry>
+              <entry>
+                Description
+              </entry>
             </row>
           </thead>
           <tbody>
@@ -344,6 +459,9 @@
               <entry>
                 <literal>bool</literal>
               </entry>
+              <entry>
+                Returns <literal>true</> if package and variable exists.
+              </entry>
             </row>
             <row>
               <entry>
@@ -351,6 +469,11 @@
               </entry>
               <entry>
                 <literal>void</literal>
+              </entry>
+              <entry>
+                Removes the variable with the corresponding name. Required
+                package and variable must exists, otherwise the error will be
+                raised.
               </entry>
             </row>
             <row>
@@ -360,6 +483,11 @@
               <entry>
                 <literal>void</literal>
               </entry>
+              <entry>
+                Removes the package and all package variables with the
+                corresponding name. Required package must exists, otherwise the
+                error will be raised.
+              </entry>
             </row>
             <row>
               <entry>
@@ -367,6 +495,9 @@
               </entry>
               <entry>
                 <literal>void</literal>
+              </entry>
+              <entry>
+                Removes all packages and variables.
               </entry>
             </row>
             <row>
@@ -376,6 +507,9 @@
               <entry>
                 <literal>table(package text, name text)</literal>
               </entry>
+              <entry>
+                Returns set of records of assigned packages and variables.
+              </entry>
             </row>
             <row>
               <entry>
@@ -383,6 +517,9 @@
               </entry>
               <entry>
                 <literal>table(package text, used_memory bigint)</literal>
+              </entry>
+              <entry>
+                Returns list of assigned packages and used memory in bytes.
               </entry>
             </row>
           </tbody>
@@ -399,7 +536,7 @@
     <para>
       It is easy to use functions to work with scalar variables:
     </para>
-    <programlisting>
+<programlisting>
 SELECT pgv_set_int('vars', 'int1', 101);
 SELECT pgv_set_int('vars', 'int2', 102);
 
@@ -418,14 +555,14 @@ SELECT pgv_get_int('vars', 'int2');
     <para>
       Let's assume we have a <varname>tab</varname> table:
     </para>
-    <programlisting>
+<programlisting>
 CREATE TABLE tab (id int, t varchar);
 INSERT INTO tab VALUES (0, 'str00'), (1, 'str11');
 </programlisting>
     <para>
       Then you can use functions to work with record variables:
     </para>
-    <programlisting>
+<programlisting>
 SELECT pgv_insert('vars', 'r1', tab) FROM tab;
 
 SELECT pgv_select('vars', 'r1');
@@ -465,7 +602,7 @@ SELECT pgv_select('vars', 'r1');
     <para>
       You can list packages and variables:
     </para>
-    <programlisting>
+<programlisting>
 SELECT * FROM pgv_list() order by package, name;
  package | name 
 ---------+------
@@ -477,7 +614,7 @@ SELECT * FROM pgv_list() order by package, name;
     <para>
       And get used memory in bytes:
     </para>
-    <programlisting>
+<programlisting>
 SELECT * FROM pgv_stats() order by package;
  package | used_memory
 ---------+-------------
@@ -487,14 +624,14 @@ SELECT * FROM pgv_stats() order by package;
     <para>
       You can delete variables or whole packages:
     </para>
-    <programlisting>
+<programlisting>
 SELECT pgv_remove('vars', 'int1');
 SELECT pgv_remove('vars');
 </programlisting>
     <para>
       You can delete all packages and variables:
     </para>
-    <programlisting>
+<programlisting>
 SELECT pgv_free();
 </programlisting>
   </sect2>
