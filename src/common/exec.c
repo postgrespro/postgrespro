@@ -441,13 +441,13 @@ pipe_read_line(char *cmd, char *line, int maxsize)
 			/* Let's see if we can read */
 			if (WaitForSingleObject(childstdoutrddup, 10000) != WAIT_OBJECT_0)
 				break;			/* Timeout, but perhaps we got a line already */
-
+			
 			if (!ReadFile(childstdoutrddup, lineptr, maxsize - (lineptr - line),
-						  &bytesread, NULL))
+				&bytesread, NULL))
 				break;			/* Error, but perhaps we got a line already */
-
+			
 			lineptr += strlen(lineptr);
-
+			
 			if (!bytesread)
 				break;			/* EOF */
 
@@ -577,6 +577,11 @@ set_pglocale_pgservice(const char *argv0, const char *app)
 	get_locale_path(my_exec_path, path);
 	bindtextdomain(app, path);
 	textdomain(app);
+
+#if defined(HAVE_WIN32_LIBEDIT) && defined(ENABLE_NLS)
+	bind_textdomain_codeset(app, "UTF-8");
+	bind_textdomain_codeset(PG_TEXTDOMAIN("libpq"), "UTF-8");
+#endif
 
 	if (getenv("PGLOCALEDIR") == NULL)
 	{

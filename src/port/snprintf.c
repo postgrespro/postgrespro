@@ -1,4 +1,4 @@
-/*
+ /*
  * Copyright (c) 1983, 1995, 1996 Eric P. Allman
  * Copyright (c) 1988, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -292,6 +292,7 @@ flushbuffer(PrintfTarget *target)
 #endif		
 	}
 	target->bufptr = target->bufstart;
+	fflush(target->stream);
 }
 
 
@@ -1179,6 +1180,24 @@ int pg_fputs(const char *s, FILE *stream)
 	target.bufend=NULL;
 	target.failed=false;
 	target.stream = stream;
+	flushbuffer(&target);
+	return target.failed ? -1 : target.nchars;
+}
+
+/* replacement to puts function which uses flushBuffer */
+int pg_puts(const char *tmps)
+{
+	char *s = NULL;
+
+	s = (char *)malloc(strlen(tmps) + 1);	
+	sprintf(s, "%s\n", tmps);
+	PrintfTarget target;
+	target.bufstart = s;
+	target.nchars = 0;
+	target.bufptr = s + strlen(s);
+	target.bufend = NULL;
+	target.failed = false;
+	target.stream = stdout;
 	flushbuffer(&target);
 	return target.failed ? -1 : target.nchars;
 }

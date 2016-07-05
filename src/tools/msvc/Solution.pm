@@ -168,6 +168,8 @@ s{PG_VERSION_STR "[^"]+"}{__STRINGIFY(x) #x\n#define __STRINGIFY2(z) __STRINGIFY
 		print O "#define PG_MAJORVERSION \"$self->{majorver}\"\n";
 		print O "#define LOCALEDIR \"/share/locale\"\n"
 		  if ($self->{options}->{nls});
+		print O "#define LC_MESSAGES 6\n"
+			if ($self->{options}->{nls});
 		print O "/* defines added by config steps */\n";
 		print O "#ifndef IGNORE_CONFIGURED_SETTINGS\n";
 		print O "#define USE_ASSERT_CHECKING 1\n"

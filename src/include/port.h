@@ -164,6 +164,7 @@ extern int	pg_printf(const char *fmt,...) pg_attribute_printf(1, 2);
 
 #ifdef HAVE_WIN32_LIBEDIT
 extern int pg_fputs(const char *s, FILE *stream);
+extern int pg_puts(const char *s);
 #endif
 /*
  *	The GCC-specific code below prevents the pg_attribute_printf above from
@@ -188,6 +189,7 @@ extern int pg_fputs(const char *s, FILE *stream);
 #ifdef HAVE_WIN32_LIBEDIT
 /* Catch fputs as well so we can use WriteConsole for table output */
 #define fputs(s,f)		pg_fputs(s,f)
+#define puts(s)			pg_puts(s)
 #endif
 #endif   /* USE_REPL_SNPRINTF */
 
