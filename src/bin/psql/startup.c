@@ -96,10 +96,6 @@ main(int argc, char *argv[])
 	bool		new_pass;
 
 	set_pglocale_pgservice(argv[0], PG_TEXTDOMAIN("psql"));
-#if defined(HAVE_WIN32_LIBEDIT) && defined(ENABLE_NLS)
-	bind_textdomain_codeset(PG_TEXTDOMAIN("psql"),"UTF-8");
-	bind_textdomain_codeset(PG_TEXTDOMAIN("libpq"),"UTF-8");
-#endif
 
 	if (argc > 1)
 	{
