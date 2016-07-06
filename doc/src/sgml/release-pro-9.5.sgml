@@ -1,5 +1,47 @@
 <!-- doc/src/sgml/release-pro-9.5.sgml -->
 <!-- See header comment in release.sgml about typical markup -->
+<sect1 id="release-pro-9-5-3-3">
+  <title>Postgres Pro 9.5.3.3</title>
+  <note>
+    <title>Release Date</title>
+    <simpara>2016-XX-XX</simpara>
+  </note>
+  <sect2>
+    <title>Overview</title>
+    <para>This release is based on <productname>PostgreSQL</productname>
+      9.5.3</para>
+    <para>Major enhancement over the <productname>PostgresPro</productname>
+      9.5.3.2 include:</para>
+    <itemizedlist>
+      <listitem>
+        <para>Changed the distance semantic of the FTS phrase operator: less-or-equal
+          replaced by exact match (For details see: <xref linkend="textsearch-matching">).</para>
+      </listitem>
+      <listitem>
+        <para>Changed predecence of the phrase operator. The
+          operator <literal>&lt;-&gt;</literal> now have higher
+          predecence than <literal>&amp;</literal> (AND) operator.</para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+  <sect2>
+    <title>Migration to Version 9.5.3.3</title>    
+    <para>
+      A dump/restore is not required for those running 9.5.3.X.
+    </para>    
+    <para>
+      However, if you are upgrading from a version earlier than 9.5.3.2,
+      see <xref linkend="release-pro-9-5-3-2">.
+    </para>
+  </sect2>
+  <sect2>
+    <title>Potential problems</title>
+    <para>On the Microsoft Windows systems may not work plperl loading (<command>create
+      extension plperl</command>). For ActivePerl since version 5.16 as C
+      compiler used GCC from MinGW, but plperl compiled by MSVC2013 now.
+      Perl version handshake be poor.</para>
+  </sect2>
+</sect1>
 <sect1 id="release-pro-9-5-3-2">
 <title>Postgres Pro 9.5.3.2</title>
 <note>
