@@ -865,8 +865,11 @@ initialize_readline(void)
 	rl_basic_word_break_characters = WORD_BREAKS;
 
 	/* In WinLibEdit rl_basic_word_break_characters is constant */
-	completion_max_records = 1000;
+	
 #endif
+
+	completion_max_records = 1000;
+
 	/*
 	 * There is a variable rl_completion_query_items for this but apparently
 	 * it's not defined everywhere.
