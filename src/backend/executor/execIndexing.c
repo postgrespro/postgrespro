@@ -260,6 +260,9 @@ ExecCloseIndices(ResultRelInfo *resultRelInfo)
  *		the same is done for non-deferred constraints, but report
  *		if conflict was speculative or deferred conflict to caller)
  *
+ *		If 'arbiterIndexes' is nonempty, noDupErr applies only to
+ *		those indexes.  NIL means noDupErr applies to all indexes.
+ *
  *		CAUTION: this must not be called for a HOT update.
  *		We can't defend against that here for lack of info.
  *		Should we change the API to make it safer?
@@ -309,18 +312,14 @@ ExecInsertIndexTuples(TupleTableSlot *slot,
 	{
 		Relation	indexRelation = relationDescs[i];
 		IndexInfo  *indexInfo;
+		bool		applyNoDupErr;
 		IndexUniqueCheck checkUnique;
 		bool		satisfiesConstraint;
-		bool		arbiter;
 
 		if (indexRelation == NULL)
 			continue;
 
 		indexInfo = indexInfoArray[i];
-
-		/* Record if speculative insertion arbiter */
-		arbiter = list_member_oid(arbiterIndexes,
-								  indexRelation->rd_index->indexrelid);
 
 		/* If the index is marked as read-only, ignore it */
 		if (!indexInfo->ii_ReadyForInserts)
@@ -359,6 +358,12 @@ ExecInsertIndexTuples(TupleTableSlot *slot,
 					   values,
 					   isnull);
 
+		/* Check whether to apply noDupErr to this index */
+		applyNoDupErr = noDupErr &&
+			(arbiterIndexes == NIL ||
+			 list_member_oid(arbiterIndexes,
+							 indexRelation->rd_index->indexrelid));
+
 		/*
 		 * The index AM does the actual insertion, plus uniqueness checking.
 		 *
@@ -374,7 +379,7 @@ ExecInsertIndexTuples(TupleTableSlot *slot,
 		 */
 		if (!indexRelation->rd_index->indisunique)
 			checkUnique = UNIQUE_CHECK_NO;
-		else if (noDupErr && (arbiterIndexes == NIL || arbiter))
+		else if (applyNoDupErr)
 			checkUnique = UNIQUE_CHECK_PARTIAL;
 		else if (indexRelation->rd_index->indimmediate)
 			checkUnique = UNIQUE_CHECK_YES;
@@ -408,7 +413,7 @@ ExecInsertIndexTuples(TupleTableSlot *slot,
 			bool		violationOK;
 			CEOUC_WAIT_MODE waitMode;
 
-			if (noDupErr)
+			if (applyNoDupErr)
 			{
 				violationOK = true;
 				waitMode = CEOUC_LIVELOCK_PREVENTING_WAIT;

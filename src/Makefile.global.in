@@ -403,6 +403,7 @@ NSGMLS			= @NSGMLS@
 OSX				= @OSX@
 XMLLINT			= @XMLLINT@
 XSLTPROC		= @XSLTPROC@
+PANDOC			= @PANDOC@
 
 # Code coverage
 

@@ -1,5 +1,13 @@
 CREATE EXTENSION pg_variables;
 -- Integer variables
+SELECT pgv_get_int('vars', 'int1');
+ERROR:  unrecognized package "vars"
+SELECT pgv_get_int('vars', 'int1', false);
+ pgv_get_int 
+-------------
+            
+(1 row)
+
 SELECT pgv_set_int('vars', 'int1', 101);
  pgv_set_int 
 -------------

@@ -172,6 +172,8 @@ typedef struct Archive
 	int			verbose;
 	char	   *remoteVersionStr;		/* server's version string */
 	int			remoteVersion;	/* same in numeric form */
+	bool		isPgpro;		/* true if server is PGPRO version */
+	bool		isStandby;		/* is server a standby node */
 
 	int			minRemoteVersion;		/* allowable range */
 	int			maxRemoteVersion;

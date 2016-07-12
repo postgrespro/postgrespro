@@ -6,6 +6,10 @@ if [ -z "$PGDATA" ]; then
 	echo "PGDATA environment variable is not set. Stop." 1>&2
 	exit 2
 fi
+if [ -e "$PGDATA/recovery.conf" ]; then
+	echo "recovery.conf exists in PGDATA. No upgrade script could be run." 1>&2
+	exit 0
+fi
 PGBIN="`echo $0|sed 's![^/\\]*$!!'`"
 if [ "$1" = "--check" ]; then
    check=1
