@@ -284,7 +284,7 @@ ptrack_get_and_clear(Oid tablespace_oid, Oid table_oid)
 		elog(WARNING, "InvalidOid");
 		goto full_end;
 	}
-	
+
 	rel = RelationIdGetRelation(RelidByRelfilenode(tablespace_oid, table_oid));
 
 	if (rel == InvalidRelation)
