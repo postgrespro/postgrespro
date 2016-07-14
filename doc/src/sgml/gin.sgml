@@ -705,7 +705,7 @@
  </para>
 
  <para>
-  As of <productname>&productname;</productname> 9.1, null key values can be
+  As of <productname>PostgreSQL</productname> 9.1, null key values can be
   included in the index.  Also, placeholder nulls are included in the index
   for indexed items that are null or contain no keys according to
   <function>extractValue</>.  This allows searches that should find empty
@@ -725,7 +725,7 @@
    Updating a <acronym>GIN</acronym> index tends to be slow because of the
    intrinsic nature of inverted indexes: inserting or updating one heap row
    can cause many inserts into the index (one for each key extracted
-   from the indexed item). As of <productname>&productname;</productname> 8.4,
+   from the indexed item). As of <productname>PostgreSQL</productname> 8.4,
    <acronym>GIN</> is capable of postponing much of this work by inserting
    new tuples into a temporary, unsorted list of pending entries.
    When the table is vacuumed, or if the pending list becomes larger than
@@ -792,7 +792,7 @@
     </para>
 
     <para>
-     As of <productname>&productname;</productname> 8.4, this advice is less
+     As of <productname>PostgreSQL</productname> 8.4, this advice is less
      necessary since delayed indexing is used (see <xref
      linkend="gin-fast-update"> for details).  But for very large updates
      it may still be best to drop and recreate the index.

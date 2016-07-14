@@ -992,7 +992,7 @@ SPIPlanPtr SPI_prepare(const char * <parameter>command</parameter>, int <paramet
    statement.  Also, if the value of <xref linkend="guc-search-path"> changes
    from one use to the next, the statement will be re-parsed using the new
    <varname>search_path</>.  (This latter behavior is new as of
-   <productname>&productname;</productname> 9.3.)  See <xref
+   <productname>PostgreSQL</productname> 9.3.)  See <xref
    linkend="sql-prepare"> for more information about the behavior of prepared
    statements.
   </para>
@@ -3950,7 +3950,7 @@ void SPI_freetuptable(SPITupleTable * <parameter>tuptable</parameter>)
   </para>
 
   <para>
-   Beginning in <productname>&productname;</> 9.3,
+   Beginning in <productname>PostgreSQL</> 9.3,
    <function>SPI_freetuptable</function> contains guard logic to protect
    against duplicate deletion requests for the same row set.  In previous
    releases, duplicate deletions would lead to crashes.

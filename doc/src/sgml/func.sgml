@@ -1125,7 +1125,7 @@
 
    <note>
     <para>
-     Before <productname>&productname;</productname> 8.3, these functions would
+     Before <productname>PostgreSQL</productname> 8.3, these functions would
      silently accept values of several non-string data types as well, due to
      the presence of implicit coercions from those data types to
      <type>text</>.  Those coercions have been removed because they frequently
@@ -5352,7 +5352,7 @@ SELECT regexp_matches('abc01234xyz', '(?:(.*?)(\d+)(.*)){1,1}');
 
    <para>
     Two significant incompatibilities exist between AREs and the ERE syntax
-    recognized by pre-7.4 releases of <productname>&productname;</>:
+    recognized by pre-7.4 releases of <productname>PostgreSQL</>:
 
     <itemizedlist>
      <listitem>
@@ -7294,7 +7294,7 @@ SELECT EXTRACT(ISOYEAR FROM DATE '2006-01-02');
         field for more information.
        </para>
        <para>
-        This field is not available in &productname; releases prior to 8.3.
+        This field is not available in PostgreSQL releases prior to 8.3.
        </para>
       </listitem>
      </varlistentry>
@@ -8177,7 +8177,7 @@ CREATE TYPE rainbow AS ENUM ('red', 'orange', 'yellow', 'green', 'blue', 'purple
 
    <note>
     <para>
-     Before <productname>&productname;</productname> 8.2, the containment
+     Before <productname>PostgreSQL</productname> 8.2, the containment
      operators <literal>@&gt;</> and <literal>&lt;@</> were respectively
      called <literal>~</> and <literal>@</>.  These names are still
      available, but are deprecated and will eventually be removed.
@@ -11176,7 +11176,7 @@ nextval('foo')              <lineannotation>searches search path for <literal>fo
 
   <note>
    <para>
-    Before <productname>&productname;</productname> 8.1, the arguments of the
+    Before <productname>PostgreSQL</productname> 8.1, the arguments of the
     sequence functions were of type <type>text</>, not <type>regclass</>, and
     the above-described conversion from a text string to an OID value would
     happen at run time during each call.  For backward compatibility, this
@@ -11199,7 +11199,7 @@ nextval('foo')              <lineannotation>searches search path for <literal>fo
 nextval('foo'::text)      <lineannotation><literal>foo</literal> is looked up at runtime</>
 </programlisting>
     Note that late binding was the only behavior supported in
-    <productname>&productname;</productname> releases before 8.1, so you
+    <productname>PostgreSQL</productname> releases before 8.1, so you
     might need to do this to preserve the semantics of old applications.
    </para>
 
@@ -11703,7 +11703,7 @@ SELECT NULLIF(value, '(none)') ...
    If the contents of two arrays are equal but the dimensionality is
    different, the first difference in the dimensionality information
    determines the sort order.  (This is a change from versions of
-   <productname>&productname;</> prior to 8.2: older versions would claim
+   <productname>PostgreSQL</> prior to 8.2: older versions would claim
    that two arrays with the same contents were equal, even if the
    number of dimensions or subscript ranges were different.)
   </para>
@@ -12038,7 +12038,7 @@ NULL baz</literallayout>(3 rows)</entry>
    <note>
     <para>
      There are two differences in the behavior of <function>string_to_array</>
-     from pre-9.1 versions of <productname>&productname;</>.
+     from pre-9.1 versions of <productname>PostgreSQL</>.
      First, it will return an empty (zero-element) array rather than NULL when
      the input string is of zero length.  Second, if the delimiter string is
      NULL, the function splits the input into individual characters, rather

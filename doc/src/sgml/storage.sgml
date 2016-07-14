@@ -770,10 +770,10 @@ data. Empty in ordinary tables.</entry>
   unallocated space, and to the start of the special space.  The next 2
   bytes of the page header, <structfield>pd_pagesize_version</structfield>,
   store both the page size and a version indicator.  Beginning with
-  <productname>&productname;</productname> 8.3 the version number is 4;
-  <productname>&productname;</productname> 8.1 and 8.2 used version number 3;
-  <productname>&productname;</productname> 8.0 used version number 2;
-  <productname>&productname;</productname> 7.3 and 7.4 used version number 1;
+  <productname>PostgreSQL</productname> 8.3 the version number is 4;
+  <productname>PostgreSQL</productname> 8.1 and 8.2 used version number 3;
+  <productname>PostgreSQL</productname> 8.0 used version number 2;
+  <productname>PostgreSQL</productname> 7.3 and 7.4 used version number 1;
   prior releases used version number 0.
   (The basic page layout and header format has not changed in most of these
   versions, but the layout of heap row headers has.)  The page size

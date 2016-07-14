@@ -477,7 +477,7 @@
 
   <para>
    <filename>postgres_fdw</> can be used with remote servers dating back
-   to <productname>&productname;</> 8.3.  Read-only capability is available
+   to <productname>PostgreSQL</> 8.3.  Read-only capability is available
    back to 8.1.  A limitation however is that <filename>postgres_fdw</>
    generally assumes that immutable built-in functions and operators are
    safe to send to the remote server for execution, if they appear in a

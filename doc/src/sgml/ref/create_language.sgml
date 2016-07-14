@@ -39,7 +39,7 @@ CREATE [ OR REPLACE ] [ TRUSTED ] [ PROCEDURAL ] LANGUAGE <replaceable class="pa
 
   <note>
    <para>
-    As of <productname>&productname;</productname> 9.1, most procedural
+    As of <productname>PostgreSQL</productname> 9.1, most procedural
     languages have been made into <quote>extensions</>, and should
     therefore be installed with <xref linkend="sql-createextension">
     not <command>CREATE LANGUAGE</command>.  Direct use of
@@ -274,7 +274,7 @@ CREATE [ OR REPLACE ] [ TRUSTED ] [ PROCEDURAL ] LANGUAGE <replaceable class="pa
   </para>
 
   <para>
-   In <productname>&productname;</productname> versions before 7.3, it was
+   In <productname>PostgreSQL</productname> versions before 7.3, it was
    necessary to declare handler functions as returning the placeholder
    type <type>opaque</>, rather than <type>language_handler</>.
    To support loading

@@ -59,7 +59,7 @@
    </para>
 
    <para>
-    In <productname>&productname;</> 9.0 and later,
+    In <productname>PostgreSQL</> 9.0 and later,
     <application>PL/pgSQL</application> is installed by default.
     However it is still a loadable module, so especially security-conscious
     administrators could choose to remove it.
@@ -2163,7 +2163,7 @@ EXIT <optional> <replaceable>label</replaceable> </optional> <optional> WHEN <re
         Note that a label must be used for this purpose; an unlabeled
         <literal>EXIT</literal> is never considered to match a
         <literal>BEGIN</literal> block.  (This is a change from
-        pre-8.4 releases of <productname>&productname;</productname>, which
+        pre-8.4 releases of <productname>PostgreSQL</productname>, which
         would allow an unlabeled <literal>EXIT</literal> to match
         a <literal>BEGIN</literal> block.)
        </para>
@@ -3559,7 +3559,7 @@ RAISE unique_violation USING MESSAGE = 'Duplicate user ID: ' || user_id;
 
    <note>
     <para>
-     Before <productname>&productname;</> 9.1, <command>RAISE</> without
+     Before <productname>PostgreSQL</> 9.1, <command>RAISE</> without
      parameters was interpreted as re-throwing the error from the block
      containing the active exception handler.  Thus an <literal>EXCEPTION</>
      clause nested within that handler could not catch it, even if the
@@ -4310,7 +4310,7 @@ INSERT INTO foo (foo) VALUES (foo);
 
    <note>
     <para>
-     <productname>&productname;</productname> versions before 9.0 would try
+     <productname>PostgreSQL</productname> versions before 9.0 would try
      to substitute the variable in all three cases, leading to syntax errors.
     </para>
    </note>
@@ -4373,7 +4373,7 @@ BEGIN
     large body of <application>PL/pgSQL</> code.  In such cases you can
     specify that <application>PL/pgSQL</> should resolve ambiguous references
     as the variable (which is compatible with <application>PL/pgSQL</>'s
-    behavior before <productname>&productname;</productname> 9.0), or as the
+    behavior before <productname>PostgreSQL</productname> 9.0), or as the
     table column (which is compatible with some other systems such as
     <productname>Oracle</productname>).
    </para>

@@ -2187,7 +2187,7 @@ lo_import 152801
 
           <para><literal>old-ascii</literal> style uses plain <acronym>ASCII</>
           characters, using the formatting style used
-          in <productname>&productname;</productname> 8.4 and earlier.
+          in <productname>PostgreSQL</productname> 8.4 and earlier.
           Newlines in data are shown using a <literal>:</literal>
           symbol in place of the left-hand column separator.
           When the data is wrapped from one line
@@ -3737,7 +3737,7 @@ PSQL_EDITOR_LINENUMBER_ARG='--line '
        In an earlier life <application>psql</application> allowed the
        first argument of a single-letter backslash command to start
        directly after the command, without intervening whitespace.
-       As of <productname>&productname;</productname> 8.4 this is no
+       As of <productname>PostgreSQL</productname> 8.4 this is no
        longer allowed.
       </para>
       </listitem>

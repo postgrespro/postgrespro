@@ -3899,7 +3899,7 @@ Parser: "pg_catalog.default"
   </para>
 
   <para>
-   For comparison, the <productname>&productname;</productname> 8.1 documentation
+   For comparison, the <productname>PostgreSQL</productname> 8.1 documentation
    contained 10,441 unique words, a total of 335,420 words, and the most
    frequent word <quote>postgresql</> was mentioned 6,127 times in 655
    documents.
@@ -3907,7 +3907,7 @@ Parser: "pg_catalog.default"
 
    <!-- TODO we need to put a date on these numbers? -->
   <para>
-   Another example &mdash; the <productname>&productname;</productname> mailing
+   Another example &mdash; the <productname>PostgreSQL</productname> mailing
    list archives contained 910,989 unique words with 57,491,343 lexemes in
    461,020 messages.
   </para>

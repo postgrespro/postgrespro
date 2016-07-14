@@ -410,7 +410,7 @@ UPDATE OF <replaceable>column_name1</replaceable> [, <replaceable>column_name2</
   </para>
 
   <para>
-   In <productname>&productname;</productname> versions before 7.3, it was
+   In <productname>PostgreSQL</productname> versions before 7.3, it was
    necessary to declare trigger functions as returning the placeholder
    type <type>opaque</>, rather than <type>trigger</>.  To support loading
    of old dump files, <command>CREATE TRIGGER</> will accept a function

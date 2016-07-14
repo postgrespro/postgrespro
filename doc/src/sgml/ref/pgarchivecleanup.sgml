@@ -152,8 +152,8 @@ pg_archivecleanup:  removing file "archive/00000001000000370000000E"
 
   <para>
    <application>pg_archivecleanup</application> is designed to work with
-   <productname>&productname;</> 8.0 and later when used as a standalone utility,
-   or with <productname>&productname;</> 9.0 and later when used as an
+   <productname>PostgreSQL</> 8.0 and later when used as a standalone utility,
+   or with <productname>PostgreSQL</> 9.0 and later when used as an
    archive cleanup command.
   </para>
 

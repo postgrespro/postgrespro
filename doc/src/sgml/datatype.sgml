@@ -1272,7 +1272,7 @@ SELECT b, char_length(b) FROM test2;
     of these are always accepted on input.  The output format depends
     on the configuration parameter <xref linkend="guc-bytea-output">;
     the default is hex.  (Note that the hex format was introduced in
-    <productname>&productname;</productname> 9.0; earlier versions and some
+    <productname>PostgreSQL</productname> 9.0; earlier versions and some
     tools don't understand it.)
    </para>
 
@@ -2478,7 +2478,7 @@ January 8 04:05:06 1999 PST
 
     <para>
      In all cases, timezone names and abbreviations are recognized
-     case-insensitively.  (This is a change from <productname>&productname;</>
+     case-insensitively.  (This is a change from <productname>PostgreSQL</>
      versions prior to 8.2, which were case-sensitive in some contexts but
      not others.)
     </para>
@@ -2756,13 +2756,13 @@ P <optional> <replaceable>years</>-<replaceable>months</>-<replaceable>days</> <
 
     <para>
      The output of the <literal>postgres</> style matches the output of
-     <productname>&productname;</> releases prior to 8.4 when the
+     <productname>PostgreSQL</> releases prior to 8.4 when the
      <xref linkend="guc-datestyle"> parameter was set to <literal>ISO</>.
     </para>
 
     <para>
      The output of the <literal>postgres_verbose</> style matches the output of
-     <productname>&productname;</> releases prior to 8.4 when the
+     <productname>PostgreSQL</> releases prior to 8.4 when the
      <varname>DateStyle</> parameter was set to non-<literal>ISO</> output.
     </para>
 

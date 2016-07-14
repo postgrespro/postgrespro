@@ -1088,7 +1088,7 @@ CREATE TABLE circles (
      <listitem>
       <para>
        Of course, the tables in question must be created <literal>WITH
-       OIDS</literal>.  As of <productname>&productname;</productname> 8.1,
+       OIDS</literal>.  As of <productname>PostgreSQL</productname> 8.1,
        <literal>WITHOUT OIDS</> is the default.
       </para>
      </listitem>

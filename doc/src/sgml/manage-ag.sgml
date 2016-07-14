@@ -517,7 +517,7 @@ SELECT spcname FROM pg_tablespace;
    point to each of the non-built-in tablespaces defined in the cluster.
    Although not recommended, it is possible to adjust the tablespace
    layout by hand by redefining these links. Under no circumstances perform
-   this operation while the server is running. Note that in &productname; 9.1
+   this operation while the server is running. Note that in PostgreSQL 9.1
    and earlier you will also need to update the <structname>pg_tablespace</>
    catalog with the new locations. (If you do not, <literal>pg_dump</> will
    continue to output the old tablespace locations.)

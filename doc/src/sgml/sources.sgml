@@ -367,7 +367,7 @@ ereport(ERROR,
      potentially-localized error message text.
      These functions should be used in error reports for which it's likely
      that applications would wish to have automatic error handling.  As of
-     <productname>&productname;</> 9.3, complete coverage exists only for
+     <productname>PostgreSQL</> 9.3, complete coverage exists only for
      errors in SQLSTATE class 23 (integrity constraint violation), but this
      is likely to be expanded in future.
     </para>

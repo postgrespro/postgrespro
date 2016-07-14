@@ -2363,11 +2363,11 @@ include_dir 'conf.d'
         Only superusers can change this setting.
        </para>
        <para>
-        In <productname>&productname;</> releases prior to 9.3,
+        In <productname>PostgreSQL</> releases prior to 9.3,
         <varname>commit_delay</varname> behaved differently and was much
         less effective: it affected only commits, rather than all WAL flushes,
         and waited for the entire configured delay even if the WAL flush
-        was completed sooner.  Beginning in <productname>&productname;</> 9.3,
+        was completed sooner.  Beginning in <productname>PostgreSQL</> 9.3,
         the first process that becomes ready to flush waits for the configured
         interval, while subsequent processes wait only until the leader
         completes the flush operation.
@@ -3926,7 +3926,7 @@ local0.*    /var/log/postgresql
         use a log rotation utility to avoid eventually filling the
         entire disk.  In releases prior to 8.4, if
         no <literal>%</literal> escapes were
-        present, <productname>&productname;</productname> would append
+        present, <productname>PostgreSQL</productname> would append
         the epoch of the new log file's creation time, but this is no
         longer the case.
        </para>
@@ -6088,11 +6088,11 @@ SET XML OPTION { DOCUMENT | CONTENT };
         The value <literal>sql_standard</> will produce
         output matching <acronym>SQL</acronym> standard interval literals.
         The value <literal>postgres</> (which is the default) will produce
-        output matching <productname>&productname;</> releases prior to 8.4
+        output matching <productname>PostgreSQL</> releases prior to 8.4
         when the <xref linkend="guc-datestyle">
         parameter was set to <literal>ISO</>.
         The value <literal>postgres_verbose</> will produce output
-        matching <productname>&productname;</> releases prior to 8.4
+        matching <productname>PostgreSQL</> releases prior to 8.4
         when the <varname>DateStyle</>
         parameter was set to non-<literal>ISO</> output.
         The value <literal>iso_8601</> will produce output matching the time
@@ -6687,7 +6687,7 @@ dynamic_library_path = 'C:\tools\postgresql;H:\my_project\lib;$libdir'
         This controls whether the array input parser recognizes
         unquoted <literal>NULL</> as specifying a null array element.
         By default, this is <literal>on</>, allowing array values containing
-        null values to be entered.  However, <productname>&productname;</> versions
+        null values to be entered.  However, <productname>PostgreSQL</> versions
         before 8.2 did not support null values in arrays, and therefore would
         treat <literal>NULL</> as specifying a normal array element with
         the string value <quote>NULL</>.  For backward compatibility with
@@ -6753,7 +6753,7 @@ dynamic_library_path = 'C:\tools\postgresql;H:\my_project\lib;$libdir'
         nor <literal>WITHOUT OIDS</literal> is specified. It also
         determines whether OIDs will be included in tables created by
         <command>SELECT INTO</command>. The parameter is <literal>off</>
-        by default; in <productname>&productname;</> 8.0 and earlier, it
+        by default; in <productname>PostgreSQL</> 8.0 and earlier, it
         was <literal>on</> by default.
        </para>
 
@@ -6800,7 +6800,7 @@ dynamic_library_path = 'C:\tools\postgresql;H:\my_project\lib;$libdir'
       </term>
       <listitem>
        <para>
-        In <productname>&productname;</> releases prior to 9.0, large objects
+        In <productname>PostgreSQL</> releases prior to 9.0, large objects
         did not have access privileges and were, therefore, always readable
         and writable by all users.  Setting this variable to <literal>on</>
         disables the new privilege checks, for compatibility with prior
@@ -6810,7 +6810,7 @@ dynamic_library_path = 'C:\tools\postgresql;H:\my_project\lib;$libdir'
        <para>
         Setting this variable does not disable all security checks related to
         large objects &mdash; only those for which the default behavior has
-        changed in <productname>&productname;</> 9.0.
+        changed in <productname>PostgreSQL</> 9.0.
         For example, <literal>lo_import()</literal> and
         <literal>lo_export()</literal> need superuser privileges regardless
         of this setting.
@@ -6827,7 +6827,7 @@ dynamic_library_path = 'C:\tools\postgresql;H:\my_project\lib;$libdir'
       <listitem>
        <para>
         When on, the parser will emit a warning for any construct that might
-        have changed meanings since <productname>&productname;</> 9.4 as a result
+        have changed meanings since <productname>PostgreSQL</> 9.4 as a result
         of changes in operator precedence.  This is useful for auditing
         applications to see if precedence changes have broken anything; but it
         is not meant to be kept turned on in production, since it will warn
@@ -6876,7 +6876,7 @@ dynamic_library_path = 'C:\tools\postgresql;H:\my_project\lib;$libdir'
         <literal>ONLY</literal> prefix is assumed).  The SQL standard
         requires child tables to be included, so the <literal>off</> setting
         is not spec-compliant, but it is provided for compatibility with
-        <productname>&productname;</> releases prior to 7.1.
+        <productname>PostgreSQL</> releases prior to 7.1.
         See <xref linkend="ddl-inherit"> for more information.
        </para>
 
@@ -6901,7 +6901,7 @@ dynamic_library_path = 'C:\tools\postgresql;H:\my_project\lib;$libdir'
         This controls whether ordinary string literals
         (<literal>'...'</>) treat backslashes literally, as specified in
         the SQL standard.
-        Beginning in <productname>&productname;</productname> 9.1, the default is
+        Beginning in <productname>PostgreSQL</productname> 9.1, the default is
         <literal>on</> (prior releases defaulted to <literal>off</>).
         Applications can check this
         parameter to determine how string literals will be processed.

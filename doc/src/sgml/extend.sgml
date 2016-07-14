@@ -772,7 +772,7 @@ SELECT pg_catalog.pg_extension_config_dump('my_config', 'WHERE NOT standard_entr
      The update mechanism can be used to solve an important special case:
      converting a <quote>loose</> collection of objects into an extension.
      Before the extension mechanism was added to
-     <productname>&productname;</productname> (in 9.1), many people wrote
+     <productname>PostgreSQL</productname> (in 9.1), many people wrote
      extension modules that simply created assorted unpackaged objects.
      Given an existing database containing such objects, how can we convert
      the objects into a properly packaged extension?  Dropping them and then

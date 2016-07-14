@@ -181,7 +181,7 @@ CREATE DOMAIN <replaceable class="parameter">name</replaceable> [ AS ] <replacea
      <para>
       When a domain has multiple <literal>CHECK</literal> constraints,
       they will be tested in alphabetical order by name.
-      (<productname>&productname;</> versions before 9.5 did not honor any
+      (<productname>PostgreSQL</> versions before 9.5 did not honor any
       particular firing order for <literal>CHECK</literal> constraints.)
      </para>
     </listitem>

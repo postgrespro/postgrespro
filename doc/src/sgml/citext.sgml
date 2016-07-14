@@ -196,7 +196,7 @@ SELECT * FROM users WHERE nick = 'Larry';
 
     <listitem>
      <para>
-      As of <productname>&productname;</> 9.1, you can attach a
+      As of <productname>PostgreSQL</> 9.1, you can attach a
       <literal>COLLATE</> specification to <type>citext</> columns or data
       values.  Currently, <type>citext</> operators will honor a non-default
       <literal>COLLATE</> specification while comparing case-folded strings,
