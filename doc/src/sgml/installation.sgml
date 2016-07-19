@@ -930,14 +930,14 @@ su - postgres
          Disable support for 64-bit integer storage for timestamps and
          intervals, and store datetime values as floating-point
          numbers instead. Floating-point datetime storage was the
-         default in <productname>&productname;</productname> releases
+         default in <productname>PostgreSQL</productname> releases
          prior to 8.4, but it is now deprecated, because it does not
          support microsecond precision for the full range of
          <type>timestamp</type> values. However, integer-based
          datetime storage requires a 64-bit integer type. Therefore,
          this option can be used when no such type is available, or
          for compatibility with applications written for prior
-         versions of <productname>&productname;</productname>. See
+         versions of <productname>PostgreSQL</productname>. See
          <![%standalone-include[the documentation about datetime datatypes]]>
          <![%standalone-ignore[<xref linkend="datatype-datetime">]]>
          for more information.
@@ -2137,7 +2137,7 @@ kill `cat /usr/local/pgsql/data/postmaster.pid`
     </para>
 
     <para>
-     When implementing &productname; version 8.1 on AIX 5.3, we
+     When implementing PostgreSQL version 8.1 on AIX 5.3, we
      periodically ran into problems where the statistics collector
      would <quote>mysteriously</quote> not come up successfully.  This
      appears to be the result of unexpected behavior in the IPv6
@@ -2455,7 +2455,7 @@ make MAX_CONNECTIONS=5 check
    </indexterm>
 
    <para>
-    &productname; 7.3+ should work on Series 700/800 PA-RISC machines
+    PostgreSQL 7.3+ and &productname; should work on Series 700/800 PA-RISC machines
     running HP-UX 10.X or 11.X, given appropriate system patch levels
     and build tools.  At least one developer routinely tests on HP-UX
     10.20, and we have reports of successful installations on HP-UX

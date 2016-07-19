@@ -912,7 +912,7 @@ my_fetch(PG_FUNCTION_ARGS)
    Building large GiST indexes by simply inserting all the tuples tends to be
    slow, because if the index tuples are scattered across the index and the
    index is large enough to not fit in cache, the insertions need to perform
-   a lot of random I/O.  Beginning in version 9.2, &productname; supports a more
+   a lot of random I/O.  Beginning in version 9.2, PostgreSQL supports a more
    efficient method to build GiST indexes based on buffering, which can
    dramatically reduce the number of random I/Os needed for non-ordered data
    sets. For well-ordered data sets the benefit is smaller or non-existent,

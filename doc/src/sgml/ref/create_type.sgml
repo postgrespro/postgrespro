@@ -784,7 +784,7 @@ CREATE TYPE <replaceable class="parameter">name</replaceable>
   </para>
 
   <para>
-   Before <productname>&productname;</productname> version 8.3, the name of
+   Before <productname>PostgreSQL</productname> version 8.3, the name of
    a generated array type was always exactly the element type's name with one
    underscore character (<literal>_</literal>) prepended.  (Type names were
    therefore restricted in length to one less character than other names.)
@@ -805,11 +805,11 @@ CREATE TYPE <replaceable class="parameter">name</replaceable>
   </para>
 
   <para>
-   Before <productname>&productname;</productname> version 8.2, the shell-type
+   Before <productname>PostgreSQL</productname> version 8.2, the shell-type
    creation syntax
    <literal>CREATE TYPE <replaceable>name</></literal> did not exist.
    The way to create a new base type was to create its input function first.
-   In this approach, <productname>&productname;</productname> will first see
+   In this approach, <productname>PostgreSQL</productname> will first see
    the name of the new data type as the return type of the input function.
    The shell type is implicitly created in this situation, and then it
    can be referenced in the definitions of the remaining I/O functions.
@@ -821,7 +821,7 @@ CREATE TYPE <replaceable class="parameter">name</replaceable>
   </para>
 
   <para>
-   In <productname>&productname;</productname> versions before 7.3, it
+   In <productname>PostgreSQL</productname> versions before 7.3, it
    was customary to avoid creating a shell type at all, by replacing the
    functions' forward references to the type name with the placeholder
    pseudotype <type>opaque</>.  The <type>cstring</> arguments and

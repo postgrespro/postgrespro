@@ -1,5 +1,5 @@
 <sect1 id="jsquery">
-  <title>JsQuery - json query language with GIN indexing support</title>
+  <title>jsquery</title>
   <sect2 id="jsquery-introduction">
     <title>Introduction</title>
     <para>

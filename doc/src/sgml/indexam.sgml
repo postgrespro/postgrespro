@@ -262,7 +262,7 @@ amvacuumcleanup (IndexVacuumInfo *info,
   </para>
 
   <para>
-   As of <productname>&productname;</productname> 8.4,
+   As of <productname>PostgreSQL</productname> 8.4,
    <function>amvacuumcleanup</> will also be called at completion of an
    <command>ANALYZE</> operation.  In this case <literal>stats</> is always
    NULL and any return value will be ignored.  This case can be distinguished

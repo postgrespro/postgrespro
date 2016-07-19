@@ -38,7 +38,7 @@ PGAC_ARG_REQ(with, extra-version, [STRING], [append STRING to version],
              [PG_VERSION="$PACKAGE_VERSION$withval"],
              [PG_VERSION="$PACKAGE_VERSION"])
             
-PGPRO_VERSION="$PACKAGE_VERSION.2"
+PGPRO_VERSION="$PACKAGE_VERSION.3"
 PGPRO_PACKAGE_NAME="PostgresPro"
 AC_SUBST(PGPRO_PACKAGE_NAME)
  
@@ -2134,7 +2134,7 @@ AC_CHECK_PROGS(DBTOEPUB, dbtoepub)
 AC_CHECK_PROGS(XMLLINT, xmllint)
 AC_CHECK_PROGS(XSLTPROC, xsltproc)
 AC_CHECK_PROGS(OSX, [osx sgml2xml sx])
-
+AC_CHECK_PROGS(PANDOC, pandoc)
 #
 # Check for test tools
 #

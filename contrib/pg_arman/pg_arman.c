@@ -8,6 +8,7 @@
  */
 
 #include "pg_arman.h"
+#include "streamutil.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,6 +34,8 @@ pgBackup	current;
 static bool		smooth_checkpoint;
 static int		keep_data_generations = KEEP_INFINITE;
 static int		keep_data_days = KEEP_INFINITE;
+int				num_threads = 1;
+bool			stream_wal = false;
 static bool		backup_validate = false;
 
 /* restore configuration */
@@ -55,6 +58,8 @@ static pgut_option options[] =
 	{ 's', 'B', "backup-path",	&backup_path,	SOURCE_ENV },
 	/* common options */
 	{ 'b', 'c', "check",		&check },
+	{ 'i', 'j', "threads",		&num_threads },
+	{ 'b', 8, "stream",		&stream_wal },
 	/* backup options */
 	{ 'f', 'b', "backup-mode",			opt_backup_mode,		SOURCE_ENV },
 	{ 'b', 'C', "smooth-checkpoint",	&smooth_checkpoint,		SOURCE_ENV },
@@ -134,6 +139,16 @@ main(int argc, char *argv[])
 
 		join_path_components(path, backup_path, PG_RMAN_INI_FILE);
 		pgut_readopt(path, options, ERROR);
+
+		/* setup stream options */
+		if (pgut_dbname != NULL)
+			dbname = pstrdup(pgut_dbname);
+		if (host != NULL)
+			dbhost = pstrdup(host);
+		if (port != NULL)
+			dbport = pstrdup(port);
+		if (username != NULL)
+			dbuser = pstrdup(username);
 	}
 
 	/* BACKUP_PATH is always required */
@@ -215,8 +230,10 @@ pgut_help(bool details)
 	printf(_("  -A, --arclog-path=PATH    location of archive WAL storage area\n"));
 	printf(_("  -B, --backup-path=PATH    location of the backup storage area\n"));
 	printf(_("  -c, --check               show what would have been done\n"));
+	printf(_("  -j, --threads=NUM         num threads for backup and restore\n"));
+	printf(_("  --stream                  use stream for save/restore WAL during backup\n"));
 	printf(_("\nBackup options:\n"));
-	printf(_("  -b, --backup-mode=MODE    full or page\n"));
+	printf(_("  -b, --backup-mode=MODE    full,page,ptrack\n"));
 	printf(_("  -C, --smooth-checkpoint   do smooth checkpoint before backup\n"));
 	printf(_("  --validate                validate backup after taking it\n"));
 	printf(_("  --keep-data-generations=N keep GENERATION of full data backup\n"));

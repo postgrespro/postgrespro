@@ -80,7 +80,7 @@ SET [ SESSION | LOCAL ] TIME ZONE { <replaceable class="PARAMETER">timezone</rep
 
   <note>
    <para>
-    In <productname>&productname;</productname> versions 8.0 through 8.2,
+    In <productname>PostgreSQL</productname> versions 8.0 through 8.2,
     the effects of a <command>SET LOCAL</command> would be canceled by
     releasing an earlier savepoint, or by successful exit from a
     <application>PL/pgSQL</application> exception block.  This behavior

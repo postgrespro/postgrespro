@@ -54,9 +54,9 @@
   Many modules supply new user-defined functions, operators, or types.
   To make use of one of these modules, after you have installed the code
   you need to register the new SQL objects in the database system.
-  In <productname>&productname;</> 9.1 and later, this is done by executing
-  a <xref linkend="sql-createextension"> command.  In a fresh database,
-  you can simply do
+  In <productname>&productname;</>, and <productname>PostgreSQL</> 9.1 and later,
+  this is done by executing a <xref linkend="sql-createextension"> command.
+  In a fresh database, you can simply do
 
 <programlisting>
 CREATE EXTENSION <replaceable>module_name</>;
@@ -80,7 +80,7 @@ CREATE EXTENSION <replaceable>module_name</>;
 
  <para>
   If your database was brought forward by dump and reload from a pre-9.1
-  version of <productname>&productname;</>, and you had been using the pre-9.1
+  version of <productname>PostgreSQL</>, and you had been using the pre-9.1
   version of the module in it, you should instead do
 
 <programlisting>

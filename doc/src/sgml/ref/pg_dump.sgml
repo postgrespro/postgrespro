@@ -319,7 +319,7 @@ doc/src/sgml/ref/pg_dump.sgml
        </para>
        <para>
         For a consistent backup, the database server needs to support synchronized snapshots,
-        a feature that was introduced in <productname>&productname;</productname> 9.2. With this
+        a feature that was introduced in <productname>PostgreSQL</productname> 9.2. With this
         feature, database clients can ensure they see the same data set even though they use
         different connections. <command>pg_dump -j</command> uses multiple database
         connections; it connects to the database once with the master process and
@@ -334,7 +334,7 @@ doc/src/sgml/ref/pg_dump.sgml
         do this is to halt any data modifying processes (DDL and DML) accessing the database
         before starting the backup. You also need to specify the
         <option>--no-synchronized-snapshots</option> parameter when running
-        <command>pg_dump -j</command> against a pre-9.2 <productname>&productname;</productname>
+        <command>pg_dump -j</command> against a pre-9.2 <productname>PostgreSQL</productname>
         server.
        </para>
       </listitem>
@@ -530,7 +530,7 @@ doc/src/sgml/ref/pg_dump.sgml
        <note>
         <para>
          The behavior of the <option>-t</> switch is not entirely upward
-         compatible with pre-8.2 <productname>&productname;</productname>
+         compatible with pre-8.2 <productname>PostgreSQL</productname>
          versions.  Formerly, writing <literal>-t tab</> would dump all
          tables named <literal>tab</>, but now it just dumps whichever one
          is visible in your default search path.  To get the old behavior

@@ -212,7 +212,7 @@ CLUSTER;
 <synopsis>
 CLUSTER <replaceable class="PARAMETER">index_name</replaceable> ON <replaceable class="PARAMETER">table_name</replaceable>
 </synopsis>
-  is also supported for compatibility with pre-8.3 <productname>&productname;</>
+  is also supported for compatibility with pre-8.3 <productname>PostgreSQL</>
   versions.
   </para>
  </refsect1>

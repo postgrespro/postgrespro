@@ -148,7 +148,7 @@ restore_command = 'pg_standby <replaceable>archiveDir</> %f %p %r'
         specification method is more accurate in determining the correct
         archive cut-off point.
         Use of this parameter is <emphasis>deprecated</> as of
-        <productname>&productname;</> 8.3; it is safer and more efficient to
+        <productname>PostgreSQL</> 8.3; it is safer and more efficient to
         specify a <replaceable>restartwalfile</replaceable> parameter.  A too
         small setting could result in removal of files that are still needed
         for a restart of the standby server, while a too large setting wastes
@@ -241,17 +241,17 @@ restore_command = 'pg_standby <replaceable>archiveDir</> %f %p %r'
 
   <para>
    <application>pg_standby</application> is designed to work with
-   <productname>&productname;</> 8.2 and later.
+   <productname>PostgreSQL</> 8.2 and later.
   </para>
   <para>
-   <productname>&productname;</> 8.3 provides the <literal>%r</literal> macro,
+   <productname>PostgreSQL</> 8.3 provides the <literal>%r</literal> macro,
    which is designed to let <application>pg_standby</application> know the
-   last file it needs to keep.  With <productname>&productname;</> 8.2, the
+   last file it needs to keep.  With <productname>PostgreSQL</> 8.2, the
    <literal>-k</literal> option must be used if archive cleanup is
    required.  This option remains available in 8.3, but its use is deprecated.
   </para>
   <para>
-   <productname>&productname;</> 8.4 provides the
+   <productname>PostgreSQL</> 8.4 provides the
    <varname>recovery_end_command</> option.  Without this option
    a leftover trigger file can be hazardous.
   </para>

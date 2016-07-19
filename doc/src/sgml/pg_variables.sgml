@@ -1,5 +1,5 @@
 <sect1 id="pg-variables">
-  <title>pg_variables - session variables with various types</title>
+  <title>pg_variables</title>
   <sect2 id="pg-varaibles-introduction">
     <title>Introduction</title>
     <para>
@@ -210,7 +210,7 @@ ERROR:  variable "int1" requires "integer" value
         </tgroup>
       </informaltable>
     </sect3>
-    <sect3 id="pg-variables-timestamp-with-timezone-variables">
+    <sect3 id="pg-variables-timestamptz-variables">
       <title>Timestamp with timezone variables</title>
       <informaltable>
         <tgroup cols="2">

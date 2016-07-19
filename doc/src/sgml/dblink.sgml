@@ -1828,7 +1828,7 @@ dblink_build_sql_insert(text relname,
    <title>Notes</title>
 
    <para>
-    As of <productname>&productname;</> 9.0, the attribute numbers in
+    As of <productname>PostgreSQL</> 9.0, the attribute numbers in
     <parameter>primary_key_attnums</parameter> are interpreted as logical
     column numbers, corresponding to the column's position in
     <literal>SELECT * FROM relname</>.  Previous versions interpreted the
@@ -1946,7 +1946,7 @@ dblink_build_sql_delete(text relname,
    <title>Notes</title>
 
    <para>
-    As of <productname>&productname;</> 9.0, the attribute numbers in
+    As of <productname>PostgreSQL</> 9.0, the attribute numbers in
     <parameter>primary_key_attnums</parameter> are interpreted as logical
     column numbers, corresponding to the column's position in
     <literal>SELECT * FROM relname</>.  Previous versions interpreted the
@@ -2083,7 +2083,7 @@ dblink_build_sql_update(text relname,
    <title>Notes</title>
 
    <para>
-    As of <productname>&productname;</> 9.0, the attribute numbers in
+    As of <productname>PostgreSQL</> 9.0, the attribute numbers in
     <parameter>primary_key_attnums</parameter> are interpreted as logical
     column numbers, corresponding to the column's position in
     <literal>SELECT * FROM relname</>.  Previous versions interpreted the

@@ -593,6 +593,17 @@ ReadBufferWithoutRelcache(RelFileNode rnode, ForkNumber forkNum,
 							 mode, strategy, &hit);
 }
 
+Buffer
+ReadBufferWithoutRelcache2(SMgrRelation smgr, ForkNumber forkNum,
+						  BlockNumber blockNum, ReadBufferMode mode,
+						  BufferAccessStrategy strategy)
+{
+	bool		hit;
+
+	return ReadBuffer_common(smgr, RELPERSISTENCE_PERMANENT, forkNum, blockNum,
+							 mode, strategy, &hit);
+}
+
 
 /*
  * ReadBuffer_common -- common logic for all ReadBuffer variants
@@ -3109,7 +3120,7 @@ IncrBufferRefCount(Buffer buffer)
  * This is essentially the same as MarkBufferDirty, except:
  *
  * 1. The caller does not write WAL; so if checksums are enabled, we may need
- *	  to write an XLOG_HINT WAL record to protect against torn pages.
+ *	  to write an XLOG_FPI WAL record to protect against torn pages.
  * 2. The caller might have only share-lock instead of exclusive-lock on the
  *	  buffer's content lock.
  * 3. This function does not guarantee that the buffer is always marked dirty

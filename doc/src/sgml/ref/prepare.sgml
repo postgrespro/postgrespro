@@ -161,7 +161,7 @@ PREPARE <replaceable class="PARAMETER">name</replaceable> [ ( <replaceable class
    statement.  Also, if the value of <xref linkend="guc-search-path"> changes
    from one use to the next, the statement will be re-parsed using the new
    <varname>search_path</>.  (This latter behavior is new as of
-   <productname>&productname;</productname> 9.3.)  These rules make use of a
+   <productname>PostgreSQL</productname> 9.3.)  These rules make use of a
    prepared statement semantically almost equivalent to re-submitting the
    same query text over and over, but with a performance benefit if no object
    definitions are changed, especially if the best plan remains the same

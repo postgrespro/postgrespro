@@ -454,7 +454,7 @@ SELECT 'foo'      'bar';
      <xref linkend="guc-standard-conforming-strings"> is <literal>off</>,
      then <productname>&productname;</productname> recognizes backslash escapes
      in both regular and escape string constants.  However, as of
-     <productname>&productname;</> 9.1, the default is <literal>on</>, meaning
+     <productname>PostgreSQL</> 9.1, the default is <literal>on</>, meaning
      that backslash escapes are recognized only in escape string constants.
      This behavior is more standards-compliant, but might break applications
      which rely on the historical behavior, where backslash escapes
@@ -1133,7 +1133,7 @@ SELECT 3 OPERATOR(pg_catalog.+) 4;
 
    <note>
     <para>
-     <productname>&productname;</> versions before 9.5 used slightly different
+     <productname>PostgreSQL</> versions before 9.5 used slightly different
      operator precedence rules.  In particular, <token>&lt;=</token>
      <token>&gt;=</token> and <token>&lt;&gt;</token> used to be treated as
      generic operators; <literal>IS</> tests used to have higher priority;
@@ -2301,7 +2301,7 @@ SELECT ROW(t.f1, t.f2, 42) FROM t;
 
    <note>
     <para>
-     Before <productname>&productname;</productname> 8.2, the
+     Before <productname>PostgreSQL</productname> 8.2, the
      <literal>.*</literal> syntax was not expanded, so that writing
      <literal>ROW(t.*, 42)</> created a two-field row whose first field
      was another row value.  The new behavior is usually more useful.
