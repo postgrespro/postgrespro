@@ -1272,7 +1272,7 @@ SELECT b, char_length(b) FROM test2;
     of these are always accepted on input.  The output format depends
     on the configuration parameter <xref linkend="guc-bytea-output">;
     the default is hex.  (Note that the hex format was introduced in
-    <productname>&productname;</productname> 9.0; earlier versions and some
+    <productname>PostgreSQL</productname> 9.0; earlier versions and some
     tools don't understand it.)
    </para>
 
@@ -2478,7 +2478,7 @@ January 8 04:05:06 1999 PST
 
     <para>
      In all cases, timezone names and abbreviations are recognized
-     case-insensitively.  (This is a change from <productname>&productname;</>
+     case-insensitively.  (This is a change from <productname>PostgreSQL</>
      versions prior to 8.2, which were case-sensitive in some contexts but
      not others.)
     </para>
@@ -2756,13 +2756,13 @@ P <optional> <replaceable>years</>-<replaceable>months</>-<replaceable>days</> <
 
     <para>
      The output of the <literal>postgres</> style matches the output of
-     <productname>&productname;</> releases prior to 8.4 when the
+     <productname>PostgreSQL</> releases prior to 8.4 when the
      <xref linkend="guc-datestyle"> parameter was set to <literal>ISO</>.
     </para>
 
     <para>
      The output of the <literal>postgres_verbose</> style matches the output of
-     <productname>&productname;</> releases prior to 8.4 when the
+     <productname>PostgreSQL</> releases prior to 8.4 when the
      <varname>DateStyle</> parameter was set to non-<literal>ISO</> output.
     </para>
 
@@ -3861,12 +3861,12 @@ SELECT 'a:1A fat:2B,4C cat:5D'::tsvector;
 
     <para>
      It is important to understand that the
-     <type>tsvector</type> type itself does not perform any normalization;
-     it assumes the words it is given are normalized appropriately
-     for the application.  For example,
+     <type>tsvector</type> type itself does not perform any word
+     normalization; it assumes the words it is given are normalized
+     appropriately for the application.  For example,
 
 <programlisting>
-select 'The Fat Rats'::tsvector;
+SELECT 'The Fat Rats'::tsvector;
       tsvector      
 --------------------
  'Fat' 'Rats' 'The'
@@ -3899,11 +3899,26 @@ SELECT to_tsvector('english', 'The Fat Rats');
 
     <para>
      A <type>tsquery</type> value stores lexemes that are to be
-     searched for, and combines them honoring the Boolean operators
-     <literal>&amp;</literal> (AND), <literal>|</literal> (OR),
-     <literal>!</> (NOT) and <literal>?</> (FOLLOWED BY) phrase search
-     operator.  Parentheses can be used to enforce grouping
-     of the operators:
+     searched for, and can combine them using the Boolean operators
+     <literal>&amp;</literal> (AND), <literal>|</literal> (OR), and
+     <literal>!</> (NOT), as well as the phrase search operator
+     <literal>&lt;-&gt;</> (FOLLOWED BY).  There is also a variant
+     <literal>&lt;<replaceable>N</>&gt;</literal> of the FOLLOWED BY
+     operator, where <replaceable>N</> is an integer constant that
+     specifies the distance between the two lexemes being searched
+     for.  <literal>&lt;-&gt;</> is equivalent to <literal>&lt;1&gt;</>.
+    </para>
+
+    <para>
+     Parentheses can be used to enforce grouping of these operators.
+     In the absence of parentheses, <literal>!</> (NOT) binds most tightly,
+     <literal>&lt;-&gt;</literal> (FOLLOWED BY) next most tightly, then
+     <literal>&amp;</literal> (AND), with <literal>|</literal> (OR) binding
+     the least tightly.
+    </para>
+
+    <para>
+     Here are some examples:
 
 <programlisting>
 SELECT 'fat &amp; rat'::tsquery;
@@ -3920,17 +3935,21 @@ SELECT 'fat &amp; rat &amp; ! cat'::tsquery;
         tsquery         
 ------------------------
  'fat' &amp; 'rat' &amp; !'cat'
+
+SELECT '(fat | rat) &lt;-&gt; cat'::tsquery;
+              tsquery
+-----------------------------------
+ 'fat' &lt;-&gt; 'cat' | 'rat' &lt;-&gt; 'cat'
 </programlisting>
 
-     In the absence of parentheses, <literal>!</> (NOT) binds most tightly,
-     and <literal>&amp;</literal> (AND) and <literal>?</literal> (FOLLOWED BY)
-     both bind more tightly than <literal>|</literal> (OR).
+     The last example demonstrates that <type>tsquery</type> sometimes
+     rearranges nested operators into a logically equivalent formulation.
     </para>
 
     <para>
      Optionally, lexemes in a <type>tsquery</type> can be labeled with
      one or more weight letters, which restricts them to match only
-     <type>tsvector</> lexemes with matching weights:
+     <type>tsvector</> lexemes with one of those weights:
 
 <programlisting>
 SELECT 'fat:ab &amp; cat'::tsquery;
@@ -3950,25 +3969,7 @@ SELECT 'super:*'::tsquery;
  'super':*
 </programlisting>
      This query will match any word in a <type>tsvector</> that begins
-     with <quote>super</>.  Note that prefixes are first processed by
-     text search configurations, which means this comparison returns
-     true:
-<programlisting>
-SELECT to_tsvector( 'postgraduate' ) @@ to_tsquery( 'postgres:*' );
- ?column? 
-----------
- t
-(1 row)
-</programlisting>
-     because <literal>postgres</> gets stemmed to <literal>postgr</>:
-<programlisting>
-SELECT to_tsquery('postgres:*');
- to_tsquery 
-------------
- 'postgr':*
-(1 row)
-</programlisting>
-     which then matches <literal>postgraduate</>.
+     with <quote>super</>.
     </para>
 
     <para>
@@ -3984,6 +3985,24 @@ SELECT to_tsquery('Fat:ab &amp; Cats');
 ------------------
  'fat':AB &amp; 'cat'
 </programlisting>
+
+     Note that <function>to_tsquery</> will process prefixes in the same way
+     as other words, which means this comparison returns true:
+
+<programlisting>
+SELECT to_tsvector( 'postgraduate' ) @@ to_tsquery( 'postgres:*' );
+ ?column?
+----------
+ t
+</programlisting>
+     because <literal>postgres</> gets stemmed to <literal>postgr</>:
+<programlisting>
+SELECT to_tsvector( 'postgraduate' ), to_tsquery( 'postgres:*' );
+  to_tsvector  | to_tsquery
+---------------+------------
+ 'postgradu':1 | 'postgr':*
+</programlisting>
+     which will match the stemmed form of <literal>postgraduate</>.
     </para>
 
    </sect2>

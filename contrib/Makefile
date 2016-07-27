@@ -34,12 +34,14 @@ SUBDIRS = \
 		oid2name	\
 		pageinspect	\
 		passwordcheck	\
+		pg_arman	\
 		pg_buffercache	\
 		pg_freespacemap \
 		pg_prewarm	\
 		pg_standby	\
 		pg_stat_statements \
 		pg_trgm		\
+		pg_variables	\
 		pgcrypto	\
 		pgrowlocks	\
 		pgstattuple	\
@@ -55,7 +57,8 @@ SUBDIRS = \
 		tsm_system_time \
 		tsearch2	\
 		unaccent	\
-		vacuumlo
+		vacuumlo    \
+		pg_pathman
 
 ifeq ($(with_openssl),yes)
 SUBDIRS += sslinfo

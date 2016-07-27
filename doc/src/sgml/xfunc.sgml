@@ -225,7 +225,7 @@ INSERT INTO $1 VALUES (42);
     <note>
      <para>
       The ability to use names to reference SQL function arguments was added
-      in <productname>&productname;</productname> 9.2.  Functions to be used in
+      in <productname>PostgreSQL</productname> 9.2.  Functions to be used in
       older servers must use the <literal>$<replaceable>n</></> notation.
      </para>
     </note>
@@ -1706,7 +1706,7 @@ CREATE FUNCTION square_root(double precision) RETURNS double precision
     This allows the server to detect obvious incompatibilities, such as code
     compiled for a different major version of
     <productname>&productname;</productname>.  A magic block is required as of
-    <productname>&productname;</productname> 8.2.  To include a magic block,
+    <productname>PostgreSQL</productname> 8.2.  To include a magic block,
     write this in one (and only one) of the module source files, after having
     included the header <filename>fmgr.h</>:
 
@@ -1717,7 +1717,7 @@ PG_MODULE_MAGIC;
 </programlisting>
 
     The <literal>#ifdef</> test can be omitted if the code doesn't
-    need to compile against pre-8.2 <productname>&productname;</productname>
+    need to compile against pre-8.2 <productname>PostgreSQL</productname>
     releases.
    </para>
 

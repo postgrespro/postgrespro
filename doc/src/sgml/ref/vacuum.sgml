@@ -71,7 +71,7 @@ VACUUM [ FULL ] [ FREEZE ] [ VERBOSE ] ANALYZE [ <replaceable class="PARAMETER">
    written in any order.  Without parentheses, options must be specified
    in exactly the order shown above.
    The parenthesized syntax was added in
-   <productname>&productname;</productname> 9.0;  the unparenthesized
+   <productname>PostgreSQL</productname> 9.0;  the unparenthesized
    syntax is deprecated.
   </para>
  </refsect1>

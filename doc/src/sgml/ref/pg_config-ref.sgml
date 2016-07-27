@@ -303,9 +303,9 @@
    <option>--cc</option>, <option>--cppflags</option>,
    <option>--cflags</option>, <option>--cflags_sl</option>,
    <option>--ldflags</option>, <option>--ldflags_sl</option>,
-   and <option>--libs</option> were added in <productname>&productname;</> 8.1.
-   The option <option>--htmldir</option> was added in <productname>&productname;</> 8.4.
-   The option <option>--ldflags_ex</option> was added in <productname>&productname;</> 9.0.
+   and <option>--libs</option> were added in <productname>PostgreSQL</> 8.1.
+   The option <option>--htmldir</option> was added in <productname>PostgreSQL</> 8.4.
+   The option <option>--ldflags_ex</option> was added in <productname>PostgreSQL</> 9.0.
   </para>
  </refsect1>
 

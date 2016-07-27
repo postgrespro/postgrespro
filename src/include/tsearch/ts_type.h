@@ -50,7 +50,7 @@ typedef struct
 #define MAXSTRLEN ( (1<<11) - 1)
 #define MAXSTRPOS ( (1<<20) - 1)
 
-int comparePos(const void *a, const void *b);
+extern int compareWordEntryPos(const void *a, const void *b);
 
 /*
  * Equivalent to
@@ -209,20 +209,22 @@ typedef struct
 } QueryOperand;
 
 
-/* 
+/*
  * Legal values for QueryOperator.operator.
- * They should be ordered by priority! We assume that phrase 
- * has highest priority, but this agreement is only
- * for query transformation! That's need to simplify
- * algorithm of query transformation.
  */
-#define OP_OR		1
-#define OP_AND		2
-#define OP_NOT		3
-#define OP_PHRASE	4
+#define OP_NOT			1
+#define OP_AND			2
+#define OP_OR			3
+#define OP_PHRASE		4  /* highest code, tsquery_cleanup.c */
+#define OP_COUNT		4
 
-#define	OP_PRIORITY(x)	(x)
-#define QO_PRIORITY(x)	OP_PRIORITY( ((QueryOperator*)(x))->oper )
+extern const int tsearch_op_priority[OP_COUNT];
+
+/* get operation priority  by its code*/
+#define	OP_PRIORITY(x)	( tsearch_op_priority[(x) - 1] )
+/* get QueryOperator priority */
+#define QO_PRIORITY(x)	OP_PRIORITY(((QueryOperator *) (x))->oper)
+
 typedef struct
 {
 	QueryItemType type;

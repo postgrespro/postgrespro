@@ -2048,7 +2048,7 @@ checkcondition_HL(void *opaque, QueryOperand *val, ExecPhraseData *data)
 				data->npos = 1;
 				data->pos[0] = checkval->words[i].pos;
 			}
-			else if (data->pos[data->npos-1] < checkval->words[i].pos)
+			else if (data->pos[data->npos - 1] < checkval->words[i].pos)
 			{
 				data->pos[data->npos++] = checkval->words[i].pos;
 			}
@@ -2419,7 +2419,7 @@ mark_hl_words(HeadlineParsedText *prs, TSQuery query, int highlight,
 
 			if (poslen < bestlen && !(NOENDTOKEN(prs->words[beste].type) || prs->words[beste].len <= shortword))
 			{
-				/* best already finded, so try one more cover */
+				/* best already found, so try one more cover */
 				p++;
 				continue;
 			}
@@ -2463,6 +2463,8 @@ mark_hl_words(HeadlineParsedText *prs, TSQuery query, int highlight,
 			}
 			else
 			{					/* shorter cover :((( */
+				if (i > q)
+					i = q;
 				for (; curlen > min_words; i--)
 				{
 					if (!NONWORDTOKEN(prs->words[i].type))

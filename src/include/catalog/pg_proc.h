@@ -412,11 +412,11 @@ DESCR("round to nearest integer");
 DATA(insert OID = 229 (  dtrunc			   PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 701 "701" _null_ _null_ _null_ _null_ _null_	dtrunc _null_ _null_ _null_ ));
 DESCR("truncate to integer");
 DATA(insert OID = 2308 ( ceil			   PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 701 "701" _null_ _null_ _null_ _null_ _null_	dceil _null_ _null_ _null_ ));
-DESCR("smallest integer >= value");
+DESCR("nearest integer >= value");
 DATA(insert OID = 2320 ( ceiling		   PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 701 "701" _null_ _null_ _null_ _null_ _null_	dceil _null_ _null_ _null_ ));
-DESCR("smallest integer >= value");
+DESCR("nearest integer >= value");
 DATA(insert OID = 2309 ( floor			   PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 701 "701" _null_ _null_ _null_ _null_ _null_	dfloor _null_ _null_ _null_ ));
-DESCR("largest integer <= value");
+DESCR("nearest integer <= value");
 DATA(insert OID = 2310 ( sign			   PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 701 "701" _null_ _null_ _null_ _null_ _null_	dsign _null_ _null_ _null_ ));
 DESCR("sign of value");
 DATA(insert OID = 230 (  dsqrt			   PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 701 "701" _null_ _null_ _null_ _null_ _null_	dsqrt _null_ _null_ _null_ ));
@@ -2319,11 +2319,11 @@ DESCR("value truncated to 'scale'");
 DATA(insert OID = 1710 ( trunc					PGNSP PGUID 14 1 0 0 0 f f f f t f i 1 0 1700 "1700" _null_ _null_ _null_ _null_ _null_ "select pg_catalog.trunc($1,0)" _null_ _null_ _null_ ));
 DESCR("value truncated to 'scale' of zero");
 DATA(insert OID = 1711 ( ceil					PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 1700 "1700" _null_ _null_ _null_ _null_ _null_ numeric_ceil _null_ _null_ _null_ ));
-DESCR("smallest integer >= value");
+DESCR("nearest integer >= value");
 DATA(insert OID = 2167 ( ceiling				PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 1700 "1700" _null_ _null_ _null_ _null_ _null_ numeric_ceil _null_ _null_ _null_ ));
-DESCR("smallest integer >= value");
+DESCR("nearest integer >= value");
 DATA(insert OID = 1712 ( floor					PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 1700 "1700" _null_ _null_ _null_ _null_ _null_ numeric_floor _null_ _null_ _null_ ));
-DESCR("largest integer <= value");
+DESCR("nearest integer <= value");
 DATA(insert OID = 1718 ( numeric_eq				PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 16 "1700 1700" _null_ _null_ _null_ _null_ _null_ numeric_eq _null_ _null_ _null_ ));
 DATA(insert OID = 1719 ( numeric_ne				PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 16 "1700 1700" _null_ _null_ _null_ _null_ _null_ numeric_ne _null_ _null_ _null_ ));
 DATA(insert OID = 1720 ( numeric_gt				PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 16 "1700 1700" _null_ _null_ _null_ _null_ _null_ numeric_gt _null_ _null_ _null_ ));
@@ -3143,6 +3143,12 @@ DATA(insert OID = 3814 ( pg_backup_start_time		PGNSP PGUID 12 1 0 0 0 f f f f t 
 DESCR("start time of an online backup");
 DATA(insert OID = 2848 ( pg_switch_xlog			PGNSP PGUID 12 1 0 0 0 f f f f t f v 0 0 3220 "" _null_ _null_ _null_ _null_ _null_ pg_switch_xlog _null_ _null_ _null_ ));
 DESCR("switch to new xlog file");
+DATA(insert OID = 6016 ( pg_ptrack_clear		PGNSP PGUID 12 1 0 0 0 f f f f t f v 0 0 2278 "" _null_ _null_ _null_ _null_ _null_ pg_ptrack_clear _null_ _null_ _null_ ));
+DESCR("clear ptrack fork files");
+DATA(insert OID = 6017 ( pg_ptrack_test		PGNSP PGUID 12 1 0 0 0 f f f f t f v 1 0 1007 "26" _null_ _null_ _null_ _null_ _null_ pg_ptrack_test _null_ _null_ _null_ ));
+DESCR("test ptrack fork relation");
+DATA(insert OID = 6018 ( pg_ptrack_get_and_clear		PGNSP PGUID 12 1 0 0 0 f f f f t f v 2 0 17 "26 26" _null_ _null_ _null_ _null_ _null_ pg_ptrack_get_and_clear _null_ _null_ _null_ ));
+DESCR("get ptrack file as bytea and clear him");
 DATA(insert OID = 3098 ( pg_create_restore_point	PGNSP PGUID 12 1 0 0 0 f f f f t f v 1 0 3220 "25" _null_ _null_ _null_ _null_ _null_ pg_create_restore_point _null_ _null_ _null_ ));
 DESCR("create a named restore point");
 DATA(insert OID = 2849 ( pg_current_xlog_location	PGNSP PGUID 12 1 0 0 0 f f f f t f v 0 0 3220 "" _null_ _null_ _null_ _null_ _null_ pg_current_xlog_location _null_ _null_ _null_ ));
@@ -5334,6 +5340,11 @@ DESCR("get an individual replication origin's replication progress");
 
 DATA(insert OID = 6014 ( pg_show_replication_origin_status PGNSP PGUID 12 1 100 0 0 f f f f f t v 0 0 2249 "" "{26,25,3220,3220}" "{o,o,o,o}" "{local_id, external_id, remote_lsn, local_lsn}" _null_ _null_ pg_show_replication_origin_status _null_ _null_ _null_ ));
 DESCR("get progress for all replication origins");
+
+/* pgpro version */
+DATA(insert OID =  6015 (  pgpro_version		   PGNSP PGUID 12 1 0 0 0 f f f f t f s 0 0 25 "" _null_ _null_ _null_ _null_ _null_ pgpro_version _null_ _null_ _null_ ));
+DESCR("PostgresPro version string");
+
 
 /* rls */
 DATA(insert OID = 3298 (  row_security_active	   PGNSP PGUID 12 1 0 0 0 f f f f t f s 1 0 16 "26" _null_ _null_ _null_ _null_ _null_	row_security_active _null_ _null_ _null_ ));

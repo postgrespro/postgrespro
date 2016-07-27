@@ -274,7 +274,7 @@ ALTER SEQUENCE [ IF EXISTS ] <replaceable class="parameter">name</replaceable> S
 
   <para>
    <command>ALTER SEQUENCE</command> does not affect the <function>currval</>
-   status for the sequence.  (Before <productname>&productname;</productname>
+   status for the sequence.  (Before <productname>PostgreSQL</productname>
    8.3, it sometimes did.)
   </para>
 

@@ -17,12 +17,21 @@
 
 #include "libpq/pqformat.h"
 #include "miscadmin.h"
+#include "tsearch/ts_type.h"
 #include "tsearch/ts_locale.h"
 #include "tsearch/ts_utils.h"
 #include "utils/builtins.h"
 #include "utils/memutils.h"
 #include "utils/pg_crc.h"
 
+/* FTS operator priorities, see ts_type.h */
+const int tsearch_op_priority[OP_COUNT] =
+{
+	4,							/* OP_NOT */
+	2,							/* OP_AND */
+	1,							/* OP_OR */
+	3							/* OP_PHRASE */
+};
 
 struct TSQueryParserStateData
 {
@@ -102,49 +111,91 @@ get_modifiers(char *buf, int16 *weight, bool *prefix)
 }
 
 /*
- * Get distance for phrase node like ?[123]
+ * Parse phrase operator. The operator
+ * may take the following forms:
+ *
+ *		a <X> b (distance is no greater than X)
+ *		a <-> b (default distance = 1)
+ *
+ * The buffer should begin with '<' char
  */
 static char *
-get_phrase_distance(char *buf, int16 *distance)
+parse_phrase_operator(char *buf, int16 *distance)
 {
-	char 	*ptr = buf;
-	char	*endptr;
-	long	 l;
+	enum
+	{
+		PHRASE_OPEN = 0,
+		PHRASE_DIST,
+		PHRASE_CLOSE,
+		PHRASE_ERR,
+		PHRASE_FINISH
+	}		state = PHRASE_OPEN;
 
-	*distance = 1;
+	char   *ptr = buf;
+	char   *endptr;
+	long	l = 1;
 
-	while (ptr && t_isspace(ptr))
-		ptr += pg_mblen(ptr);
+	while (*ptr)
+	{
+		switch(state)
+		{
+			case PHRASE_OPEN:
+				Assert(t_iseq(ptr, '<'));
+				state = PHRASE_DIST;
+				ptr++;
+				break;
 
-	if (!t_iseq(ptr, '['))
-		return buf;
-	ptr++;
+			case PHRASE_DIST:
+				if (t_iseq(ptr, '-'))
+				{
+					state = PHRASE_CLOSE;
+					ptr++;
+					break;
+				}
+				else if (!t_isdigit(ptr))
+				{
+					state = PHRASE_ERR;
+					break;
+				}
 
-	while (*ptr && t_isspace(ptr))
-		ptr += pg_mblen(ptr);
+				l = strtol(ptr, &endptr, 10);
+				if (ptr == endptr)
+					state = PHRASE_ERR;
+				else if (errno == ERANGE || l > MAXENTRYPOS)
+					ereport(ERROR,
+							(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+							 errmsg("distance in phrase operator should not be greater than %d",
+									MAXENTRYPOS)));
+				else
+				{
+					state = PHRASE_CLOSE;
+					ptr = endptr;
+				}
+				break;
 
-	l = strtol(ptr, &endptr, 10);
+			case PHRASE_CLOSE:
+				if (t_iseq(ptr, '>'))
+				{
+					state = PHRASE_FINISH;
+					ptr++;
+				}
+				else
+					state = PHRASE_ERR;
+				break;
 
-	if (ptr == endptr)
-		return buf;
+			case PHRASE_FINISH:
+				*distance = (int16) l;
+				return ptr;
 
-	if (errno == ERANGE || l < 0 || l > MAXENTRYPOS)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("distance in phrase operator should be non-negative and less than %d",
-						MAXENTRYPOS)));
+			case PHRASE_ERR:
+			default:
+				goto err;
+		}
+	}
 
-	ptr = endptr;
-
-	while (*ptr && t_isspace(ptr))
-		ptr += pg_mblen(ptr);
-
-	if (!t_iseq(ptr, ']'))
-		return buf;
-	ptr++;
-
-	*distance = (int16) l;
-	return ptr;
+	err:
+	*distance = -1;
+	return buf;
 }
 
 /*
@@ -163,8 +214,10 @@ typedef enum
 /*
  * get token from query string
  *
- * *operator is filled in with OP_* when return values is PT_OPR
+ * *operator is filled in with OP_* when return values is PT_OPR,
+ * but *weight could contain a distance value in case of phrase operator.
  * *strval, *lenval and *weight are filled in when return value is PT_VAL
+ *
  */
 static ts_tokentype
 gettoken_query(TSQueryParserState state,
@@ -232,20 +285,21 @@ gettoken_query(TSQueryParserState state,
 					(state->buf)++;
 					return PT_OPR;
 				}
-				if (t_iseq(state->buf, '|'))
+				else if (t_iseq(state->buf, '|'))
 				{
 					state->state = WAITOPERAND;
 					*operator = OP_OR;
 					(state->buf)++;
 					return PT_OPR;
 				}
-				if (t_iseq(state->buf, '?'))
+				else if (t_iseq(state->buf, '<'))
 				{
 					state->state = WAITOPERAND;
 					*operator = OP_PHRASE;
-					(state->buf)++;
-					state->buf = get_phrase_distance(state->buf,
-													 weight); /* use as storage for distance */
+					/* weight var is used as storage for distance */
+					state->buf = parse_phrase_operator(state->buf, weight);
+					if (*weight < 0)
+						return PT_ERR;
 					return PT_OPR;
 				}
 				else if (t_iseq(state->buf, ')'))
@@ -377,10 +431,39 @@ pushStop(TSQueryParserState state)
 
 #define STACKDEPTH	32
 
-typedef struct {
+typedef struct OperatorElement {
 	int8	op;
 	int16	distance;
-} stack_op;
+} OperatorElement;
+
+static void
+pushOpStack(OperatorElement *stack, int *lenstack, int8 op, int16 distance)
+{
+	if (*lenstack == STACKDEPTH) /* internal error */
+		elog(ERROR, "tsquery stack too small");
+
+	stack[*lenstack].op = op;
+	stack[*lenstack].distance = distance;
+
+	(*lenstack)++;
+}
+
+static void
+cleanOpStack(TSQueryParserState state,
+		   OperatorElement *stack, int *lenstack, int8 op)
+{
+	int	opPriority = OP_PRIORITY(op);
+
+	while(*lenstack)
+	{
+		if (opPriority > OP_PRIORITY(stack[*lenstack - 1].op))
+			break;
+
+		(*lenstack)--;
+		pushOperator(state, stack[*lenstack].op,
+							stack[*lenstack].distance);
+	}
+}
 
 /*
  * Make polish (prefix) notation of query.
@@ -396,7 +479,7 @@ makepol(TSQueryParserState state,
 	ts_tokentype type;
 	int			lenval = 0;
 	char	   *strval = NULL;
-	stack_op	opstack[STACKDEPTH];
+	OperatorElement	opstack[STACKDEPTH];
 	int			lenstack = 0;
 	int16		weight = 0;
 	bool		prefix;
@@ -410,49 +493,16 @@ makepol(TSQueryParserState state,
 		{
 			case PT_VAL:
 				pushval(opaque, state, strval, lenval, weight, prefix);
-				while (lenstack && (opstack[lenstack - 1].op == OP_AND ||
-									opstack[lenstack - 1].op == OP_PHRASE ||
-									opstack[lenstack - 1].op == OP_NOT))
-				{
-					lenstack--;
-					pushOperator(state,
-								 opstack[lenstack].op,
-								 opstack[lenstack].distance);
-				}
 				break;
 			case PT_OPR:
-				if (lenstack && operator == OP_OR)
-					pushOperator(state, OP_OR, 0);
-				else
-				{
-					if (lenstack == STACKDEPTH) /* internal error */
-						elog(ERROR, "tsquery stack too small");
-					opstack[lenstack].op = operator;
-					opstack[lenstack].distance = weight;
-					lenstack++;
-				}
+				cleanOpStack(state, opstack, &lenstack, operator);
+				pushOpStack(opstack, &lenstack, operator, weight);
 				break;
 			case PT_OPEN:
 				makepol(state, pushval, opaque);
-
-				while (lenstack && (opstack[lenstack - 1].op == OP_AND ||
-									opstack[lenstack - 1].op == OP_PHRASE ||
-									opstack[lenstack - 1].op == OP_NOT))
-				{
-					lenstack--;
-					pushOperator(state,
-								 opstack[lenstack].op,
-								 opstack[lenstack].distance);
-				}
 				break;
 			case PT_CLOSE:
-				while (lenstack)
-				{
-					lenstack--;
-					pushOperator(state,
-								 opstack[lenstack].op,
-								 opstack[lenstack].distance);
-				};
+				cleanOpStack(state, opstack, &lenstack, OP_OR /* lowest */);
 				return;
 			case PT_ERR:
 			default:
@@ -462,13 +512,8 @@ makepol(TSQueryParserState state,
 								state->buffer)));
 		}
 	}
-	while (lenstack)
-	{
-		lenstack--;
-		pushOperator(state,
-					 opstack[lenstack].op,
-					 opstack[lenstack].distance);
-	}
+
+	cleanOpStack(state, opstack, &lenstack, OP_OR /* lowest */);
 }
 
 static void
@@ -486,7 +531,7 @@ findoprnd_recurse(QueryItem *ptr, uint32 *pos, int nnodes, bool *needcleanup)
 	}
 	else if (ptr[*pos].type == QI_VALSTOP)
 	{
-		*needcleanup=true;
+		*needcleanup = true; /* we'll have to remove stop words */
 		(*pos)++;
 	}
 	else
@@ -495,25 +540,31 @@ findoprnd_recurse(QueryItem *ptr, uint32 *pos, int nnodes, bool *needcleanup)
 
 		if (ptr[*pos].qoperator.oper == OP_NOT)
 		{
-			ptr[*pos].qoperator.left = 1;
+			ptr[*pos].qoperator.left = 1; /* fixed offset */
 			(*pos)++;
+
+			/* process the only argument */
 			findoprnd_recurse(ptr, pos, nnodes, needcleanup);
 		}
 		else
 		{
-			QueryOperator *curitem = &ptr[*pos].qoperator;
-			int			tmp = *pos;
+			QueryOperator  *curitem = &ptr[*pos].qoperator;
+			int				tmp = *pos; /* save current position */
 
 			Assert(curitem->oper == OP_AND ||
 				   curitem->oper == OP_OR ||
 				   curitem->oper == OP_PHRASE);
 
-			if ( curitem->oper == OP_PHRASE )
-				*needcleanup = true;
+			if (curitem->oper == OP_PHRASE)
+				*needcleanup = true; /* push OP_PHRASE down later */
 
 			(*pos)++;
+
+			/* process RIGHT argument */
 			findoprnd_recurse(ptr, pos, nnodes, needcleanup);
-			curitem->left = *pos - tmp;
+			curitem->left = *pos - tmp; /* set LEFT arg's offset */
+
+			/* process LEFT argument */
 			findoprnd_recurse(ptr, pos, nnodes, needcleanup);
 		}
 	}
@@ -561,7 +612,7 @@ parse_tsquery(char *buf,
 	int			commonlen;
 	QueryItem  *ptr;
 	ListCell   *cell;
-	bool	 	needcleanup;
+	bool		needcleanup;
 
 	/* init state */
 	state.buffer = buf;
@@ -611,7 +662,7 @@ parse_tsquery(char *buf,
 	i = 0;
 	foreach(cell, state.polstr)
 	{
-		QueryItem  *item = (QueryItem *) lfirst(cell);
+		QueryItem *item = (QueryItem *) lfirst(cell);
 
 		switch (item->type)
 		{
@@ -638,10 +689,10 @@ parse_tsquery(char *buf,
 	findoprnd(ptr, query->size, &needcleanup);
 
 	/*
-	 * QI_VALSTOP nodes should be cleaned and 
+	 * QI_VALSTOP nodes should be cleaned and
 	 * and OP_PHRASE should be pushed down
 	 */
-	if ( needcleanup )
+	if (needcleanup)
 		return cleanup_fakeval_and_phrase(query);
 
 	return query;
@@ -687,14 +738,12 @@ while( ( (inf)->cur - (inf)->buf ) + (addsize) + 1 >= (inf)->buflen ) \
 	(inf)->cur = (inf)->buf + len; \
 }
 
-#define PRINT_PRIORITY(x)	( (((QueryOperator*)(x))->oper == OP_NOT) ? 5 : QO_PRIORITY(x) )
-
 /*
- * recursive walk on tree and print it in
- * infix (human-readable) view
+ * recursively traverse the tree and
+ * print it in infix (human-readable) form
  */
 static void
-infix(INFIX *in, int parentPriority)
+infix(INFIX *in, int parentPriority, bool rightPhraseOp)
 {
 	/* since this function recurses, it could be driven to stack overflow. */
 	check_stack_depth();
@@ -763,9 +812,9 @@ infix(INFIX *in, int parentPriority)
 	}
 	else if (in->curpol->qoperator.oper == OP_NOT)
 	{
-		int		priority = PRINT_PRIORITY(in->curpol);
+		int			priority = QO_PRIORITY(in->curpol);
 
-		if (priority < parentPriority) 
+		if (priority < parentPriority)
 		{
 			RESIZEBUF(in, 2);
 			sprintf(in->cur, "( ");
@@ -777,8 +826,8 @@ infix(INFIX *in, int parentPriority)
 		*(in->cur) = '\0';
 		in->curpol++;
 
-		infix(in, priority);
-		if (priority < parentPriority) 
+		infix(in, priority, false);
+		if (priority < parentPriority)
 		{
 			RESIZEBUF(in, 2);
 			sprintf(in->cur, " )");
@@ -788,16 +837,15 @@ infix(INFIX *in, int parentPriority)
 	else
 	{
 		int8		op = in->curpol->qoperator.oper;
-		int         priority = PRINT_PRIORITY(in->curpol);
-		int16       distance = in->curpol->qoperator.distance;
+		int			priority = QO_PRIORITY(in->curpol);
+		int16		distance = in->curpol->qoperator.distance;
 		INFIX		nrm;
-		bool        needParenthesis = false;
+		bool		needParenthesis = false;
 
 		in->curpol++;
 		if (priority < parentPriority ||
-			(op == OP_PHRASE &&
-				(priority == parentPriority || /* phrases are not commutative! */
-					parentPriority == OP_PRIORITY(OP_AND))))
+			 /* phrase operator depends on order */
+			 (op == OP_PHRASE && rightPhraseOp))
 		{
 			needParenthesis = true;
 			RESIZEBUF(in, 2);
@@ -811,11 +859,11 @@ infix(INFIX *in, int parentPriority)
 		nrm.cur = nrm.buf = (char *) palloc(sizeof(char) * nrm.buflen);
 
 		/* get right operand */
-		infix(&nrm, priority);
+		infix(&nrm, priority, (op == OP_PHRASE));
 
 		/* get & print left operand */
 		in->curpol = nrm.curpol;
-		infix(in, priority);
+		infix(in, priority, false);
 
 		/* print operator & right operand */
 		RESIZEBUF(in, 3 + (2 + 10 /* distance */) + (nrm.cur - nrm.buf));
@@ -829,9 +877,9 @@ infix(INFIX *in, int parentPriority)
 				break;
 			case OP_PHRASE:
 				if (distance != 1)
-					sprintf(in->cur, " ?[%d] %s", distance, nrm.buf);
+					sprintf(in->cur, " <%d> %s", distance, nrm.buf);
 				else
-					sprintf(in->cur, " ? %s", nrm.buf);
+					sprintf(in->cur, " <-> %s", nrm.buf);
 				break;
 			default:
 				/* OP_NOT is handled in above if-branch */
@@ -867,7 +915,7 @@ tsqueryout(PG_FUNCTION_ARGS)
 	nrm.cur = nrm.buf = (char *) palloc(sizeof(char) * nrm.buflen);
 	*(nrm.cur) = '\0';
 	nrm.op = GETOPERAND(query);
-	infix(&nrm, -1 /* lowest priority */);
+	infix(&nrm, -1 /* lowest priority */, false);
 
 	PG_FREE_IF_COPY(query, 0);
 	PG_RETURN_CSTRING(nrm.buf);
@@ -916,7 +964,8 @@ tsquerysend(PG_FUNCTION_ARGS)
 			case QI_OPR:
 				pq_sendint(&buf, item->qoperator.oper, sizeof(item->qoperator.oper));
 				if (item->qoperator.oper == OP_PHRASE)
-					pq_sendint(&buf, item->qoperator.distance, sizeof(item->qoperator.distance));
+					pq_sendint(&buf, item->qoperator.distance,
+							   sizeof(item->qoperator.distance));
 				break;
 			default:
 				elog(ERROR, "unrecognized tsquery node type: %d", item->type);
@@ -1093,7 +1142,7 @@ tsquerytree(PG_FUNCTION_ARGS)
 		nrm.cur = nrm.buf = (char *) palloc(sizeof(char) * nrm.buflen);
 		*(nrm.cur) = '\0';
 		nrm.op = GETOPERAND(query);
-		infix(&nrm, true);
+		infix(&nrm, -1, false);
 		res = cstring_to_text_with_len(nrm.buf, nrm.cur - nrm.buf);
 		pfree(q);
 	}

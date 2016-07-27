@@ -19,6 +19,13 @@
 #include "utils/builtins.h"
 
 
+typedef struct MorphOpaque
+{
+	Oid		cfg_id;
+	int		qoperator;	/* query operator */
+} MorphOpaque;
+
+
 Datum
 get_current_ts_config(PG_FUNCTION_ARGS)
 {
@@ -254,11 +261,6 @@ to_tsvector(PG_FUNCTION_ARGS)
  * to_tsquery
  */
 
-typedef struct MorphOpaque
-{
-	Oid		cfg_id;
-	int		qoperator;	/* query operator */
-} MorphOpaque;
 
 /*
  * This function is used for morph parsing.
@@ -268,7 +270,7 @@ typedef struct MorphOpaque
  * to the stack.
  *
  * All words belonging to the same variant are pushed as an ANDed list,
- * and different variants are ORred together.
+ * and different variants are ORed together.
  */
 static void
 pushval_morph(Datum opaque, TSQueryParserState state, char *strval, int lenval, int16 weight, bool prefix)
@@ -293,11 +295,15 @@ pushval_morph(Datum opaque, TSQueryParserState state, char *strval, int lenval, 
 	{
 		while (count < prs.curwords)
 		{
+			/*
+			 * Were any stop words removed? If so, fill empty positions
+			 * with placeholders linked by an appropriate operator.
+			 */
 			if (pos > 0 && pos + 1 < prs.words[count].pos.pos)
 			{
 				while (pos + 1 < prs.words[count].pos.pos)
 				{
-					/* put placeholders for each stop word */
+					/* put placeholders for each missing stop word */
 					pushStop(state);
 					if (cntpos)
 						pushOperator(state, data->qoperator, 1);
@@ -306,25 +312,25 @@ pushval_morph(Datum opaque, TSQueryParserState state, char *strval, int lenval, 
 				}
 			}
 
-			pos = prs.words[count].pos.pos;
+			pos = prs.words[count].pos.pos; /* save current word's position */
+
+			/* Go through all variants obtained from this token */
 			cntvar = 0;
 			while (count < prs.curwords && pos == prs.words[count].pos.pos)
 			{
 				variant = prs.words[count].nvariant;
 
+				/* Push all words belonging to the same variant */
 				cnt = 0;
 				while (count < prs.curwords &&
 					   pos == prs.words[count].pos.pos &&
 					   variant == prs.words[count].nvariant)
 				{
-
 					pushValue(state,
 							  prs.words[count].word,
 							  prs.words[count].len,
 							  weight,
-							  ((prs.words[count].flags & TSL_PREFIX) || prefix) ?
-									true :
-									false);
+							  ((prs.words[count].flags & TSL_PREFIX) || prefix));
 					pfree(prs.words[count].word);
 					if (cnt)
 						pushOperator(state, OP_AND, 0);
@@ -338,11 +344,12 @@ pushval_morph(Datum opaque, TSQueryParserState state, char *strval, int lenval, 
 			}
 
 			if (cntpos)
-				pushOperator(state, data->qoperator, 1);
+				pushOperator(state, data->qoperator, 1); /* distance may be useful */
 			cntpos++;
 		}
 
 		pfree(prs.words);
+
 	}
 	else
 		pushStop(state);

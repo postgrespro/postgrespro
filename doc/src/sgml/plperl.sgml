@@ -201,9 +201,9 @@ select returns_array();
 
   <para>
    Perl passes <productname>&productname;</productname> arrays as a blessed
-   <type>&productname;::InServer::ARRAY</type> object. This object may be treated as an array
+   <type>PostgreSQL::InServer::ARRAY</type> object. This object may be treated as an array
    reference or a string, allowing for backward compatibility with Perl
-   code written for <productname>&productname;</productname> versions below 9.1 to
+   code written for <productname>PostgreSQL</productname> versions below 9.1 to
    run.  For example:
 
 <programlisting>

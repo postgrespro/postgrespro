@@ -54,7 +54,7 @@ ifndef XSLTPROC
 XSLTPROC = $(missing) xsltproc
 endif
 
-override XSLTPROCFLAGS += --stringparam pg.version '$(VERSION)'
+override XSLTPROCFLAGS += --stringparam pg.version '$(PGPRO_VERSION)'
 
 
 GENERATED_SGML = bookindex.sgml version.sgml \
@@ -100,6 +100,12 @@ ifeq ($(STYLE),website)
 JADE.html.call += -V website-stylesheet
 endif
 
+ifeq ($(PGPRO_PACKAGE_NAME),)
+PRODUCT_NAME=$(PACKAGE_NAME)
+else
+PRODUCT_NAME="Postgres Pro"
+endif
+
 # The draft target creates HTML output in draft mode, without index (for faster build).
 draft: postgres.sgml $(ALMOSTALLSGML) stylesheet.dsl
 	$(MKDIR_P) html
@@ -141,9 +147,9 @@ endif
 # changes.
 version.sgml: $(top_srcdir)/configure
 	{ \
-	  echo "<!ENTITY version \"$(VERSION)\">"; \
+	  echo "<!ENTITY version \"$(PGPRO_VERSION)\">"; \
 	  echo "<!ENTITY majorversion \"$(MAJORVERSION)\">"; \
-	  echo "<!ENTITY productname \"$(PACKAGE_NAME)\">"; \
+	  echo "<!ENTITY productname \"$(PRODUCT_NAME)\">"; \
 	} > $@
 
 features-supported.sgml: $(top_srcdir)/src/backend/catalog/sql_feature_packages.txt $(top_srcdir)/src/backend/catalog/sql_features.txt

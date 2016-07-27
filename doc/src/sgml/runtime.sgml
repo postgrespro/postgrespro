@@ -183,6 +183,15 @@ postgres$ <userinput>initdb -D /usr/local/pgsql/data</userinput>
    locale setting.  For details see <xref linkend="multibyte">.
   </para>
 
+  <para>
+   Non<literal>C</> and and non-<literal>POSIX</> locales rely on the
+   operating system's collation library for character set ordering.
+   This controls the ordering of keys stored in indexes.  For this reason,
+   a cluster cannot switch to an incompatible collation library version,
+   either through snapshot restore, binary streaming replication, or
+   <application>pg_upgrade</> run.
+  </para>
+
   <sect2 id="creating-cluster-mount-points">
    <title>Use of Secondary File Systems</title>
 
@@ -592,7 +601,7 @@ psql: could not connect to server: No such file or directory
 
    <note>
      <para>
-       Prior to <productname>&productname;</> 9.3, the amount of System V shared
+       Prior to <productname>PostgreSQL</> 9.3, the amount of System V shared
        memory required to start the server was much larger.  If you are running
        an older version of the server, please consult the documentation for
        your server version.

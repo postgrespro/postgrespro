@@ -3,7 +3,7 @@ CREATE TABLE table1(name varchar);
 INSERT INTO table1 VALUES ('земля'), ('землей'), ('землями'), ('земли'),
 						('туши'), ('тушь'), ('туша'), ('тушат'),
 						('тушью');
-SELECT d.* FROM table1 AS t, LATERAL ts_debug('public.russian', t.name) AS d;
+SELECT d.* FROM table1 AS t, LATERAL ts_debug('russian_hunspell', t.name) AS d;
  alias |    description    |  token  |          dictionaries           |    dictionary    |        lexemes         
 -------+-------------------+---------+---------------------------------+------------------+------------------------
  word  | Word, all letters | земля   | {russian_hunspell,russian_stem} | russian_hunspell | {земля}
@@ -17,9 +17,9 @@ SELECT d.* FROM table1 AS t, LATERAL ts_debug('public.russian', t.name) AS d;
  word  | Word, all letters | тушью   | {russian_hunspell,russian_stem} | russian_hunspell | {тушь}
 (9 rows)
 
-CREATE INDEX name_idx ON table1 USING GIN (to_tsvector('public.russian', "name"));
-SELECT * FROM table1 WHERE to_tsvector('public.russian', name)
-	@@ to_tsquery('public.russian', 'землей');
+CREATE INDEX name_idx ON table1 USING GIN (to_tsvector('russian_hunspell', "name"));
+SELECT * FROM table1 WHERE to_tsvector('russian_hunspell', name)
+	@@ to_tsquery('russian_hunspell', 'землей');
   name   
 ---------
  земля
@@ -28,8 +28,8 @@ SELECT * FROM table1 WHERE to_tsvector('public.russian', name)
  земли
 (4 rows)
 
-SELECT * FROM table1 WHERE to_tsvector('public.russian', name)
-	@@ to_tsquery('public.russian', 'тушь');
+SELECT * FROM table1 WHERE to_tsvector('russian_hunspell', name)
+	@@ to_tsquery('russian_hunspell', 'тушь');
  name  
 -------
  туши
@@ -37,8 +37,8 @@ SELECT * FROM table1 WHERE to_tsvector('public.russian', name)
  тушью
 (3 rows)
 
-SELECT * FROM table1 WHERE to_tsvector('public.russian', name)
-	@@ to_tsquery('public.russian', 'туша');
+SELECT * FROM table1 WHERE to_tsvector('russian_hunspell', name)
+	@@ to_tsquery('russian_hunspell', 'туша');
  name  
 -------
  туши
@@ -47,9 +47,9 @@ SELECT * FROM table1 WHERE to_tsvector('public.russian', name)
 (3 rows)
 
 DROP INDEX name_idx;
-CREATE INDEX name_idx ON table1 USING GIST (to_tsvector('public.russian', "name"));
-SELECT * FROM table1 WHERE to_tsvector('public.russian', name)
-	@@ to_tsquery('public.russian', 'землей');
+CREATE INDEX name_idx ON table1 USING GIST (to_tsvector('russian_hunspell', "name"));
+SELECT * FROM table1 WHERE to_tsvector('russian_hunspell', name)
+	@@ to_tsquery('russian_hunspell', 'землей');
   name   
 ---------
  земля
@@ -58,8 +58,8 @@ SELECT * FROM table1 WHERE to_tsvector('public.russian', name)
  земли
 (4 rows)
 
-SELECT * FROM table1 WHERE to_tsvector('public.russian', name)
-	@@ to_tsquery('public.russian', 'тушь');
+SELECT * FROM table1 WHERE to_tsvector('russian_hunspell', name)
+	@@ to_tsquery('russian_hunspell', 'тушь');
  name  
 -------
  туши
@@ -67,8 +67,8 @@ SELECT * FROM table1 WHERE to_tsvector('public.russian', name)
  тушью
 (3 rows)
 
-SELECT * FROM table1 WHERE to_tsvector('public.russian', name)
-	@@ to_tsquery('public.russian', 'туша');
+SELECT * FROM table1 WHERE to_tsvector('russian_hunspell', name)
+	@@ to_tsquery('russian_hunspell', 'туша');
  name  
 -------
  туши

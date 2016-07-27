@@ -429,7 +429,7 @@ GRANT <replaceable class="PARAMETER">role_name</replaceable> [, ...] TO <replace
    </para>
 
    <para>
-    Since <productname>&productname;</productname> 8.1, the concepts of users and
+    Since <productname>PostgreSQL</productname> 8.1, the concepts of users and
     groups have been unified into a single kind of entity called a role.
     It is therefore no longer necessary to use the keyword <literal>GROUP</>
     to identify whether a grantee is a user or a group.  <literal>GROUP</>

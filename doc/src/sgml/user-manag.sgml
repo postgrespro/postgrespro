@@ -16,7 +16,7 @@
 
  <para>
   The concept of roles subsumes the concepts of <quote>users</> and
-  <quote>groups</>.  In <productname>&productname;</productname> versions
+  <quote>groups</>.  In <productname>PostgreSQL</productname> versions
   before 8.1, users and groups were distinct kinds of entities, but now
   there are only roles.  Any role can act as a user, a group, or both.
  </para>
@@ -380,8 +380,8 @@ RESET ROLE;
     giving roles being used as SQL users the <literal>NOINHERIT</> attribute.
     However, <productname>&productname;</productname> defaults to giving all roles
     the <literal>INHERIT</> attribute, for backward compatibility with pre-8.1
-    releases in which users always had use of permissions granted to groups
-    they were members of.
+    releases of <productname>PostgreSQL</productname> in which users always
+    had use of permissions granted to groups they were members of.
    </para>
   </note>
 

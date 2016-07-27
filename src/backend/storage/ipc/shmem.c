@@ -241,7 +241,7 @@ InitShmemIndex(void)
 	hash_flags = HASH_ELEM;
 
 	ShmemIndex = ShmemInitHash("ShmemIndex",
-							   SHMEM_INDEX_SIZE,
+							   SHMEM_INDEX_SIZE, SHMEM_INDEX_SIZE,
 							   &info, hash_flags);
 }
 
@@ -259,12 +259,17 @@ InitShmemIndex(void)
  * exceeded substantially (since it's used to compute directory size and
  * the hash table buckets will get overfull).
  *
+ * init_size is the number of hashtable entries to preallocate.  For a table
+ * whose maximum size is certain, this should be equal to max_size; that
+ * ensures that no run-time out-of-shared-memory failures can occur.
+ *
  * Note: before Postgres 9.0, this function returned NULL for some failure
  * cases.  Now, it always throws error instead, so callers need not check
  * for NULL.
  */
 HTAB *
 ShmemInitHash(const char *name, /* table string name for shmem index */
+			  long init_size,	/* initial table size */
 			  long max_size,	/* max size of the table */
 			  HASHCTL *infoP,	/* info about key and bucket size */
 			  int hash_flags)	/* info about infoP */
@@ -298,7 +303,7 @@ ShmemInitHash(const char *name, /* table string name for shmem index */
 	/* Pass location of hashtable header to hash_create */
 	infoP->hctl = (HASHHDR *) location;
 
-	return hash_create(name, max_size, infoP, hash_flags);
+	return hash_create(name, init_size, infoP, hash_flags);
 }
 
 /*

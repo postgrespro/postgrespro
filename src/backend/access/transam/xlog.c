@@ -3069,7 +3069,7 @@ XLogFileInit(XLogSegNo logsegno, bool *use_existent, bool use_lock)
  *
  * destsegno: identify segment to be created.
  *
- * srcTLI, srclog, srcseg: identify segment to be copied (could be from
+ * srcTLI, srcsegno: identify segment to be copied (could be from
  *		a different timeline)
  *
  * upto: how much of the source file to copy (the rest is filled with
@@ -6674,6 +6674,7 @@ StartupXLOG(void)
 			do
 			{
 				bool		switchedTLI = false;
+				int nblock;
 
 #ifdef WAL_DEBUG
 				if (XLOG_DEBUG ||
@@ -6827,6 +6828,17 @@ StartupXLOG(void)
 				/* Pop the error context stack */
 				error_context_stack = errcallback.previous;
 
+				if (ptrack_enable)
+					for(nblock = 0; nblock < xlogreader->max_block_id; nblock++)
+					{
+						if(xlogreader->blocks[nblock].forknum == MAIN_FORKNUM)
+						{
+							ptrack_add_block(xlogreader->blocks[nblock].blkno,
+											xlogreader->blocks[nblock].rnode);
+							ptrack_save();
+						}
+					}
+
 				/*
 				 * Update lastReplayedEndRecPtr after this record has been
 				 * successfully replayed.
@@ -6977,7 +6989,7 @@ StartupXLOG(void)
 	 * EndOfLogTLI is the TLI in the filename of the XLOG segment containing
 	 * the end-of-log. It could be different from the timeline that EndOfLog
 	 * nominally belongs to, if there was a timeline switch in that segment,
-	 * and we were reading the old wAL from a segment belonging to a higher
+	 * and we were reading the old WAL from a segment belonging to a higher
 	 * timeline.
 	 */
 	EndOfLogTLI = xlogreader->readPageTLI;

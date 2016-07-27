@@ -53,7 +53,7 @@ typedef struct
 	HeadlineWordEntry *words;
 	int32		lenwords;
 	int32		curwords;
-	int32		vectorpos; /* postions a-la tsvector */
+	int32		vectorpos; /* positions a-la tsvector */
 	char	   *startsel;
 	char	   *stopsel;
 	char	   *fragdelim;

@@ -209,7 +209,7 @@ key =&gt; NULL
 
   <note>
   <para>
-   Prior to &productname; 8.2, the containment operators <literal>@&gt;</>
+   Prior to PostgreSQL 8.2, the containment operators <literal>@&gt;</>
    and <literal>&lt;@</> were called <literal>@</> and <literal>~</>,
    respectively. These names are still available, but are deprecated and will
    eventually be removed. Notice that the old names are reversed from the
@@ -588,7 +588,7 @@ SELECT key, count(*) FROM
   <title>Compatibility</title>
 
   <para>
-   As of &productname; 9.0, <type>hstore</> uses a different internal
+   As of PostgreSQL 9.0, <type>hstore</> uses a different internal
    representation than previous versions. This presents no obstacle for
    dump/restore upgrades since the text representation (used in the dump) is
    unchanged.

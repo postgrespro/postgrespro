@@ -19,9 +19,9 @@
 
  <para>
   This document describes version 3.0 of the protocol, implemented in
-  <productname>&productname;</productname> 7.4 and later.  For descriptions
+  <productname>PostgreSQL</productname> 7.4 and later.  For descriptions
   of the earlier protocol versions, see previous releases of the
-  <productname>&productname;</productname> documentation.  A single server
+  <productname>PostgreSQL</productname> documentation.  A single server
   can support multiple protocol versions.  The initial
   startup-request message tells the server which protocol version the
   client is attempting to use, and then the server follows that protocol
@@ -164,7 +164,7 @@
 
    <para>
     Data of a particular data type might be transmitted in any of several
-    different <firstterm>formats</>.  As of <productname>&productname;</> 7.4
+    different <firstterm>formats</>.  As of <productname>PostgreSQL</> 7.4
     the only supported formats are <quote>text</> and <quote>binary</>,
     but the protocol makes provision for future extensions.  The desired
     format for any value is specified by a <firstterm>format code</>.
@@ -2844,7 +2844,7 @@ CancelRequest (F)
 <para>
                 The cancel request code.  The value is chosen to contain
                 <literal>1234</> in the most significant 16 bits, and <literal>5678</> in the
-                least 16 significant bits.  (To avoid confusion, this code
+                least significant 16 bits.  (To avoid confusion, this code
                 must not be the same as any protocol version number.)
 </para>
 </listitem>
@@ -3054,7 +3054,7 @@ CommandComplete (B)
         <literal>COPY <replaceable>rows</replaceable></literal> where
         <replaceable>rows</replaceable> is the number of rows copied.
         (Note: the row count appears only in
-        <productname>&productname;</productname> 8.2 and later.)
+        <productname>PostgreSQL</productname> 8.2 and later.)
        </para>
 
 </listitem>
@@ -4650,7 +4650,7 @@ SSLRequest (F)
 <para>
                 The <acronym>SSL</acronym> request code.  The value is chosen to contain
                 <literal>1234</> in the most significant 16 bits, and <literal>5679</> in the
-                least 16 significant bits.  (To avoid confusion, this code
+                least significant 16 bits.  (To avoid confusion, this code
                 must not be the same as any protocol version number.)
 </para>
 </listitem>

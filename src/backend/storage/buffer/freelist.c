@@ -100,9 +100,9 @@ typedef struct BufferAccessStrategyData
 
 /* Prototypes for internal functions */
 static BufferDesc *GetBufferFromRing(BufferAccessStrategy strategy,
-											  uint32 *lockstate);
+				  uint32 *buf_state);
 static void AddBufferToRing(BufferAccessStrategy strategy,
-				volatile BufferDesc *buf);
+				BufferDesc *buf);
 
 /*
  * ClockSweepTick - Helper routine for StrategyGetBuffer()
@@ -182,11 +182,12 @@ ClockSweepTick(void)
  *	return the buffer with the buffer header spinlock still held.
  */
 BufferDesc *
-StrategyGetBuffer(BufferAccessStrategy strategy, uint32 *lockstate)
+StrategyGetBuffer(BufferAccessStrategy strategy, uint32 *buf_state)
 {
 	BufferDesc *buf;
 	int			bgwprocno;
 	int			trycounter;
+	uint32		local_buf_state;	/* to avoid repeated (de-)referencing */
 
 	/*
 	 * If given a strategy object, see whether it can select a buffer. We
@@ -194,7 +195,7 @@ StrategyGetBuffer(BufferAccessStrategy strategy, uint32 *lockstate)
 	 */
 	if (strategy != NULL)
 	{
-		buf = GetBufferFromRing(strategy, lockstate);
+		buf = GetBufferFromRing(strategy, buf_state);
 		if (buf != NULL)
 			return buf;
 	}
@@ -252,8 +253,6 @@ StrategyGetBuffer(BufferAccessStrategy strategy, uint32 *lockstate)
 	{
 		while (true)
 		{
-			uint32	state;
-
 			/* Acquire the spinlock to remove element from the freelist */
 			SpinLockAcquire(&StrategyControl->buffer_strategy_lock);
 
@@ -283,16 +282,16 @@ StrategyGetBuffer(BufferAccessStrategy strategy, uint32 *lockstate)
 			 * it before we got to it.  It's probably impossible altogether as
 			 * of 8.3, but we'd better check anyway.)
 			 */
-			state = LockBufHdr(buf);
-			if (BUF_STATE_GET_REFCOUNT(state) == 0
-				&& BUF_STATE_GET_USAGECOUNT(state) == 0)
+			local_buf_state = LockBufHdr(buf);
+			if (BUF_STATE_GET_REFCOUNT(local_buf_state) == 0
+				&& BUF_STATE_GET_USAGECOUNT(local_buf_state) == 0)
 			{
 				if (strategy != NULL)
 					AddBufferToRing(strategy, buf);
-				*lockstate = state;
+				*buf_state = local_buf_state;
 				return buf;
 			}
-			UnlockBufHdr(buf);
+			UnlockBufHdr(buf, local_buf_state);
 
 		}
 	}
@@ -301,21 +300,19 @@ StrategyGetBuffer(BufferAccessStrategy strategy, uint32 *lockstate)
 	trycounter = NBuffers;
 	for (;;)
 	{
-		uint32	state;
-
 		buf = GetBufferDescriptor(ClockSweepTick());
 
 		/*
 		 * If the buffer is pinned or has a nonzero usage_count, we cannot use
 		 * it; decrement the usage_count (unless pinned) and keep scanning.
 		 */
-		state = LockBufHdr(buf);
+		local_buf_state = LockBufHdr(buf);
 
-		if (BUF_STATE_GET_REFCOUNT(state) == 0)
+		if (BUF_STATE_GET_REFCOUNT(local_buf_state) == 0)
 		{
-			if (BUF_STATE_GET_USAGECOUNT(state) != 0)
+			if (BUF_STATE_GET_USAGECOUNT(local_buf_state) != 0)
 			{
-				pg_atomic_fetch_sub_u32(&buf->state, BUF_USAGECOUNT_ONE);
+				local_buf_state -= BUF_USAGECOUNT_ONE;
 
 				trycounter = NBuffers;
 			}
@@ -324,7 +321,7 @@ StrategyGetBuffer(BufferAccessStrategy strategy, uint32 *lockstate)
 				/* Found a usable buffer */
 				if (strategy != NULL)
 					AddBufferToRing(strategy, buf);
-				*lockstate = state;
+				*buf_state = local_buf_state;
 				return buf;
 			}
 		}
@@ -337,10 +334,10 @@ StrategyGetBuffer(BufferAccessStrategy strategy, uint32 *lockstate)
 			 * probably better to fail than to risk getting stuck in an
 			 * infinite loop.
 			 */
-			UnlockBufHdr(buf);
+			UnlockBufHdr(buf, local_buf_state);
 			elog(ERROR, "no unpinned buffers available");
 		}
-		UnlockBufHdr(buf);
+		UnlockBufHdr(buf, local_buf_state);
 	}
 }
 
@@ -348,7 +345,7 @@ StrategyGetBuffer(BufferAccessStrategy strategy, uint32 *lockstate)
  * StrategyFreeBuffer: put a buffer on the freelist
  */
 void
-StrategyFreeBuffer(volatile BufferDesc *buf)
+StrategyFreeBuffer(BufferDesc *buf)
 {
 	SpinLockAcquire(&StrategyControl->buffer_strategy_lock);
 
@@ -595,11 +592,12 @@ FreeAccessStrategy(BufferAccessStrategy strategy)
  * The bufhdr spin lock is held on the returned buffer.
  */
 static BufferDesc *
-GetBufferFromRing(BufferAccessStrategy strategy, uint32 *lockstate)
+GetBufferFromRing(BufferAccessStrategy strategy, uint32 *buf_state)
 {
 	BufferDesc *buf;
 	Buffer		bufnum;
-	uint32		state;
+	uint32		local_buf_state;	/* to avoid repeated (de-)referencing */
+
 
 	/* Advance to next ring slot */
 	if (++strategy->current >= strategy->ring_size)
@@ -627,15 +625,15 @@ GetBufferFromRing(BufferAccessStrategy strategy, uint32 *lockstate)
 	 * shouldn't re-use it.
 	 */
 	buf = GetBufferDescriptor(bufnum - 1);
-	state = LockBufHdr(buf);
-	if (BUF_STATE_GET_REFCOUNT(state) == 0
-		&& BUF_STATE_GET_USAGECOUNT(state) <= 1)
+	local_buf_state = LockBufHdr(buf);
+	if (BUF_STATE_GET_REFCOUNT(local_buf_state) == 0
+		&& BUF_STATE_GET_USAGECOUNT(local_buf_state) <= 1)
 	{
 		strategy->current_was_in_ring = true;
-		*lockstate = state;
+		*buf_state = local_buf_state;
 		return buf;
 	}
-	UnlockBufHdr(buf);
+	UnlockBufHdr(buf, local_buf_state);
 
 	/*
 	 * Tell caller to allocate a new buffer with the normal allocation
@@ -652,7 +650,7 @@ GetBufferFromRing(BufferAccessStrategy strategy, uint32 *lockstate)
  * is called with the spinlock held, it had better be quite cheap.
  */
 static void
-AddBufferToRing(BufferAccessStrategy strategy, volatile BufferDesc *buf)
+AddBufferToRing(BufferAccessStrategy strategy, BufferDesc *buf)
 {
 	strategy->buffers[strategy->current] = BufferDescriptorGetBuffer(buf);
 }
@@ -669,7 +667,7 @@ AddBufferToRing(BufferAccessStrategy strategy, volatile BufferDesc *buf)
  * if this buffer should be written and re-used.
  */
 bool
-StrategyRejectBuffer(BufferAccessStrategy strategy, volatile BufferDesc *buf)
+StrategyRejectBuffer(BufferAccessStrategy strategy, BufferDesc *buf)
 {
 	/* We only do this in bulkread mode */
 	if (strategy->btype != BAS_BULKREAD)

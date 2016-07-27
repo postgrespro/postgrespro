@@ -264,6 +264,9 @@ clean_dict_affix(IspellDict *dict)
 	dict->nAffixData = 0;
 
 	dict->CompoundAffix = NULL;
+	dict->CompoundAffixFlags = NULL;
+	dict->nCompoundAffixFlag = 0;
+	dict->mCompoundAffixFlag = 0;
 
 	dict->avail = 0;
 }
@@ -315,7 +318,13 @@ init_shared_dict(DictInfo *info, char *dictFile, char *affFile, char *stopFile)
 		NIImportDictionary(dict, get_tsearch_config_filename(dictFile, "dict"));
 
 		dict->usecompound = info->dict.usecompound;
-		memcpy(dict->flagval, &(info->dict.flagval), 65000);
+
+		dict->nCompoundAffixFlag = dict->mCompoundAffixFlag =
+			info->dict.nCompoundAffixFlag;
+		dict->CompoundAffixFlags = (CompoundAffixFlag *) palloc0(
+			dict->nCompoundAffixFlag * sizeof(CompoundAffixFlag));
+		memcpy(dict->CompoundAffixFlags, info->dict.CompoundAffixFlags,
+			   dict->nCompoundAffixFlag * sizeof(CompoundAffixFlag));
 
 		/*
 		 * If affix->useFlagAliases == true then AffixData is generated

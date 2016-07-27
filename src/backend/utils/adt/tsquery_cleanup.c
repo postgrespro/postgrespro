@@ -26,9 +26,18 @@ typedef struct NODE
 	QueryItem  *valnode;
 } NODE;
 
-/* Non-operator nodes have fake (but highest) priority */
+/*
+ * To simplify walking on query tree and pushing down of phrase operator
+ * we define some fake priority here: phrase operator has highest priority
+ * of any other operators (and we believe here that OP_PHRASE is a highest
+ * code of operations) and value node has ever highest priority.
+ * Priority values of other operations don't matter until they are less than
+ * phrase operator and value node.
+ */
+#define VALUE_PRIORITY			(OP_COUNT + 1)
 #define NODE_PRIORITY(x) \
-	( ((x)->valnode->qoperator.type == QI_OPR) ? QO_PRIORITY((x)->valnode) : 16 )
+	( ((x)->valnode->qoperator.type == QI_OPR) ? \
+		(x)->valnode->qoperator.oper : VALUE_PRIORITY )
 
 /*
  * make query tree from plain view of query
@@ -218,14 +227,13 @@ clean_NOT(QueryItem *ptr, int *len)
 #define V_STOP		3			/* the expression is a stop word */
 
 /*
- * Clean query tree from values which is always in
- * text (stopword)
+ * Remove QI_VALSTOP (stopword nodes) from query tree.
  */
 static NODE *
 clean_fakeval_intree(NODE *node, char *result, int *adddistance)
 {
-	char		lresult = V_UNKNOWN,
-				rresult = V_UNKNOWN;
+	char	lresult = V_UNKNOWN,
+			rresult = V_UNKNOWN;
 
 	/* since this function recurses, it could be driven to stack overflow. */
 	check_stack_depth();
@@ -256,8 +264,8 @@ clean_fakeval_intree(NODE *node, char *result, int *adddistance)
 	}
 	else
 	{
-		NODE	   *res = node;
-		int			ndistance, ldistance = 0, rdistance = 0;
+		NODE   *res = node;
+		int		ndistance, ldistance = 0, rdistance = 0;
 
 		ndistance = (node->valnode->qoperator.oper == OP_PHRASE) ?
 						node->valnode->qoperator.distance :
@@ -266,14 +274,14 @@ clean_fakeval_intree(NODE *node, char *result, int *adddistance)
 		node->left  = clean_fakeval_intree(node->left,
 										   &lresult,
 										   ndistance ? &ldistance : NULL);
-		
+
 		node->right = clean_fakeval_intree(node->right,
 										   &rresult,
 										   ndistance ? &rdistance : NULL);
 
 		/*
-		 * ndistance, ldistance and rdistance are greater than zero if
-		 * corresponding node are OP_PHRASE
+		 * ndistance, ldistance and rdistance are greater than zero
+		 * if their corresponding nodes are OP_PHRASE
 		 */
 
 		if (lresult == V_STOP && rresult == V_STOP)
@@ -289,7 +297,7 @@ clean_fakeval_intree(NODE *node, char *result, int *adddistance)
 			res = node->right;
 			/*
 			 * propagate distance from current node to the
-			 * right upper sub-tree
+			 * right upper subtree.
 			 */
 			if (adddistance && ndistance)
 				*adddistance = rdistance;
@@ -299,7 +307,7 @@ clean_fakeval_intree(NODE *node, char *result, int *adddistance)
 		{
 			res = node->left;
 			/*
-			 * propagate distance to the upper tree to current node
+			 * propagate distance from current node to the upper tree.
 			 */
 			if (adddistance && ndistance)
 				*adddistance = ndistance + ldistance;
@@ -321,7 +329,7 @@ clean_fakeval_intree(NODE *node, char *result, int *adddistance)
 	return node;
 }
 
-static NODE*
+static NODE *
 copyNODE(NODE *node)
 {
 	NODE *cnode = palloc(sizeof(NODE));
@@ -342,12 +350,13 @@ copyNODE(NODE *node)
 	return cnode;
 }
 
-static NODE*
+static NODE *
 makeNODE(int8 op, NODE *left, NODE *right)
 {
 	NODE *node = palloc(sizeof(NODE));
 
-	node->valnode = palloc(sizeof(QueryItem));
+	/* zeroing allocation to prevent difference in unused bytes */
+	node->valnode = palloc0(sizeof(QueryItem));
 
 	node->valnode->qoperator.type = QI_OPR;
 	node->valnode->qoperator.oper = op;
@@ -359,24 +368,32 @@ makeNODE(int8 op, NODE *left, NODE *right)
 }
 
 /*
- * Move operation with high priority to the leaves.
- * That guarantees that ? operation will be near the bottom of tree.
- * But it's needed only for ? operation, so actual convertation
- * will be done only for subtrees under ? operation.
+ * Move operation with high priority to the leaves. This guarantees
+ * that the phrase operator will be near the bottom of the tree.
+ * An idea behind is do not store position of lexemes during execution
+ * of ordinary operations (AND, OR, NOT) because it could be expensive.
+ * Actual transformation will be performed only on subtrees under the
+ * <-> (<n>) operation since it's needed solely for the phrase operator.
+ *
  * Rules:
- *	a ? (b|c) => (a?b) | (a?c)
- *	(a|b) ? c => (a?c) | (b?c)
- *	a ? !b    => a & !(a?b)
- *	!a ? b    => b & !(a?b)
- *  Warnings:
- *	- a?b != b?a
- *	- a ?[n] ( b ?[n] c ) != (a ?[n] b) ?[n] c , because phrase's length is:
- *          n                    2n-1
+ *	  a	 <->  (b | c)	=>	(a <-> b)  |   (a <-> c)
+ *   (a | b)  <->	 c	   =>	(a <-> c)  |   (b <-> c)
+ *	  a	 <->	!b	   =>		a	  &  !(a <-> b)
+ *	 !a	 <->	 b	   =>		b	  &  !(a <-> b)
+ *
+ * Warnings for readers:
+ *		  a <-> b	   !=	   b <-> a
+ *
+ *	  a <n> (b <n> c)   !=   (a <n> b) <n> c since the phrase lengths are:
+ *			 n					2n-1
  */
-static NODE*
+static NODE *
 normalize_phrase_tree(NODE *node)
 {
-	if (node->valnode->type == QI_VAL || node->valnode->type == QI_VALSTOP)
+	/* there should be no stop words at this point */
+	Assert(node->valnode->type != QI_VALSTOP);
+
+	if (node->valnode->type == QI_VAL)
 		return node;
 
 	/* since this function recurses, it could be driven to stack overflow. */
@@ -398,18 +415,22 @@ normalize_phrase_tree(NODE *node)
 	else if (node->valnode->qoperator.oper == OP_PHRASE)
 	{
 		int16	 distance;
-		NODE 	*X;
+		NODE	*X;
 
 		node->left = normalize_phrase_tree(node->left);
 		node->right = normalize_phrase_tree(node->right);
 
+		/*
+		 * if subtree contains only nodes with higher "priority" then
+		 * we are done. See comment near NODE_PRIORITY()
+		 */
 		if (NODE_PRIORITY(node) <= NODE_PRIORITY(node->right) &&
 			NODE_PRIORITY(node) <= NODE_PRIORITY(node->left))
 				return node;
 
 		/*
 		 * We can't swap left-right and works only with left child
-		 * because of a?b != b?a
+		 * because of a <-> b  !=  b <-> a
 		 */
 
 		distance = node->valnode->qoperator.distance;
@@ -419,7 +440,7 @@ normalize_phrase_tree(NODE *node)
 			switch (node->right->valnode->qoperator.oper)
 			{
 				case OP_AND:
-					/* a ? (b&c) => (a?b) & (a?c) */
+					/* a <-> (b & c)  =>  (a <-> b) & (a <-> c) */
 					node = makeNODE(OP_AND,
 									makeNODE(OP_PHRASE,
 											 node->left,
@@ -431,7 +452,7 @@ normalize_phrase_tree(NODE *node)
 						node->right->valnode->qoperator.distance = distance;
 					break;
 				case OP_OR:
-					/* a ? (b|c) => (a?b) | (a?c) */
+					/* a <-> (b | c)  =>  (a <-> b) | (a <-> c) */
 					node = makeNODE(OP_OR,
 									makeNODE(OP_PHRASE,
 											 node->left,
@@ -443,7 +464,7 @@ normalize_phrase_tree(NODE *node)
 						node->right->valnode->qoperator.distance = distance;
 					break;
 				case OP_NOT:
-					/* a ? !b  => a & !(a?b) */
+					/* a <-> !b  =>  a & !(a <-> b) */
 					X = node->right;
 					node->right = node->right->right;
 					X->right = node;
@@ -464,13 +485,13 @@ normalize_phrase_tree(NODE *node)
 			node->valnode->qoperator.oper == OP_PHRASE)
 		{
 			/*
-			 * if node is still OP_PHRASE, check the left subtree
-			 * else the whole node will be done later.
+			 * if the node is still OP_PHRASE, check the left subtree,
+			 * otherwise the whole node will be transformed later.
 			 */
 			switch(node->left->valnode->qoperator.oper)
 			{
 				case OP_AND:
-					/*  (a&b) ? c => (a?c) & (b?c) */
+					/*  (a & b) <-> c  =>  (a <-> c) & (b <-> c) */
 					node = makeNODE(OP_AND,
 									makeNODE(OP_PHRASE,
 											 node->left->left,
@@ -482,7 +503,7 @@ normalize_phrase_tree(NODE *node)
 						node->right->valnode->qoperator.distance = distance;
 					break;
 				case OP_OR:
- 					/*	(a|b) ? c => (a?c) | (b?c) */
+					/* (a | b) <-> c  =>  (a <-> c) | (b <-> c) */
 					node = makeNODE(OP_OR,
 									makeNODE(OP_PHRASE,
 											 node->left->left,
@@ -494,7 +515,7 @@ normalize_phrase_tree(NODE *node)
 						node->right->valnode->qoperator.distance = distance;
 					break;
 				case OP_NOT:
- 					/*	!a ? b    => b & !(a?b) */
+					/* !a <-> b  =>  b & !(a <-> b) */
 					X = node->left;
 					node->left = node->left->right;
 					X->right = node;
@@ -511,6 +532,7 @@ normalize_phrase_tree(NODE *node)
 			}
 		}
 
+		/* continue transformation */
 		node = normalize_phrase_tree(node);
 	}
 	else /* AND or OR */
@@ -519,10 +541,12 @@ normalize_phrase_tree(NODE *node)
 		node->right = normalize_phrase_tree(node->right);
 	}
 
-
 	return node;
 }
 
+/*
+ * Number of elements in query tree
+ */
 static int32
 calcstrlen(NODE *node)
 {
@@ -551,15 +575,16 @@ cleanup_fakeval_and_phrase(TSQuery in)
 				lenstr,
 				commonlen,
 				i;
-	NODE       *root;
+	NODE	   *root;
 	char		result = V_UNKNOWN;
-	TSQuery	    out;
+	TSQuery		out;
 	QueryItem  *items;
-	char	   *ptr;
+	char	   *operands;
 
 	if (in->size == 0)
 		return in;
 
+	/* eliminate stop words */
 	root = clean_fakeval_intree(maketree(GETQUERY(in)), &result, NULL);
 	if (result != V_UNKNOWN)
 	{
@@ -571,7 +596,12 @@ cleanup_fakeval_and_phrase(TSQuery in)
 		return out;
 	}
 
+	/* push OP_PHRASE nodes down */
 	root = normalize_phrase_tree(root);
+
+	/*
+	 * Build TSQuery from plain view
+	 */
 
 	lenstr = calcstrlen(root);
 	items = plaintree(root, &len);
@@ -584,18 +614,18 @@ cleanup_fakeval_and_phrase(TSQuery in)
 	memcpy(GETQUERY(out), items, len * sizeof(QueryItem));
 
 	items = GETQUERY(out);
-	ptr = GETOPERAND(out);
+	operands = GETOPERAND(out);
 	for (i = 0; i < out->size; i++)
 	{
-		QueryOperand	*op = (QueryOperand *) (items + i);
+		QueryOperand *op = (QueryOperand *) &items[i];
 
 		if (op->type != QI_VAL)
 			continue;
 
-		memcpy(ptr, GETOPERAND(in) + op->distance, op->length);
-		ptr[op->length] ='\0';
-		op->distance = ptr - GETOPERAND(out);
-		ptr += op->length + 1;
+		memcpy(operands, GETOPERAND(in) + op->distance, op->length);
+		operands[op->length] = '\0';
+		op->distance = operands - GETOPERAND(out);
+		operands += op->length + 1;
 	}
 
 	return out;

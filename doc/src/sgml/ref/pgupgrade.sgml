@@ -207,7 +207,7 @@
 
     <para>
      If you are using a version-specific installation directory, e.g.
-     <filename>/opt/&productname;/9.1</>, you do not need to move the old cluster. The
+     <filename>/opt/PostgreSQL/9.1</>, you do not need to move the old cluster. The
      graphical installers all use version-specific installation directories.
     </para>
 
@@ -297,8 +297,8 @@ make prefix=/usr/local/pgsql.new install
      Make sure both database servers are stopped using, on Unix, e.g.:
 
 <programlisting>
-pg_ctl -D /opt/&productname;/8.4 stop
-pg_ctl -D /opt/&productname;/9.0 stop
+pg_ctl -D /opt/PostgreSQL/8.4 stop
+pg_ctl -D /opt/PostgreSQL/9.0 stop
 </programlisting>
 
      or on Windows, using the proper service names:
@@ -365,17 +365,17 @@ NET STOP postgresql-9.0
 
 <programlisting>
 RUNAS /USER:postgres "CMD.EXE"
-SET PATH=%PATH%;C:\Program Files\&productname;\9.0\bin;
+SET PATH=%PATH%;C:\Program Files\PostgreSQL\9.0\bin;
 </programlisting>
 
      and then run <application>pg_upgrade</> with quoted directories, e.g.:
 
 <programlisting>
 pg_upgrade.exe
-        --old-datadir "C:/Program Files/&productname;/8.4/data"
-        --new-datadir "C:/Program Files/&productname;/9.0/data"
-        --old-bindir "C:/Program Files/&productname;/8.4/bin"
-        --new-bindir "C:/Program Files/&productname;/9.0/bin"
+        --old-datadir "C:/Program Files/PostgreSQL/8.4/data"
+        --new-datadir "C:/Program Files/PostgreSQL/9.0/data"
+        --old-bindir "C:/Program Files/PostgreSQL/8.4/bin"
+        --new-bindir "C:/Program Files/PostgreSQL/9.0/bin"
 </programlisting>
 
      Once started, <command>pg_upgrade</> will verify the two clusters are compatible
@@ -499,7 +499,7 @@ rsync --archive --delete --hard-links --size-only old_pgdata new_pgdata remote_d
        the standby server.  The old and new relative cluster paths
        must match on the master and standby server.  Consult the
        <application>rsync</> manual page for details on specifying the
-       remote directory, e.g. <literal>standbyhost:/opt/&productname;/</>.
+       remote directory, e.g. <literal>standbyhost:/opt/PostgreSQL/</>.
        <application>rsync</> will be fast when <application>pg_upgrade</>'s
        <option>--link</> mode is used because it will create hard links
        on the remote server rather than transferring user data.
@@ -673,7 +673,7 @@ psql --username postgres --file script.sql postgres
   </para>
 
   <para>
-   If you are upgrading a pre-<productname>&productname;</> 9.2 cluster
+   If you are upgrading a pre-<productname>PostgreSQL</> 9.2 cluster
    that uses a configuration-file-only directory, you must pass the
    real data directory location to <application>pg_upgrade</>, and
    pass the configuration directory location to the server, e.g.

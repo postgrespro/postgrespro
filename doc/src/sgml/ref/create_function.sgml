@@ -739,7 +739,7 @@ $$  LANGUAGE plpgsql
 </programlisting>
 
    <para>
-    Before <productname>&productname;</productname> version 8.3, the
+    Before <productname>PostgreSQL</productname> version 8.3, the
     <literal>SET</> option was not available, and so older functions may
     contain rather complicated logic to save, set, and restore
     <varname>search_path</>.  The <literal>SET</> option is far easier

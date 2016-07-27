@@ -966,9 +966,20 @@ ExecInitIndexScan(IndexScan *node, EState *estate, int eflags)
 			Oid			orderbyop = lfirst_oid(lco);
 			Node	   *orderbyexpr = (Node *) lfirst(lcx);
 			Oid			orderbyType = exprType(orderbyexpr);
+			Oid			orderbyColl = exprCollation(orderbyexpr);
+			SortSupport orderbysort = &indexstate->iss_SortSupport[i];
 
-			PrepareSortSupportFromOrderingOp(orderbyop,
-											 &indexstate->iss_SortSupport[i]);
+			/* Initialize sort support */
+			orderbysort->ssup_cxt = CurrentMemoryContext;
+			orderbysort->ssup_collation = orderbyColl;
+			/* See cmp_orderbyvals() comments on NULLS LAST */
+			orderbysort->ssup_nulls_first = false;
+			/* ssup_attno is unused here and elsewhere */
+			orderbysort->ssup_attno = 0;
+			/* No abbreviation */
+			orderbysort->abbreviate = false;
+			PrepareSortSupportFromOrderingOp(orderbyop, orderbysort);
+
 			get_typlenbyval(orderbyType,
 							&indexstate->iss_OrderByTypLens[i],
 							&indexstate->iss_OrderByTypByVals[i]);
@@ -1143,7 +1154,9 @@ ExecIndexBuildScanKeys(PlanState *planstate, Relation index,
 		Expr	   *leftop;		/* expr on lhs of operator */
 		Expr	   *rightop;	/* expr on rhs ... */
 		AttrNumber	varattno;	/* att number used in scan */
+		int			indnkeyatts;
 
+		indnkeyatts = IndexRelationGetNumberOfKeyAttributes(index);
 		if (IsA(clause, OpExpr))
 		{
 			/* indexkey op const or indexkey op expression */
@@ -1168,7 +1181,7 @@ ExecIndexBuildScanKeys(PlanState *planstate, Relation index,
 				elog(ERROR, "indexqual doesn't have key on left side");
 
 			varattno = ((Var *) leftop)->varattno;
-			if (varattno < 1 || varattno > index->rd_index->indnatts)
+			if (varattno < 1 || varattno > indnkeyatts)
 				elog(ERROR, "bogus index qualification");
 
 			/*
@@ -1291,7 +1304,7 @@ ExecIndexBuildScanKeys(PlanState *planstate, Relation index,
 				opnos_cell = lnext(opnos_cell);
 
 				if (index->rd_rel->relam != BTREE_AM_OID ||
-					varattno < 1 || varattno > index->rd_index->indnatts)
+					varattno < 1 || varattno > indnkeyatts)
 					elog(ERROR, "bogus RowCompare index qualification");
 				opfamily = index->rd_opfamily[varattno - 1];
 
@@ -1412,7 +1425,7 @@ ExecIndexBuildScanKeys(PlanState *planstate, Relation index,
 				elog(ERROR, "indexqual doesn't have key on left side");
 
 			varattno = ((Var *) leftop)->varattno;
-			if (varattno < 1 || varattno > index->rd_index->indnatts)
+			if (varattno < 1 || varattno > indnkeyatts)
 				elog(ERROR, "bogus index qualification");
 
 			/*

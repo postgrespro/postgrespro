@@ -56,7 +56,7 @@
   <symbol>unique_violation</> error.  Such names are supplied in separate
   fields of the error report message so that applications need not try to
   extract them from the possibly-localized human-readable text of the message.
-  As of <productname>&productname;</> 9.3, complete coverage for this feature
+  As of <productname>PostgreSQL</> 9.3, complete coverage for this feature
   exists only for errors in SQLSTATE class 23 (integrity constraint
   violation), but this is likely to be expanded in future.
  </para>

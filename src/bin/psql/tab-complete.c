@@ -3423,7 +3423,7 @@ psql_completion(const char *text, int start, int end)
 			 pg_strcasecmp(prev_wd, "LABEL") == 0)
 	{
 		static const char *const list_SECURITY_LABEL_preposition[] =
-		{"ON", "FOR"};
+			{"ON", "FOR", NULL};
 
 		COMPLETE_WITH_LIST(list_SECURITY_LABEL_preposition);
 	}
@@ -3862,8 +3862,8 @@ psql_completion(const char *text, int start, int end)
 		static const char *const my_list[] =
 		{"border", "columns", "expanded", "fieldsep", "fieldsep_zero",
 			"footer", "format", "linestyle", "null", "numericlocale",
-			"pager", "recordsep", "recordsep_zero", "tableattr", "title",
-			"tuples_only", "unicode_border_linestyle",
+			"pager", "pager_min_lines", "recordsep", "recordsep_zero",
+			"tableattr", "title", "tuples_only", "unicode_border_linestyle",
 		"unicode_column_linestyle", "unicode_header_linestyle", NULL};
 
 		COMPLETE_WITH_LIST_CS(my_list);

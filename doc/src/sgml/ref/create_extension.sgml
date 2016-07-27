@@ -133,7 +133,7 @@ CREATE EXTENSION [ IF NOT EXISTS ] <replaceable class="parameter">extension_name
         extension's author, and might vary if there is more than one version
         of the old-style module that can be upgraded into an extension.
         For the standard additional modules supplied with pre-9.1
-        <productname>&productname;</productname>, use <literal>unpackaged</>
+        <productname>PostgreSQL</productname>, use <literal>unpackaged</>
         for <replaceable class="parameter">old_version</replaceable> when
         updating a module to extension style.
        </para>

@@ -744,7 +744,7 @@ COPY <replaceable class="parameter">count</replaceable>
 
    <note>
     <para>
-     <productname>&productname;</productname> releases before 7.4 used a
+     <productname>PostgreSQL</productname> releases before 7.4 used a
      different binary file format.
     </para>
    </note>
@@ -957,7 +957,7 @@ ZW      ZIMBABWE
   </para>
 
   <para>
-   The following syntax was used before <productname>&productname;</>
+   The following syntax was used before <productname>PostgreSQL</>
    version 9.0 and is still supported:
 
 <synopsis>
@@ -992,7 +992,7 @@ COPY { <replaceable class="parameter">table_name</replaceable> [ ( <replaceable 
   </para>
 
   <para>
-   The following syntax was used before <productname>&productname;</>
+   The following syntax was used before <productname>PostgreSQL</>
    version 7.3 and is still supported:
 
 <synopsis>

@@ -92,10 +92,11 @@
       <entry><type>real</type></entry>
       <entry>
        Returns a number that indicates how similar the first string
-       to the most similar word of the second string.  The range of
-       the result is zero (indicating that the two strings are completely
-       dissimilar) to one (indicating that the first string is identical
-       to one of the word of the second string).
+       to the most similar word of the second string. The function searches in
+       the second string a most similar word not a most similar substring.  The
+       range of the result is zero (indicating that the two strings are
+       completely dissimilar) to one (indicating that the first string is
+       identical to one of the word of the second string).
       </entry>
      </row>
      <row>
@@ -155,9 +156,9 @@
       <entry><type>text</> <literal>%&gt;</literal> <type>text</></entry>
       <entry><type>boolean</type></entry>
       <entry>
-       Returns <literal>true</> if its first argument have a word which is the
-       similar word to the second argument and they have a similarity
-       that is greater than the current word similarity threshold set by
+       Returns <literal>true</> if its first argument has the similar word in
+       the second argument and they have a similarity that is greater than the
+       current word similarity threshold set by
        <varname>pg_trgm.word_similarity_threshold</> parameter.
       </entry>
      </row>

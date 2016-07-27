@@ -345,6 +345,9 @@ EOF
 		$d =~ s/__CFGNAME__/$cfgname/g;
 		print $f "      <ModuleDefinitionFile>$d</ModuleDefinitionFile>\n";
 	}
+	if ($self->{name} =~ /plperl/ and $self->{platform} eq 'Win32') {
+		print $f "      <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>\n";
+	}
 	print $f <<EOF;
     </Link>
     <ResourceCompile>
@@ -461,6 +464,29 @@ sub new
 	$self->{vcver}           = '12.00';
 	$self->{PlatformToolset} = 'v120';
 	$self->{ToolsVersion}    = '12.0';
+
+	return $self;
+}
+
+package VC2015Project;
+
+#
+# Package that encapsulates a Visual C++ 2015 project file
+#
+
+use strict;
+use warnings;
+use base qw(VC2012Project);
+
+sub new
+{
+	my $classname = shift;
+	my $self      = $classname->SUPER::_new(@_);
+	bless($self, $classname);
+
+	$self->{vcver}           = '14.00';
+	$self->{PlatformToolset} = 'v140';
+	$self->{ToolsVersion}    = '14.0';
 
 	return $self;
 }

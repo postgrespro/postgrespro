@@ -339,6 +339,8 @@ extern float get_float4_infinity(void);
 extern double get_float8_nan(void);
 extern float get_float4_nan(void);
 extern int	is_infinite(double val);
+extern int	float4_cmp_internal(float4 a, float4 b);
+extern int	float8_cmp_internal(float8 a, float8 b);
 
 extern Datum float4in(PG_FUNCTION_ARGS);
 extern Datum float4out(PG_FUNCTION_ARGS);
@@ -856,6 +858,7 @@ extern Datum text_format_nv(PG_FUNCTION_ARGS);
 
 /* version.c */
 extern Datum pgsql_version(PG_FUNCTION_ARGS);
+extern Datum pgpro_version(PG_FUNCTION_ARGS);
 
 /* xid.c */
 extern Datum xidin(PG_FUNCTION_ARGS);

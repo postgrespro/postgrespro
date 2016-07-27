@@ -1135,17 +1135,20 @@ pg_get_indexdef_worker(Oid indexrelid, int colno,
 		Oid			keycoltype;
 		Oid			keycolcollation;
 
+		/*
+		 * attrsOnly flag is used for building unique-constraint and
+		 * exclusion-constraint error messages. Included attrs are
+		 * meaningless there, so do not include them into the message.
+		 */
+		if (attrsOnly && keyno >= idxrec->indnkeyatts)
+			break;
+
 		/* Report the INCLUDED attributes, if any. */
-		if(keyno == idxrec->indnkeyatts)
+		if ((!attrsOnly) && keyno == idxrec->indnkeyatts)
 		{
-			if(!attrsOnly)
-			{
 				appendStringInfoString(&buf, ") INCLUDING (");
 				sep = "";
-			}
 		}
-		else if (keyno > idxrec->indnkeyatts)
-			sep = ", ";
 
 		if (!colno)
 			appendStringInfoString(&buf, sep);
@@ -1535,6 +1538,19 @@ pg_get_constraintdef_worker(Oid constraintId, bool fullCommand,
 				decompile_column_index_array(val, conForm->conrelid, &buf);
 
 				appendStringInfoChar(&buf, ')');
+
+				/* Fetch and build including column list */
+				isnull = true;
+				val = SysCacheGetAttr(CONSTROID, tup,
+									  Anum_pg_constraint_conincluding, &isnull);
+				if (!isnull)
+				{
+					appendStringInfoString(&buf, " INCLUDING (");
+
+					decompile_column_index_array(val, conForm->conrelid, &buf);
+
+					appendStringInfoChar(&buf, ')');
+				}
 
 				indexId = get_constraint_index(constraintId);
 
@@ -5565,12 +5581,15 @@ get_insert_query_def(Query *query, deparse_context *context)
 				context->varprefix = save_varprefix;
 			}
 		}
-		else if (confl->constraint != InvalidOid)
+		else if (OidIsValid(confl->constraint))
 		{
 			char	   *constraint = get_constraint_name(confl->constraint);
 
+			if (!constraint)
+				elog(ERROR, "cache lookup failed for constraint %u",
+					 confl->constraint);
 			appendStringInfo(buf, " ON CONSTRAINT %s",
-							 quote_qualified_identifier(NULL, constraint));
+							 quote_identifier(constraint));
 		}
 
 		if (confl->action == ONCONFLICT_NOTHING)
@@ -6031,7 +6050,8 @@ get_variable(Var *var, int levelsup, bool istoplevel, deparse_context *context)
 
 		tle = get_tle_by_resno(dpns->inner_tlist, var->varattno);
 		if (!tle)
-			elog(ERROR, "bogus varattno for subquery var: %d", var->varattno);
+			elog(ERROR, "invalid attnum %d for relation \"%s\"",
+				 var->varattno, rte->eref->aliasname);
 
 		Assert(netlevelsup == 0);
 		push_child_plan(dpns, dpns->inner_planstate, &save_dpns);
@@ -6092,9 +6112,13 @@ get_variable(Var *var, int levelsup, bool istoplevel, deparse_context *context)
 	else if (attnum > 0)
 	{
 		/* Get column name to use from the colinfo struct */
-		Assert(attnum <= colinfo->num_cols);
+		if (attnum > colinfo->num_cols)
+			elog(ERROR, "invalid attnum %d for relation \"%s\"",
+				 attnum, rte->eref->aliasname);
 		attname = colinfo->colnames[attnum - 1];
-		Assert(attname != NULL);
+		if (attname == NULL)	/* dropped column? */
+			elog(ERROR, "invalid attnum %d for relation \"%s\"",
+				 attnum, rte->eref->aliasname);
 	}
 	else
 	{
@@ -7225,6 +7249,24 @@ get_rule_expr(Node *node, deparse_context *context,
 									  get_base_element_type(exprType(arg2))),
 								 expr->useOr ? "ANY" : "ALL");
 				get_rule_expr_paren(arg2, context, true, node);
+
+				/*
+				 * There's inherent ambiguity in "x op ANY/ALL (y)" when y is
+				 * a bare sub-SELECT.  Since we're here, the sub-SELECT must
+				 * be meant as a scalar sub-SELECT yielding an array value to
+				 * be used in ScalarArrayOpExpr; but the grammar will
+				 * preferentially interpret such a construct as an ANY/ALL
+				 * SubLink.  To prevent misparsing the output that way, insert
+				 * a dummy coercion (which will be stripped by parse analysis,
+				 * so no inefficiency is added in dump and reload).  This is
+				 * indeed most likely what the user wrote to get the construct
+				 * accepted in the first place.
+				 */
+				if (IsA(arg2, SubLink) &&
+					((SubLink *) arg2)->subLinkType == EXPR_SUBLINK)
+					appendStringInfo(buf, "::%s",
+									 format_type_with_typemod(exprType(arg2),
+														  exprTypmod(arg2)));
 				appendStringInfoChar(buf, ')');
 				if (!PRETTY_PAREN(context))
 					appendStringInfoChar(buf, ')');

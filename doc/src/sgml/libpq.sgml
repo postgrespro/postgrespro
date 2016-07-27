@@ -1702,7 +1702,7 @@ int PQprotocolVersion(const PGconn *conn);
        not change after connection startup is complete, but it could
        theoretically change during a connection reset.  The 3.0 protocol
        will normally be used when communicating with
-       <productname>&productname;</> 7.4 or later servers; pre-7.4 servers
+       <productname>PostgreSQL</> 7.4 or later servers; pre-7.4 servers
        support only protocol 2.0.  (Protocol 1.0 is obsolete and not
        supported by <application>libpq</application>.)
       </para>
@@ -5955,7 +5955,7 @@ int PQlibVersion(void);
       loaded version of libpq. The function can be used, for example,
       to determine which connection options are available for
       <function>PQconnectdb</> or if the <literal>hex</> <type>bytea</>
-      output added in &productname; 9.0 is supported.
+      output added in PostgreSQL 9.0 is supported.
      </para>
 
      <para>
@@ -5967,7 +5967,7 @@ int PQlibVersion(void);
 
      <note>
       <para>
-       This function appeared in <productname>&productname;</> version 9.1, so
+       This function appeared in <productname>PostgreSQL</> version 9.1, so
        it cannot be used to detect required functionality in earlier
        versions, since linking to it will create a link dependency
        on version 9.1.
@@ -7643,8 +7643,8 @@ void PQinitSSL(int do_ssl);
 
       <para>
        <function>PQinitSSL</> has been present since
-       <productname>&productname;</> 8.0, while <function>PQinitOpenSSL</>
-       was added in <productname>&productname;</> 8.4, so <function>PQinitSSL</>
+       <productname>PostgreSQL</> 8.0, while <function>PQinitOpenSSL</>
+       was added in <productname>PostgreSQL</> 8.4, so <function>PQinitSSL</>
        might be preferable for applications that need to work with older
        versions of <application>libpq</application>.
       </para>
@@ -7907,7 +7907,7 @@ testlibpq.o(.text+0xa4): undefined reference to `PQerrorMessage'
 /*
  * testlibpq.c
  *
- *      Test the C version of libpq, the &productname; frontend library.
+ *      Test the C version of libpq, the Postgres Pro frontend library.
  */
 #include <stdio.h>
 #include <stdlib.h>

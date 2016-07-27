@@ -728,7 +728,7 @@ SELECT f1[1][-2][3] AS e1, f1[1][-1][5] AS e2
    variant), the element is taken to be NULL.  The presence of any quotes
    or backslashes disables this and allows the literal string value
    <quote>NULL</> to be entered.  Also, for backward compatibility with
-   pre-8.2 versions of <productname>&productname;</>, the <xref
+   pre-8.2 versions of <productname>PostgreSQL</>, the <xref
    linkend="guc-array-nulls"> configuration parameter can be turned
    <literal>off</> to suppress recognition of <literal>NULL</> as a NULL.
   </para>

@@ -549,232 +549,232 @@ SELECT plainto_tsquery('english', 'foo bar') && 'asd | fg';
 (1 row)
 
 -- Check stop word deletion, a and s are stop-words
-SELECT to_tsquery('english', '(1 ? 2) ? a');
- to_tsquery 
-------------
- '1' ? '2'
+SELECT to_tsquery('english', '(1 <-> 2) <-> a');
+ to_tsquery  
+-------------
+ '1' <-> '2'
 (1 row)
 
-SELECT to_tsquery('english', '(1 ? a) ? 2');
-  to_tsquery  
---------------
- '1' ?[2] '2'
+SELECT to_tsquery('english', '(1 <-> a) <-> 2');
+ to_tsquery  
+-------------
+ '1' <2> '2'
 (1 row)
 
-SELECT to_tsquery('english', '(a ? 1) ? 2');
- to_tsquery 
-------------
- '1' ? '2'
+SELECT to_tsquery('english', '(a <-> 1) <-> 2');
+ to_tsquery  
+-------------
+ '1' <-> '2'
 (1 row)
 
-SELECT to_tsquery('english', 'a ? (1 ? 2)');
- to_tsquery 
-------------
- '1' ? '2'
+SELECT to_tsquery('english', 'a <-> (1 <-> 2)');
+ to_tsquery  
+-------------
+ '1' <-> '2'
 (1 row)
 
-SELECT to_tsquery('english', '1 ? (a ? 2)');
- to_tsquery 
-------------
- '1' ? '2'
+SELECT to_tsquery('english', '1 <-> (a <-> 2)');
+ to_tsquery  
+-------------
+ '1' <-> '2'
 (1 row)
 
-SELECT to_tsquery('english', '1 ? (2 ? a)');
- to_tsquery 
-------------
- '1' ? '2'
+SELECT to_tsquery('english', '1 <-> (2 <-> a)');
+ to_tsquery  
+-------------
+ '1' <-> '2'
 (1 row)
 
-SELECT to_tsquery('english', '(1 ? 2) ?[3] a');
- to_tsquery 
-------------
- '1' ? '2'
+SELECT to_tsquery('english', '(1 <-> 2) <3> a');
+ to_tsquery  
+-------------
+ '1' <-> '2'
 (1 row)
 
-SELECT to_tsquery('english', '(1 ? a) ?[3] 2');
-  to_tsquery  
---------------
- '1' ?[4] '2'
+SELECT to_tsquery('english', '(1 <-> a) <3> 2');
+ to_tsquery  
+-------------
+ '1' <4> '2'
 (1 row)
 
-SELECT to_tsquery('english', '(a ? 1) ?[3] 2');
-  to_tsquery  
---------------
- '1' ?[3] '2'
+SELECT to_tsquery('english', '(a <-> 1) <3> 2');
+ to_tsquery  
+-------------
+ '1' <3> '2'
 (1 row)
 
-SELECT to_tsquery('english', 'a ?[3] (1 ? 2)');
- to_tsquery 
-------------
- '1' ? '2'
+SELECT to_tsquery('english', 'a <3> (1 <-> 2)');
+ to_tsquery  
+-------------
+ '1' <-> '2'
 (1 row)
 
-SELECT to_tsquery('english', '1 ?[3] (a ? 2)');
-  to_tsquery  
---------------
- '1' ?[3] '2'
+SELECT to_tsquery('english', '1 <3> (a <-> 2)');
+ to_tsquery  
+-------------
+ '1' <3> '2'
 (1 row)
 
-SELECT to_tsquery('english', '1 ?[3] (2 ? a)');
-  to_tsquery  
---------------
- '1' ?[3] '2'
+SELECT to_tsquery('english', '1 <3> (2 <-> a)');
+ to_tsquery  
+-------------
+ '1' <3> '2'
 (1 row)
 
-SELECT to_tsquery('english', '(1 ?[3] 2) ? a');
-  to_tsquery  
---------------
- '1' ?[3] '2'
+SELECT to_tsquery('english', '(1 <3> 2) <-> a');
+ to_tsquery  
+-------------
+ '1' <3> '2'
 (1 row)
 
-SELECT to_tsquery('english', '(1 ?[3] a) ? 2');
-  to_tsquery  
---------------
- '1' ?[4] '2'
+SELECT to_tsquery('english', '(1 <3> a) <-> 2');
+ to_tsquery  
+-------------
+ '1' <4> '2'
 (1 row)
 
-SELECT to_tsquery('english', '(a ?[3] 1) ? 2');
- to_tsquery 
-------------
- '1' ? '2'
+SELECT to_tsquery('english', '(a <3> 1) <-> 2');
+ to_tsquery  
+-------------
+ '1' <-> '2'
 (1 row)
 
-SELECT to_tsquery('english', 'a ? (1 ?[3] 2)');
-  to_tsquery  
---------------
- '1' ?[3] '2'
+SELECT to_tsquery('english', 'a <-> (1 <3> 2)');
+ to_tsquery  
+-------------
+ '1' <3> '2'
 (1 row)
 
-SELECT to_tsquery('english', '1 ? (a ?[3] 2)');
- to_tsquery 
-------------
- '1' ? '2'
+SELECT to_tsquery('english', '1 <-> (a <3> 2)');
+ to_tsquery  
+-------------
+ '1' <-> '2'
 (1 row)
 
-SELECT to_tsquery('english', '1 ? (2 ?[3] a)');
- to_tsquery 
-------------
- '1' ? '2'
+SELECT to_tsquery('english', '1 <-> (2 <3> a)');
+ to_tsquery  
+-------------
+ '1' <-> '2'
 (1 row)
 
-SELECT to_tsquery('english', '((a ? 1) ? 2) ? s');
- to_tsquery 
-------------
- '1' ? '2'
+SELECT to_tsquery('english', '((a <-> 1) <-> 2) <-> s');
+ to_tsquery  
+-------------
+ '1' <-> '2'
 (1 row)
 
-SELECT to_tsquery('english', '(2 ? (a ? 1)) ? s');
- to_tsquery 
-------------
- '2' ? '1'
+SELECT to_tsquery('english', '(2 <-> (a <-> 1)) <-> s');
+ to_tsquery  
+-------------
+ '2' <-> '1'
 (1 row)
 
-SELECT to_tsquery('english', '((1 ? a) ? 2) ? s');
-  to_tsquery  
---------------
- '1' ?[2] '2'
+SELECT to_tsquery('english', '((1 <-> a) <-> 2) <-> s');
+ to_tsquery  
+-------------
+ '1' <2> '2'
 (1 row)
 
-SELECT to_tsquery('english', '(2 ? (1 ? a)) ? s');
- to_tsquery 
-------------
- '2' ? '1'
+SELECT to_tsquery('english', '(2 <-> (1 <-> a)) <-> s');
+ to_tsquery  
+-------------
+ '2' <-> '1'
 (1 row)
 
-SELECT to_tsquery('english', 's ? ((a ? 1) ? 2)');
- to_tsquery 
-------------
- '1' ? '2'
+SELECT to_tsquery('english', 's <-> ((a <-> 1) <-> 2)');
+ to_tsquery  
+-------------
+ '1' <-> '2'
 (1 row)
 
-SELECT to_tsquery('english', 's ? (2 ? (a ? 1))');
- to_tsquery 
-------------
- '2' ? '1'
+SELECT to_tsquery('english', 's <-> (2 <-> (a <-> 1))');
+ to_tsquery  
+-------------
+ '2' <-> '1'
 (1 row)
 
-SELECT to_tsquery('english', 's ? ((1 ? a) ? 2)');
-  to_tsquery  
---------------
- '1' ?[2] '2'
+SELECT to_tsquery('english', 's <-> ((1 <-> a) <-> 2)');
+ to_tsquery  
+-------------
+ '1' <2> '2'
 (1 row)
 
-SELECT to_tsquery('english', 's ? (2 ? (1 ? a))');
- to_tsquery 
-------------
- '2' ? '1'
+SELECT to_tsquery('english', 's <-> (2 <-> (1 <-> a))');
+ to_tsquery  
+-------------
+ '2' <-> '1'
 (1 row)
 
-SELECT to_tsquery('english', '((a ? 1) ? s) ? 2');
-  to_tsquery  
---------------
- '1' ?[2] '2'
+SELECT to_tsquery('english', '((a <-> 1) <-> s) <-> 2');
+ to_tsquery  
+-------------
+ '1' <2> '2'
 (1 row)
 
-SELECT to_tsquery('english', '(s ? (a ? 1)) ? 2');
- to_tsquery 
-------------
- '1' ? '2'
+SELECT to_tsquery('english', '(s <-> (a <-> 1)) <-> 2');
+ to_tsquery  
+-------------
+ '1' <-> '2'
 (1 row)
 
-SELECT to_tsquery('english', '((1 ? a) ? s) ? 2');
-  to_tsquery  
---------------
- '1' ?[3] '2'
+SELECT to_tsquery('english', '((1 <-> a) <-> s) <-> 2');
+ to_tsquery  
+-------------
+ '1' <3> '2'
 (1 row)
 
-SELECT to_tsquery('english', '(s ? (1 ? a)) ? 2');
-  to_tsquery  
---------------
- '1' ?[2] '2'
+SELECT to_tsquery('english', '(s <-> (1 <-> a)) <-> 2');
+ to_tsquery  
+-------------
+ '1' <2> '2'
 (1 row)
 
-SELECT to_tsquery('english', '2 ? ((a ? 1) ? s)');
- to_tsquery 
-------------
- '2' ? '1'
+SELECT to_tsquery('english', '2 <-> ((a <-> 1) <-> s)');
+ to_tsquery  
+-------------
+ '2' <-> '1'
 (1 row)
 
-SELECT to_tsquery('english', '2 ? (s ? (a ? 1))');
- to_tsquery 
-------------
- '2' ? '1'
+SELECT to_tsquery('english', '2 <-> (s <-> (a <-> 1))');
+ to_tsquery  
+-------------
+ '2' <-> '1'
 (1 row)
 
-SELECT to_tsquery('english', '2 ? ((1 ? a) ? s)');
- to_tsquery 
-------------
- '2' ? '1'
+SELECT to_tsquery('english', '2 <-> ((1 <-> a) <-> s)');
+ to_tsquery  
+-------------
+ '2' <-> '1'
 (1 row)
 
-SELECT to_tsquery('english', '2 ? (s ? (1 ? a))');
- to_tsquery 
-------------
- '2' ? '1'
+SELECT to_tsquery('english', '2 <-> (s <-> (1 <-> a))');
+ to_tsquery  
+-------------
+ '2' <-> '1'
 (1 row)
 
-SELECT to_tsquery('foo ? (a ? (the ? bar))');
-  to_tsquery   
----------------
- 'foo' ? 'bar'
+SELECT to_tsquery('english', 'foo <-> (a <-> (the <-> bar))');
+   to_tsquery    
+-----------------
+ 'foo' <-> 'bar'
 (1 row)
 
-SELECT to_tsquery('((foo ? a) ? the) ? bar');
-    to_tsquery    
-------------------
- 'foo' ?[3] 'bar'
+SELECT to_tsquery('english', '((foo <-> a) <-> the) <-> bar');
+   to_tsquery    
+-----------------
+ 'foo' <3> 'bar'
 (1 row)
 
-SELECT to_tsquery('foo ? a ? the ? bar');
-    to_tsquery    
-------------------
- 'foo' ?[3] 'bar'
+SELECT to_tsquery('english', 'foo <-> a <-> the <-> bar');
+   to_tsquery    
+-----------------
+ 'foo' <3> 'bar'
 (1 row)
 
-SELECT phraseto_tsquery('PostgreSQL can be extended by the user in many ways');
-                            phraseto_tsquery                            
-------------------------------------------------------------------------
- ( ( ( 'postgresql' ?[3] 'extend' ) ?[3] 'user' ) ?[2] 'mani' ) ? 'way'
+SELECT phraseto_tsquery('english', 'PostgreSQL can be extended by the user in many ways');
+                     phraseto_tsquery                      
+-----------------------------------------------------------
+ 'postgresql' <3> 'extend' <3> 'user' <2> 'mani' <-> 'way'
 (1 row)
 
 SELECT ts_rank_cd(to_tsvector('english', '
@@ -835,7 +835,7 @@ Water, water, every where
 Water, water, every where,
   Nor any drop to drink.
 S. T. Coleridge (1772-1834)
-'), to_tsquery('english', 'painted ? Ship'));
+'), to_tsquery('english', 'painted <-> Ship'));
  ts_rank_cd 
 ------------
         0.1
@@ -980,7 +980,7 @@ to_tsquery('english', 'sea&foo'), 'HighlightAll=true');
  </html>
 (1 row)
 
-SELECT ts_headline('simple', '1 2 3 1 3'::text, '1 ? 3', 'MaxWords=2, MinWords=1');
+SELECT ts_headline('simple', '1 2 3 1 3'::text, '1 <-> 3', 'MaxWords=2, MinWords=1');
     ts_headline    
 -------------------
  <b>1</b> <b>3</b>
@@ -992,7 +992,7 @@ SELECT ts_headline('simple', '1 2 3 1 3'::text, '1 & 3', 'MaxWords=4, MinWords=1
  <b>1</b> 2 <b>3</b> <b>1</b>
 (1 row)
 
-SELECT ts_headline('simple', '1 2 3 1 3'::text, '1 ? 3', 'MaxWords=4, MinWords=1');
+SELECT ts_headline('simple', '1 2 3 1 3'::text, '1 <-> 3', 'MaxWords=4, MinWords=1');
     ts_headline    
 -------------------
  <b>1</b> <b>3</b>
@@ -1163,7 +1163,7 @@ RESET enable_seqscan;
 SELECT ts_rewrite('foo & bar & qq & new & york',  'new & york'::tsquery, 'big & apple | nyc | new & york & city');
                                   ts_rewrite                                  
 ------------------------------------------------------------------------------
- 'foo' & 'bar' & 'qq' & ( 'nyc' | 'big' & 'apple' | 'city' & 'new' & 'york' )
+ 'foo' & 'bar' & 'qq' & ( 'city' & 'new' & 'york' | 'nyc' | 'big' & 'apple' )
 (1 row)
 
 SELECT ts_rewrite('moscow', 'SELECT keyword, sample FROM test_tsquery'::text );
@@ -1181,7 +1181,7 @@ SELECT ts_rewrite('moscow & hotel', 'SELECT keyword, sample FROM test_tsquery'::
 SELECT ts_rewrite('bar & new & qq & foo & york', 'SELECT keyword, sample FROM test_tsquery'::text );
                                    ts_rewrite                                    
 ---------------------------------------------------------------------------------
- ( 'nyc' | 'big' & 'appl' | 'new' & 'york' ) & 'citi' & 'foo' & ( 'bar' | 'qq' )
+ 'citi' & 'foo' & ( 'bar' | 'qq' ) & ( 'nyc' | 'big' & 'appl' | 'new' & 'york' )
 (1 row)
 
 SELECT ts_rewrite( 'moscow', 'SELECT keyword, sample FROM test_tsquery');
@@ -1199,31 +1199,31 @@ SELECT ts_rewrite( 'moscow & hotel', 'SELECT keyword, sample FROM test_tsquery')
 SELECT ts_rewrite( 'bar & new & qq & foo & york', 'SELECT keyword, sample FROM test_tsquery');
                                    ts_rewrite                                    
 ---------------------------------------------------------------------------------
- ( 'nyc' | 'big' & 'appl' | 'new' & 'york' ) & 'citi' & 'foo' & ( 'bar' | 'qq' )
+ 'citi' & 'foo' & ( 'bar' | 'qq' ) & ( 'nyc' | 'big' & 'appl' | 'new' & 'york' )
 (1 row)
 
-SELECT ts_rewrite('1 & (2 ? 3)', 'SELECT keyword, sample FROM test_tsquery'::text );
- ts_rewrite 
-------------
- '2' ? '4'
+SELECT ts_rewrite('1 & (2 <-> 3)', 'SELECT keyword, sample FROM test_tsquery'::text );
+ ts_rewrite  
+-------------
+ '2' <-> '4'
 (1 row)
 
-SELECT ts_rewrite('1 & (2 ?[2] 3)', 'SELECT keyword, sample FROM test_tsquery'::text );
-       ts_rewrite       
-------------------------
- '1' & ( '2' ?[2] '3' )
+SELECT ts_rewrite('1 & (2 <2> 3)', 'SELECT keyword, sample FROM test_tsquery'::text );
+    ts_rewrite     
+-------------------
+ '1' & '2' <2> '3'
 (1 row)
 
-SELECT ts_rewrite('5 ? (1 & (2 ? 3))', 'SELECT keyword, sample FROM test_tsquery'::text );
-               ts_rewrite                
------------------------------------------
- ( '5' ? '1' ) & ( '5' ? ( '2' ? '3' ) )
+SELECT ts_rewrite('5 <-> (1 & (2 <-> 3))', 'SELECT keyword, sample FROM test_tsquery'::text );
+              ts_rewrite               
+---------------------------------------
+ '5' <-> '1' & '5' <-> ( '2' <-> '3' )
 (1 row)
 
-SELECT ts_rewrite('5 ? (6 | 8)', 'SELECT keyword, sample FROM test_tsquery'::text );
-      ts_rewrite       
------------------------
- '5' ? '7' | '5' ? '8'
+SELECT ts_rewrite('5 <-> (6 | 8)', 'SELECT keyword, sample FROM test_tsquery'::text );
+        ts_rewrite         
+---------------------------
+ '5' <-> '7' | '5' <-> '8'
 (1 row)
 
 SELECT keyword FROM test_tsquery WHERE keyword @> 'new';
@@ -1264,7 +1264,7 @@ SELECT ts_rewrite( query, 'SELECT keyword, sample FROM test_tsquery' ) FROM to_t
 SELECT ts_rewrite( query, 'SELECT keyword, sample FROM test_tsquery' ) FROM to_tsquery('english', 'bar &  new & qq & foo & york') AS query;
                                    ts_rewrite                                    
 ---------------------------------------------------------------------------------
- ( 'nyc' | 'big' & 'appl' | 'new' & 'york' ) & 'citi' & 'foo' & ( 'bar' | 'qq' )
+ 'citi' & 'foo' & ( 'bar' | 'qq' ) & ( 'nyc' | 'big' & 'appl' | 'new' & 'york' )
 (1 row)
 
 SELECT ts_rewrite( query, 'SELECT keyword, sample FROM test_tsquery' ) FROM to_tsquery('english', 'moscow') AS query;
@@ -1282,7 +1282,7 @@ SELECT ts_rewrite( query, 'SELECT keyword, sample FROM test_tsquery' ) FROM to_t
 SELECT ts_rewrite( query, 'SELECT keyword, sample FROM test_tsquery' ) FROM to_tsquery('english', 'bar & new & qq & foo & york') AS query;
                                    ts_rewrite                                    
 ---------------------------------------------------------------------------------
- ( 'nyc' | 'big' & 'appl' | 'new' & 'york' ) & 'citi' & 'foo' & ( 'bar' | 'qq' )
+ 'citi' & 'foo' & ( 'bar' | 'qq' ) & ( 'nyc' | 'big' & 'appl' | 'new' & 'york' )
 (1 row)
 
 CREATE INDEX qq ON test_tsquery USING gist (keyword tsquery_ops);
@@ -1325,7 +1325,7 @@ SELECT ts_rewrite( query, 'SELECT keyword, sample FROM test_tsquery' ) FROM to_t
 SELECT ts_rewrite( query, 'SELECT keyword, sample FROM test_tsquery' ) FROM to_tsquery('english', 'bar & new & qq & foo & york') AS query;
                                    ts_rewrite                                    
 ---------------------------------------------------------------------------------
- ( 'nyc' | 'big' & 'appl' | 'new' & 'york' ) & 'citi' & 'foo' & ( 'bar' | 'qq' )
+ 'citi' & 'foo' & ( 'bar' | 'qq' ) & ( 'nyc' | 'big' & 'appl' | 'new' & 'york' )
 (1 row)
 
 SELECT ts_rewrite( query, 'SELECT keyword, sample FROM test_tsquery' ) FROM to_tsquery('english', 'moscow') AS query;
@@ -1343,7 +1343,7 @@ SELECT ts_rewrite( query, 'SELECT keyword, sample FROM test_tsquery' ) FROM to_t
 SELECT ts_rewrite( query, 'SELECT keyword, sample FROM test_tsquery' ) FROM to_tsquery('english', 'bar &  new & qq & foo & york') AS query;
                                    ts_rewrite                                    
 ---------------------------------------------------------------------------------
- ( 'nyc' | 'big' & 'appl' | 'new' & 'york' ) & 'citi' & 'foo' & ( 'bar' | 'qq' )
+ 'citi' & 'foo' & ( 'bar' | 'qq' ) & ( 'nyc' | 'big' & 'appl' | 'new' & 'york' )
 (1 row)
 
 RESET enable_seqscan;
@@ -1453,13 +1453,14 @@ select * from pendtest where 'ipi:*'::tsquery @@ ts;
 
 --check OP_PHRASE on index
 create temp table phrase_index_test(fts tsvector);
-insert into phrase_index_test values('A fat cat has just eaten a rat.');
+insert into phrase_index_test values ('A fat cat has just eaten a rat.');
+insert into phrase_index_test values (to_tsvector('english', 'A fat cat has just eaten a rat.'));
 create index phrase_index_test_idx on phrase_index_test using gin(fts);
 set enable_seqscan = off;
-select * from phrase_index_test where fts @@ phraseto_tsquery('fat cat');
-                       fts                       
--------------------------------------------------
- 'A' 'a' 'cat' 'eaten' 'fat' 'has' 'just' 'rat.'
+select * from phrase_index_test where fts @@ phraseto_tsquery('english', 'fat cat');
+                fts                
+-----------------------------------
+ 'cat':3 'eaten':6 'fat':2 'rat':8
 (1 row)
 
 set enable_seqscan = on;

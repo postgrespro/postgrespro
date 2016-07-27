@@ -431,6 +431,8 @@ _bt_compare(Relation rel,
 
 	itup = (IndexTuple) PageGetItem(page, PageGetItemId(page, offnum));
 
+	Assert (keysz <= rel->rd_index->indnkeyatts);
+
 	/*
 	 * The scan key is set up with the attribute number associated with each
 	 * term in the key.  It is important that, if the index is multi-key, the
@@ -1000,7 +1002,7 @@ _bt_first(IndexScanDesc scan, ScanDirection dir)
 		so->currPos.moreRight = false;
 	}
 	so->numKilled = 0;			/* just paranoia */
-	so->markItemIndex = -1;		/* ditto */
+	Assert(so->markItemIndex == -1);
 
 	/* position to the precise item on the page */
 	offnum = _bt_binsrch(rel, buf, keysCount, scankeys, nextkey);
