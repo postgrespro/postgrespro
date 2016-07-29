@@ -361,6 +361,8 @@ extern JsonbValue *getIthJsonbValueFromContainer(JsonbContainer *sheader,
 							  uint32 i);
 extern JsonbValue *pushJsonbValue(JsonbParseState **pstate,
 			   JsonbIteratorToken seq, JsonbValue *jbVal);
+extern JsonbValue *pushScalarJsonbValue(JsonbParseState **pstate,
+										   JsonbValue *jbval, bool isKey);
 extern JsonbParseState *JsonbParseStateClone(JsonbParseState *state);
 extern JsonbIterator *JsonbIteratorInit(JsonbContainer *container);
 extern JsonbIteratorToken JsonbIteratorNext(JsonbIterator **it, JsonbValue *val,

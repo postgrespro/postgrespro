@@ -3957,30 +3957,19 @@ static void
 addJsonbToParseState(JsonbParseState **jbps, Jsonb *jb)
 {
 	JsonbIterator *it;
-	JsonbValue *o = &(*jbps)->contVal;
 	JsonbValue	v;
 	JsonbIteratorToken type;
 
 	it = JsonbIteratorInit(&jb->root);
 
-	Assert(o->type == jbvArray || o->type == jbvObject);
+	Assert(*jbps);
 
 	if (JB_ROOT_IS_SCALAR(jb))
 	{
 		(void) JsonbIteratorNext(&it, &v, false);		/* skip array header */
 		(void) JsonbIteratorNext(&it, &v, false);		/* fetch scalar value */
 
-		switch (o->type)
-		{
-			case jbvArray:
-				(void) pushJsonbValue(jbps, WJB_ELEM, &v);
-				break;
-			case jbvObject:
-				(void) pushJsonbValue(jbps, WJB_VALUE, &v);
-				break;
-			default:
-				elog(ERROR, "unexpected parent of nested structure");
-		}
+		(void) pushScalarJsonbValue(jbps, &v, false);
 	}
 	else
 	{
