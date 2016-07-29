@@ -4448,8 +4448,8 @@ IteratorConcat(JsonbIterator **it1, JsonbIterator **it2,
 		res = pushJsonbValue(state, WJB_END_ARRAY, NULL /* signal to sort */ );
 	}
 	/* have we got array || object or object || array? */
-	else if (((rk1 == WJB_BEGIN_ARRAY && !(*it1)->isScalar) && rk2 == WJB_BEGIN_OBJECT) ||
-			 (rk1 == WJB_BEGIN_OBJECT && (rk2 == WJB_BEGIN_ARRAY && !(*it2)->isScalar)))
+	else if (((rk1 == WJB_BEGIN_ARRAY && !v1.val.array.rawScalar) && rk2 == WJB_BEGIN_OBJECT) ||
+			 (rk1 == WJB_BEGIN_OBJECT && (rk2 == WJB_BEGIN_ARRAY && !v2.val.array.rawScalar)))
 	{
 
 		JsonbIterator **it_array = rk1 == WJB_BEGIN_ARRAY ? it1 : it2;
@@ -4808,10 +4808,8 @@ transform_jsonb_string_values(Jsonb *jsonb, void *action_state,
 	JsonbIteratorToken	type;
 	JsonbParseState		*st = NULL;
 	text				*out;
-	bool				is_scalar = false;
 
 	it = JsonbIteratorInit(&jsonb->root);
-	is_scalar = it->isScalar;
 
 	while ((type = JsonbIteratorNext(&it, &v, false)) != WJB_DONE)
 	{
@@ -4831,7 +4829,7 @@ transform_jsonb_string_values(Jsonb *jsonb, void *action_state,
 	}
 
 	if (res->type == jbvArray)
-		res->val.array.rawScalar = is_scalar;
+		res->val.array.rawScalar = JB_ROOT_IS_SCALAR(jsonb);
 
 	return JsonbValueToJsonb(res);
 }
