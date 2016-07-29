@@ -85,7 +85,6 @@ static void datum_to_jsonb(Datum val, bool is_null, JsonbInState *result,
 			   bool key_scalar);
 static void add_jsonb(Datum val, bool is_null, JsonbInState *result,
 		  Oid val_type, bool key_scalar);
-static JsonbParseState *clone_parse_state(JsonbParseState *state);
 static char *JsonbToCStringWorker(StringInfo out, JsonbContainer *in, int estimated_len, bool indent);
 static void add_indent(StringInfo out, bool indent, int level);
 
@@ -1520,40 +1519,6 @@ close_object:
 
 
 /*
- * shallow clone of a parse state, suitable for use in aggregate
- * final functions that will only append to the values rather than
- * change them.
- */
-static JsonbParseState *
-clone_parse_state(JsonbParseState *state)
-{
-	JsonbParseState *result,
-			   *icursor,
-			   *ocursor;
-
-	if (state == NULL)
-		return NULL;
-
-	result = palloc(sizeof(JsonbParseState));
-	icursor = state;
-	ocursor = result;
-	for (;;)
-	{
-		ocursor->contVal = icursor->contVal;
-		ocursor->size = icursor->size;
-		icursor = icursor->next;
-		if (icursor == NULL)
-			break;
-		ocursor->next = palloc(sizeof(JsonbParseState));
-		ocursor = ocursor->next;
-	}
-	ocursor->next = NULL;
-
-	return result;
-}
-
-
-/*
  * jsonb_agg aggregate function
  */
 Datum
@@ -1696,7 +1661,7 @@ jsonb_agg_finalfn(PG_FUNCTION_ARGS)
 	 * values, just add the final array end marker.
 	 */
 
-	result.parseState = clone_parse_state(arg->res->parseState);
+	result.parseState = JsonbParseStateClone(arg->res->parseState);
 
 	result.res = pushJsonbValue(&result.parseState,
 								WJB_END_ARRAY, NULL);
@@ -1928,7 +1893,7 @@ jsonb_object_agg_finalfn(PG_FUNCTION_ARGS)
 	 * marker.
 	 */
 
-	result.parseState = clone_parse_state(arg->res->parseState);
+	result.parseState = JsonbParseStateClone(arg->res->parseState);
 
 	result.res = pushJsonbValue(&result.parseState,
 								WJB_END_OBJECT, NULL);
