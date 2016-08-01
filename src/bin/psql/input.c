@@ -348,7 +348,7 @@ initializeInput(int flags)
 		initialize_readline();
 #ifndef HAVE_WIN32_LIBEDIT		
 		rl_initialize();
-#endif		
+#endif
 
 		useHistory = true;
 		using_history();
@@ -368,7 +368,11 @@ initializeInput(int flags)
 		if (histfile == NULL)
 		{
 			if (get_home_path(home))
+#ifdef HAVE_WIN32_LIBEDIT
+				psql_history = psprintf("%s\\%s", home, PSQLHISTORY);
+#else
 				psql_history = psprintf("%s/%s", home, PSQLHISTORY);
+#endif
 		}
 		else
 		{
