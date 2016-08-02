@@ -795,7 +795,7 @@ get_home_path(char *ret_path)
 	tmppath = getenv("APPDATA");
 	if (!tmppath)
 		return false;
-	snprintf(ret_path, MAXPGPATH, "%s/postgresql", tmppath);
+	snprintf(ret_path, MAXPGPATH, "%s\\postgresql", tmppath);
 	return true;
 #endif
 }
