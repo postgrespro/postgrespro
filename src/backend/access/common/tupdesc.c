@@ -19,9 +19,11 @@
 
 #include "postgres.h"
 
+#include "access/compression.h"
 #include "access/htup_details.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_type.h"
+#include "commands/defrem.h"
 #include "miscadmin.h"
 #include "parser/parse_type.h"
 #include "utils/acl.h"
@@ -89,6 +91,7 @@ CreateTemplateTupleDesc(int natts, bool hasoid)
 	 */
 	desc->natts = natts;
 	desc->constr = NULL;
+	desc->tdcmroutines = NULL;
 	desc->tdtypeid = RECORDOID;
 	desc->tdtypmod = -1;
 	desc->tdhasoid = hasoid;
@@ -122,6 +125,7 @@ CreateTupleDesc(int natts, bool hasoid, Form_pg_attribute *attrs)
 	desc->attrs = attrs;
 	desc->natts = natts;
 	desc->constr = NULL;
+	desc->tdcmroutines = NULL;
 	desc->tdtypeid = RECORDOID;
 	desc->tdtypmod = -1;
 	desc->tdhasoid = hasoid;
@@ -169,6 +173,7 @@ CreateTupleDescCopyConstr(TupleDesc tupdesc)
 {
 	TupleDesc	desc;
 	TupleConstr *constr = tupdesc->constr;
+	CompressionMethodRoutine **cmroutines = tupdesc->tdcmroutines;
 	int			i;
 
 	desc = CreateTemplateTupleDesc(tupdesc->natts, tupdesc->tdhasoid);
@@ -211,6 +216,21 @@ CreateTupleDescCopyConstr(TupleDesc tupdesc)
 		}
 
 		desc->constr = cpy;
+	}
+
+	if (cmroutines)
+	{
+		CompressionMethodRoutine **cmrs = (CompressionMethodRoutine **)
+				palloc0(sizeof(*cmrs) * tupdesc->natts);
+
+		for (i = 0; i < tupdesc->natts; i++)
+			if (cmroutines[i])
+			{
+				cmrs[i] = palloc(sizeof(**cmrs));
+				memcpy(cmrs[i], cmroutines[i], sizeof(**cmrs));
+			}
+
+		desc->tdcmroutines = cmrs;
 	}
 
 	desc->tdtypeid = tupdesc->tdtypeid;
@@ -302,6 +322,14 @@ FreeTupleDesc(TupleDesc tupdesc)
 			pfree(check);
 		}
 		pfree(tupdesc->constr);
+	}
+
+	if (tupdesc->tdcmroutines)
+	{
+		for (i = 0; i < tupdesc->natts; i++)
+			if (tupdesc->tdcmroutines[i])
+				pfree(tupdesc->tdcmroutines[i]);
+		pfree(tupdesc->tdcmroutines);
 	}
 
 	pfree(tupdesc);
@@ -413,6 +441,8 @@ equalTupleDescs(TupleDesc tupdesc1, TupleDesc tupdesc2)
 			return false;
 		if (attr1->attcollation != attr2->attcollation)
 			return false;
+		if (attr1->attcompression != attr2->attcompression)
+			return false;
 		/* attacl, attoptions and attfdwoptions are not even present... */
 	}
 
@@ -475,6 +505,10 @@ equalTupleDescs(TupleDesc tupdesc1, TupleDesc tupdesc2)
 	}
 	else if (tupdesc2->constr != NULL)
 		return false;
+
+	if (tupdesc1->tdcmroutines != tupdesc2->tdcmroutines) /* FIXME compare cmroutines[*] */
+		return false;
+
 	return true;
 }
 
@@ -555,6 +589,7 @@ TupleDescInitEntry(TupleDesc desc,
 	att->attalign = typeForm->typalign;
 	att->attstorage = typeForm->typstorage;
 	att->attcollation = typeForm->typcollation;
+	att->attcompression = InvalidOid;
 
 	ReleaseSysCache(tuple);
 }
@@ -741,6 +776,22 @@ BuildDescForRelation(List *schema)
 		has_not_null |= entry->is_not_null;
 		desc->attrs[attnum - 1]->attislocal = entry->is_local;
 		desc->attrs[attnum - 1]->attinhcount = entry->inhcount;
+
+		if (entry->compression)
+		{
+			/* Get compression method OID, throwing an error if it doesn't exist. */
+			Oid cmoid = GetCompressionMethodOid(entry->compression->methodName,
+												false);
+			CompressionMethodRoutine *cmr =
+					GetCompressionMethodRoutineByCmId(cmoid);
+
+			desc->attrs[attnum - 1]->attcompression = cmoid;
+
+			if (cmr->addAttr)
+				(*cmr->addAttr)(desc->attrs[attnum - 1]);
+
+			/* TODO attcmoptions */
+		}
 	}
 
 	if (has_not_null)

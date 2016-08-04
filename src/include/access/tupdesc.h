@@ -74,6 +74,7 @@ typedef struct tupleDesc
 	Form_pg_attribute *attrs;
 	/* attrs[N] is a pointer to the description of Attribute Number N+1 */
 	TupleConstr *constr;		/* constraints, or NULL if none */
+	struct CompressionMethodRoutine **tdcmroutines;
 	Oid			tdtypeid;		/* composite type ID for tuple type */
 	int32		tdtypmod;		/* typmod for tuple type */
 	bool		tdhasoid;		/* tuple has oid attribute in its header */

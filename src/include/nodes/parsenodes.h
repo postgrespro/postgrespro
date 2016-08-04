@@ -616,6 +616,13 @@ typedef struct RangeTableSample
 	int			location;		/* method name location, or -1 if unknown */
 } RangeTableSample;
 
+typedef struct ColumnCompression
+{
+	NodeTag		type;
+	char	   *methodName;
+	List	   *options;
+} ColumnCompression;
+
 /*
  * ColumnDef - column definition (used in various creates)
  *
@@ -639,6 +646,7 @@ typedef struct ColumnDef
 	NodeTag		type;
 	char	   *colname;		/* name of column */
 	TypeName   *typeName;		/* type of column */
+	ColumnCompression *compression;
 	int			inhcount;		/* number of times column is inherited */
 	bool		is_local;		/* column has local (non-inherited) def'n */
 	bool		is_not_null;	/* NOT NULL constraint specified? */

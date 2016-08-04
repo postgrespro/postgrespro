@@ -33,6 +33,7 @@
 #include "catalog/partition.h"
 #include "catalog/pg_am.h"
 #include "catalog/pg_collation.h"
+#include "catalog/pg_compression.h"
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_constraint_fn.h"
 #include "catalog/pg_depend.h"
@@ -2135,6 +2136,8 @@ MergeAttributes(List *schema, List *supers, char relpersistence,
 							 errdetail("%s versus %s",
 									   storage_name(def->storage),
 									   storage_name(newdef->storage))));
+
+				/* FIXME check compression mismatch */
 
 				/* Mark the column as locally defined */
 				def->is_local = true;
@@ -5267,6 +5270,7 @@ ATExecAddColumn(List **wqueue, AlteredTableInfo *tab, Relation rel,
 	attribute.attislocal = colDef->is_local;
 	attribute.attinhcount = colDef->inhcount;
 	attribute.attcollation = collOid;
+	attribute.attcompression = InvalidOid;
 	/* attribute.attacl is handled by InsertPgAttributeTuple */
 
 	ReleaseSysCache(typeTuple);
@@ -9309,7 +9313,9 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 		if (!(foundDep->refclassid == TypeRelationId &&
 			  foundDep->refobjid == attTup->atttypid) &&
 			!(foundDep->refclassid == CollationRelationId &&
-			  foundDep->refobjid == attTup->attcollation))
+			  foundDep->refobjid == attTup->attcollation) &&
+			!(foundDep->refclassid == CompressionMethodRelationId &&
+			  foundDep->refobjid == attTup->attcompression))
 			elog(ERROR, "found unexpected dependency for column");
 
 		CatalogTupleDelete(depRel, &depTup->t_self);
@@ -9331,6 +9337,7 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 	attTup->attbyval = tform->typbyval;
 	attTup->attalign = tform->typalign;
 	attTup->attstorage = tform->typstorage;
+	attTup->attcompression = InvalidOid;
 
 	ReleaseSysCache(typeTuple);
 

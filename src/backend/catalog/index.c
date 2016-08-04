@@ -393,6 +393,7 @@ ConstructTupleDescriptor(Relation heapRelation,
 			to->atttypmod = exprTypmod(indexkey);
 			to->attislocal = true;
 			to->attcollation = collationObjectId[i];
+			to->attcompression = InvalidOid;
 
 			ReleaseSysCache(tuple);
 

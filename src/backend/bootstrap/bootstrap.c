@@ -718,6 +718,7 @@ DefineAttr(char *name, char *type, int attnum, int nullness)
 	attrtypes[attnum]->attcacheoff = -1;
 	attrtypes[attnum]->atttypmod = -1;
 	attrtypes[attnum]->attislocal = true;
+	attrtypes[attnum]->attcompression = InvalidOid;
 
 	if (nullness == BOOTCOL_NULL_FORCE_NOT_NULL)
 	{

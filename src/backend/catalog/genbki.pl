@@ -447,9 +447,11 @@ sub emit_pgattr_row
 		attisdropped  => 'f',
 		attislocal    => 't',
 		attinhcount   => '0',
+		attcompression=> '0',
 		attacl        => '_null_',
 		attoptions    => '_null_',
-		attfdwoptions => '_null_');
+		attfdwoptions => '_null_',
+		attcmoptions  => '_null_');
 	return { %PGATTR_DEFAULTS, %row };
 }
 
@@ -484,6 +486,7 @@ sub emit_schemapg_row
 	delete $row->{attacl};
 	delete $row->{attoptions};
 	delete $row->{attfdwoptions};
+	delete $row->{attcmoptions};
 
 	# Expand booleans from 'f'/'t' to 'false'/'true'.
 	# Some values might be other macros (eg FLOAT4PASSBYVAL), don't change.

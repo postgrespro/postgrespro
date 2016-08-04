@@ -3644,11 +3644,20 @@ raw_expression_tree_walker(Node *node,
 
 				if (walker(coldef->typeName, context))
 					return true;
+				if (walker(coldef->compression, context))
+					return true;
 				if (walker(coldef->raw_default, context))
 					return true;
 				if (walker(coldef->collClause, context))
 					return true;
 				/* for now, constraints are ignored */
+			}
+			break;
+		case T_ColumnCompression:
+			{
+				ColumnCompression *colcmp = (ColumnCompression *) node;
+				if (walker(colcmp->options, context))
+					return true;
 			}
 			break;
 		case T_IndexElem:
