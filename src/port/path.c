@@ -769,7 +769,7 @@ get_man_path(const char *my_exec_path, char *ret_path)
 
 const wchar_t* make_wc_name(const char* name) {
 	int wlen;
-	size_t size = strlen(s) + 1;
+	size_t size = (size_t)strlen(name) + 1;
 	size_t wsize = size * sizeof(wchar_t);
 	wchar_t *p = (wchar_t*)malloc(wsize);
 	wlen = MultiByteToWideChar(CP_ACP,0,(LPCCH)name,(int)size,(LPWSTR)p,(int)wsize);
@@ -781,7 +781,7 @@ const wchar_t* make_wc_name(const char* name) {
  */
 const char* make_utf8_path(const wchar_t* s) {
 	int len;
-	size_t size = wcslen(s) + 1;
+	size_t size = (size_t)wcslen(s) + 1;
 	char *p = (char*)malloc(size * sizeof(wchar_t));
 	len = WideCharToMultiByte(CP_UTF8,0,s,size,p,size * sizeof(wchar_t),NULL,NULL);
 	return p;
