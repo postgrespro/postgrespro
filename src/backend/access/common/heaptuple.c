@@ -57,6 +57,7 @@
 
 #include "postgres.h"
 
+#include "access/compression.h"
 #include "access/sysattr.h"
 #include "access/tuptoaster.h"
 #include "executor/tuptable.h"
@@ -410,8 +411,7 @@ nocachegetattr(HeapTuple tuple,
 		 */
 		if (att[attnum]->attcacheoff >= 0)
 		{
-			return fetchatt(att[attnum],
-							tp + att[attnum]->attcacheoff);
+			return fetchatt(tupleDesc, attnum, tp + att[attnum]->attcacheoff);
 		}
 
 		/*
@@ -536,7 +536,7 @@ nocachegetattr(HeapTuple tuple,
 		}
 	}
 
-	return fetchatt(att[attnum], tp + off);
+	return fetchatt(tupleDesc, attnum, tp + off);
 }
 
 /* ----------------
@@ -681,6 +681,32 @@ heap_copy_tuple_as_datum(HeapTuple tuple, TupleDesc tupleDesc)
 	return PointerGetDatum(td);
 }
 
+static inline CompressionMethodRoutine *
+TupleDescGetCompressionMethodRoutine(TupleDesc tupdesc, AttrNumber attnum)
+{
+	CompressionMethodRoutine *cmr;
+	Assert(tupdesc->tdcmroutines);
+	cmr = tupdesc->tdcmroutines[attnum];
+	Assert(cmr);
+	return cmr;
+}
+
+Datum
+tuple_compress_attr(TupleDesc tupdesc, AttrNumber attnum, Datum value)
+{
+	CompressionMethodRoutine *cmr =
+			TupleDescGetCompressionMethodRoutine(tupdesc, attnum);
+	return (*cmr->compress)(value, tupdesc->attrs[attnum]);
+}
+
+Datum
+tuple_decompress_attr(TupleDesc tupdesc, int attnum, Datum value)
+{
+	CompressionMethodRoutine *cmr =
+			TupleDescGetCompressionMethodRoutine(tupdesc, attnum);
+	return (*cmr->decompress)(value, tupdesc->attrs[attnum]);
+}
+
 /*
  * heap_form_tuple
  *		construct a tuple from the given values[] and isnull[] arrays,
@@ -695,6 +721,7 @@ heap_form_tuple(TupleDesc tupleDescriptor,
 {
 	HeapTuple	tuple;			/* return tuple */
 	HeapTupleHeader td;			/* tuple data */
+	Datum	   *oldValues = NULL;
 	Size		len,
 				data_len;
 	int			hoff;
@@ -716,7 +743,21 @@ heap_form_tuple(TupleDesc tupleDescriptor,
 		if (isnull[i])
 		{
 			hasnull = true;
-			break;
+
+			if (!tupleDescriptor->tdcmroutines)
+				break;
+		}
+		else if (/* XXX compress && */
+				 OidIsValid(tupleDescriptor->attrs[i]->attcompression))
+		{
+			if (!oldValues)
+			{
+				oldValues = values;
+				values = palloc0(sizeof(Datum) * numberOfAttributes);
+				memcpy(values, oldValues, sizeof(Datum) * numberOfAttributes);
+			}
+
+			values[i] = tuple_compress_attr(tupleDescriptor, i, values[i]);
 		}
 	}
 
@@ -774,6 +815,15 @@ heap_form_tuple(TupleDesc tupleDescriptor,
 					data_len,
 					&td->t_infomask,
 					(hasnull ? td->t_bits : NULL));
+
+	if (oldValues)
+	{
+		for (i = 0; i < numberOfAttributes; i++)
+			if (values[i] != oldValues[i])
+				pfree(DatumGetPointer(values[i]));
+
+		pfree(values);
+	}
 
 	return tuple;
 }
@@ -932,8 +982,8 @@ heap_modify_tuple_by_cols(HeapTuple tuple,
  *		noncacheable attribute offsets are involved.
  */
 void
-heap_deform_tuple(HeapTuple tuple, TupleDesc tupleDesc,
-				  Datum *values, bool *isnull)
+heap_deform_tuple_decompress(HeapTuple tuple, TupleDesc tupleDesc,
+							 Datum *values, bool *isnull, bool *decompress)
 {
 	HeapTupleHeader tup = tuple->t_data;
 	bool		hasnulls = HeapTupleHasNulls(tuple);
@@ -1002,7 +1052,8 @@ heap_deform_tuple(HeapTuple tuple, TupleDesc tupleDesc,
 				thisatt->attcacheoff = off;
 		}
 
-		values[attnum] = fetchatt(thisatt, tp + off);
+		values[attnum] = fetchatt_decompress(tupleDesc, attnum, tp + off,
+											 !decompress || decompress[attnum]);
 
 		off = att_addlength_pointer(off, thisatt->attlen, tp + off);
 
@@ -1111,7 +1162,7 @@ slot_deform_tuple(TupleTableSlot *slot, int natts)
 				thisatt->attcacheoff = off;
 		}
 
-		values[attnum] = fetchatt(thisatt, tp + off);
+		values[attnum] = fetchatt(tupleDesc, attnum, tp + off);
 
 		off = att_addlength_pointer(off, thisatt->attlen, tp + off);
 
@@ -1451,6 +1502,7 @@ heap_form_minimal_tuple(TupleDesc tupleDescriptor,
 	if (tupleDescriptor->tdhasoid)		/* else leave infomask = 0 */
 		tuple->t_infomask = HEAP_HASOID;
 
+	/* FIXME compressed/extended attributes */
 	heap_fill_tuple(tupleDescriptor,
 					values,
 					isnull,

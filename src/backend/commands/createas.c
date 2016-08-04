@@ -598,6 +598,7 @@ intorel_receive(TupleTableSlot *slot, DestReceiver *self)
 
 	heap_insert(myState->rel,
 				tuple,
+				slot->tts_tupleDescriptor,
 				myState->output_cid,
 				myState->hi_options,
 				myState->bistate);

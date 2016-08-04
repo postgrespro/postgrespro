@@ -572,7 +572,8 @@ brin_deconstruct_tuple(BrinDesc *brdesc,
 				off = att_align_nominal(off, thisatt->attalign);
 			}
 
-			values[stored++] = fetchatt(thisatt, tp + off);
+			values[stored] = fetchatt(diskdsc, stored, tp + off);
+			stored++;
 
 			off = att_addlength_pointer(off, thisatt->attlen, tp + off);
 		}

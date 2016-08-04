@@ -277,8 +277,7 @@ nocache_index_getattr(IndexTuple tup,
 		 */
 		if (att[attnum]->attcacheoff >= 0)
 		{
-			return fetchatt(att[attnum],
-							tp + att[attnum]->attcacheoff);
+			return fetchatt(tupleDesc, attnum, tp + att[attnum]->attcacheoff);
 		}
 
 		/*
@@ -403,7 +402,7 @@ nocache_index_getattr(IndexTuple tup,
 		}
 	}
 
-	return fetchatt(att[attnum], tp + off);
+	return fetchatt(tupleDesc, attnum, tp + off);
 }
 
 /*

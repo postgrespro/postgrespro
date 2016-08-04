@@ -724,7 +724,7 @@ struct MinimalTupleData
 	(																\
 		(tupleDesc)->attrs[(attnum)-1]->attcacheoff >= 0 ?			\
 		(															\
-			fetchatt((tupleDesc)->attrs[(attnum)-1],				\
+			fetchatt(tupleDesc, (attnum) - 1,						\
 				(char *) (tup)->t_data + (tup)->t_data->t_hoff +	\
 					(tupleDesc)->attrs[(attnum)-1]->attcacheoff)	\
 		)															\
@@ -811,8 +811,10 @@ extern HeapTuple heap_modify_tuple_by_cols(HeapTuple tuple,
 						  int *replCols,
 						  Datum *replValues,
 						  bool *replIsnull);
-extern void heap_deform_tuple(HeapTuple tuple, TupleDesc tupleDesc,
-				  Datum *values, bool *isnull);
+extern void heap_deform_tuple_decompress(HeapTuple tuple, TupleDesc tupleDesc,
+							 Datum *values, bool *isnull, bool *decompress);
+#define heap_deform_tuple(tuple, tupdesc, values, isnull) \
+		heap_deform_tuple_decompress(tuple, tupdesc, values, isnull, NULL)
 extern void heap_freetuple(HeapTuple htup);
 extern MinimalTuple heap_form_minimal_tuple(TupleDesc tupleDescriptor,
 						Datum *values, bool *isnull);
@@ -820,5 +822,6 @@ extern void heap_free_minimal_tuple(MinimalTuple mtup);
 extern MinimalTuple heap_copy_minimal_tuple(MinimalTuple mtup);
 extern HeapTuple heap_tuple_from_minimal_tuple(MinimalTuple mtup);
 extern MinimalTuple minimal_tuple_from_heap_tuple(HeapTuple htup);
+extern Datum tuple_compress_attr(TupleDesc td, AttrNumber attnum, Datum value);
 
 #endif   /* HTUP_DETAILS_H */

@@ -472,6 +472,7 @@ ConstructTupleDescriptor(Relation heapRelation,
 			to->attbyval = typeTup->typbyval;
 			to->attalign = typeTup->typalign;
 			to->attstorage = typeTup->typstorage;
+			to->attcompression = InvalidOid;
 
 			ReleaseSysCache(tuple);
 		}

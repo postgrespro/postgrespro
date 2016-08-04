@@ -300,6 +300,9 @@ tlist_matches_tupdesc(PlanState *ps, List *tlist, Index varno, TupleDesc tupdesc
 			 var->vartypmod != -1))
 			return false;		/* type mismatch */
 
+		if (OidIsValid(att_tup->attcompression))
+			return false;
+
 		tlist_item = lnext(tlist_item);
 	}
 

@@ -132,9 +132,9 @@ do { \
  *	Called by heap_insert() and heap_update().
  * ----------
  */
-extern HeapTuple toast_insert_or_update(Relation rel,
+extern HeapTuple toast_insert_or_update(Relation rel, TupleDesc newtupdesc,
 					   HeapTuple newtup, HeapTuple oldtup,
-					   int options);
+					   int options, bool *recompress);
 
 /* ----------
  * toast_delete -

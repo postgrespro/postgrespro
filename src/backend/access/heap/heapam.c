@@ -91,7 +91,8 @@ static HeapScanDesc heap_beginscan_internal(Relation relation,
 						bool temp_snap);
 static BlockNumber heap_parallelscan_nextpage(HeapScanDesc scan);
 static HeapTuple heap_prepare_insert(Relation relation, HeapTuple tup,
-					TransactionId xid, CommandId cid, int options);
+									 TupleDesc tupdesc, TransactionId xid,
+									 CommandId cid, int options);
 static XLogRecPtr log_heap_update(Relation reln, Buffer oldbuf,
 				Buffer newbuf, HeapTuple oldtup,
 				HeapTuple newtup, HeapTuple old_key_tup,
@@ -1062,7 +1063,7 @@ fastgetattr(HeapTuple tup, int attnum, TupleDesc tupleDesc,
 			 (
 			  (tupleDesc)->attrs[(attnum) - 1]->attcacheoff >= 0 ?
 			  (
-			   fetchatt((tupleDesc)->attrs[(attnum) - 1],
+			   fetchatt(tupleDesc, (attnum) - 1,
 						(char *) (tup)->t_data + (tup)->t_data->t_hoff +
 						(tupleDesc)->attrs[(attnum) - 1]->attcacheoff)
 			   )
@@ -2393,8 +2394,8 @@ ReleaseBulkInsertStatePin(BulkInsertState bistate)
  * within the tuple data is NOT reflected into *tup.
  */
 Oid
-heap_insert(Relation relation, HeapTuple tup, CommandId cid,
-			int options, BulkInsertState bistate)
+heap_insert(Relation relation, HeapTuple tup, TupleDesc tupdesc,
+			CommandId cid, int options, BulkInsertState bistate)
 {
 	TransactionId xid = GetCurrentTransactionId();
 	HeapTuple	heaptup;
@@ -2409,7 +2410,7 @@ heap_insert(Relation relation, HeapTuple tup, CommandId cid,
 	 * Note: below this point, heaptup is the data we actually intend to store
 	 * into the relation; tup is the caller's original untoasted data.
 	 */
-	heaptup = heap_prepare_insert(relation, tup, xid, cid, options);
+	heaptup = heap_prepare_insert(relation, tup, tupdesc, xid, cid, options);
 
 	/*
 	 * Find buffer to insert this tuple into.  If the page is all visible,
@@ -2569,6 +2570,36 @@ heap_insert(Relation relation, HeapTuple tup, CommandId cid,
 	return HeapTupleGetOid(tup);
 }
 
+static inline bool *
+heap_tuple_needs_recompression(HeapTuple tup, TupleDesc td1, TupleDesc td2)
+{
+	AttrNumber	natts = td1->natts;
+	AttrNumber	att;
+	bool	   *recompress = NULL;
+
+	if (td1 == td2)
+		return NULL;
+
+	if (!td1->tdcmroutines && !td2->tdcmroutines)
+		return NULL;
+
+	for (att = 1; att <= natts; att++)
+	{
+		if (heap_attisnull(tup, att))
+			continue;
+
+		if (td1->attrs[att - 1]->attcompression !=
+			td2->attrs[att - 1]->attcompression)
+		{
+			if (!recompress)
+				recompress = palloc0(sizeof(bool) * natts);
+			recompress[att - 1] = true;
+		}
+	}
+
+	return recompress;
+}
+
 /*
  * Subroutine for heap_insert(). Prepares a tuple for insertion. This sets the
  * tuple header fields, assigns an OID, and toasts the tuple if necessary.
@@ -2577,9 +2608,11 @@ heap_insert(Relation relation, HeapTuple tup, CommandId cid,
  * the original tuple.
  */
 static HeapTuple
-heap_prepare_insert(Relation relation, HeapTuple tup, TransactionId xid,
-					CommandId cid, int options)
+heap_prepare_insert(Relation relation, HeapTuple tup, TupleDesc tupdesc,
+					TransactionId xid, CommandId cid, int options)
 {
+	bool *recompress;
+
 	/*
 	 * For now, parallel operations are required to be strictly read-only.
 	 * Unlike heap_update() and heap_delete(), an insert should never create a
@@ -2637,10 +2670,24 @@ heap_prepare_insert(Relation relation, HeapTuple tup, TransactionId xid,
 		Assert(!HeapTupleHasExternal(tup));
 		return tup;
 	}
-	else if (HeapTupleHasExternal(tup) || tup->t_len > TOAST_TUPLE_THRESHOLD)
-		return toast_insert_or_update(relation, tup, NULL, options);
-	else
-		return tup;
+
+	recompress = heap_tuple_needs_recompression(tup, tupdesc,
+												RelationGetDescr(relation));
+
+	if (HeapTupleHasExternal(tup) || tup->t_len > TOAST_TUPLE_THRESHOLD ||
+		recompress)
+	{
+		if (!recompress)
+			recompress = palloc0(sizeof(bool) * RelationGetDescr(relation)->natts);
+
+		tup = toast_insert_or_update(relation, tupdesc, tup, NULL, options,
+									 recompress);
+	}
+
+	if (recompress)
+		pfree(recompress);
+
+	return tup;
 }
 
 /*
@@ -2677,6 +2724,7 @@ heap_multi_insert(Relation relation, HeapTuple *tuples, int ntuples,
 	heaptuples = palloc(ntuples * sizeof(HeapTuple));
 	for (i = 0; i < ntuples; i++)
 		heaptuples[i] = heap_prepare_insert(relation, tuples[i],
+											RelationGetDescr(relation),
 											xid, cid, options);
 
 	/*
@@ -2938,7 +2986,8 @@ heap_multi_insert(Relation relation, HeapTuple *tuples, int ntuples,
 Oid
 simple_heap_insert(Relation relation, HeapTuple tup)
 {
-	return heap_insert(relation, tup, GetCurrentCommandId(true), 0, NULL);
+	return heap_insert(relation, tup, RelationGetDescr(relation),
+					   GetCurrentCommandId(true), 0, NULL);
 }
 
 /*
@@ -3459,7 +3508,8 @@ simple_heap_delete(Relation relation, ItemPointer tid)
  * See comments for struct HeapUpdateFailureData for additional info.
  */
 HTSU_Result
-heap_update(Relation relation, ItemPointer otid, HeapTuple newtup,
+heap_update(Relation relation, ItemPointer otid,
+			HeapTuple newtup, TupleDesc newtupdesc,
 			CommandId cid, Snapshot crosscheck, bool wait,
 			HeapUpdateFailureData *hufd, LockTupleMode *lockmode)
 {
@@ -3500,6 +3550,7 @@ heap_update(Relation relation, ItemPointer otid, HeapTuple newtup,
 				infomask2_old_tuple,
 				infomask_new_tuple,
 				infomask2_new_tuple;
+	bool	   *recompress;
 
 	Assert(ItemPointerIsValid(otid));
 
@@ -3963,11 +4014,21 @@ l2:
 		Assert(!HeapTupleHasExternal(&oldtup));
 		Assert(!HeapTupleHasExternal(newtup));
 		need_toast = false;
+		recompress = NULL;
 	}
 	else
+	{
+		recompress = heap_tuple_needs_recompression(newtup, newtupdesc,
+													RelationGetDescr(relation));
+
 		need_toast = (HeapTupleHasExternal(&oldtup) ||
 					  HeapTupleHasExternal(newtup) ||
-					  newtup->t_len > TOAST_TUPLE_THRESHOLD);
+					  newtup->t_len > TOAST_TUPLE_THRESHOLD) ||
+					  recompress;
+
+		if (need_toast && !recompress)
+			recompress = palloc0(sizeof(bool) * RelationGetDescr(relation)->natts);
+	}
 
 	pagefree = PageGetHeapFreeSpace(page);
 
@@ -4068,8 +4129,10 @@ l2:
 		if (need_toast)
 		{
 			/* Note we always use WAL and FSM during updates */
-			heaptup = toast_insert_or_update(relation, newtup, &oldtup, 0);
+			heaptup = toast_insert_or_update(relation, newtupdesc, newtup,
+											 &oldtup, 0, recompress);
 			newtupsize = MAXALIGN(heaptup->t_len);
+			pfree(recompress);
 		}
 		else
 			heaptup = newtup;
@@ -4453,7 +4516,7 @@ simple_heap_update(Relation relation, ItemPointer otid, HeapTuple tup)
 	HeapUpdateFailureData hufd;
 	LockTupleMode lockmode;
 
-	result = heap_update(relation, otid, tup,
+	result = heap_update(relation, otid, tup, RelationGetDescr(relation),
 						 GetCurrentCommandId(true), InvalidSnapshot,
 						 true /* wait for commit */ ,
 						 &hufd, &lockmode);

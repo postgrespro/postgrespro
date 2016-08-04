@@ -149,8 +149,8 @@ extern BulkInsertState GetBulkInsertState(void);
 extern void FreeBulkInsertState(BulkInsertState);
 extern void ReleaseBulkInsertStatePin(BulkInsertState bistate);
 
-extern Oid heap_insert(Relation relation, HeapTuple tup, CommandId cid,
-			int options, BulkInsertState bistate);
+extern Oid heap_insert(Relation relation, HeapTuple tup, TupleDesc tupdesc,
+						CommandId cid, int options, BulkInsertState bistate);
 extern void heap_multi_insert(Relation relation, HeapTuple *tuples, int ntuples,
 				  CommandId cid, int options, BulkInsertState bistate);
 extern HTSU_Result heap_delete(Relation relation, ItemPointer tid,
@@ -159,7 +159,7 @@ extern HTSU_Result heap_delete(Relation relation, ItemPointer tid,
 extern void heap_finish_speculative(Relation relation, HeapTuple tuple);
 extern void heap_abort_speculative(Relation relation, HeapTuple tuple);
 extern HTSU_Result heap_update(Relation relation, ItemPointer otid,
-			HeapTuple newtup,
+			HeapTuple newtup, TupleDesc newtupdesc,
 			CommandId cid, Snapshot crosscheck, bool wait,
 			HeapUpdateFailureData *hufd, LockTupleMode *lockmode);
 extern HTSU_Result heap_lock_tuple(Relation relation, HeapTuple tuple,

@@ -30,6 +30,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+#include "access/compression.h"
 #include "access/genam.h"
 #include "access/heapam.h"
 #include "access/tuptoaster.h"
@@ -533,8 +534,8 @@ toast_delete(Relation rel, HeapTuple oldtup, bool is_speculative)
  * ----------
  */
 HeapTuple
-toast_insert_or_update(Relation rel, HeapTuple newtup, HeapTuple oldtup,
-					   int options)
+toast_insert_or_update(Relation rel, TupleDesc newtupdesc, HeapTuple newtup,
+					   HeapTuple oldtup, int options, bool *recompress)
 {
 	HeapTuple	result_tuple;
 	TupleDesc	tupleDesc;
@@ -583,7 +584,8 @@ toast_insert_or_update(Relation rel, HeapTuple newtup, HeapTuple oldtup,
 	numAttrs = tupleDesc->natts;
 
 	Assert(numAttrs <= MaxHeapAttributeNumber);
-	heap_deform_tuple(newtup, tupleDesc, toast_values, toast_isnull);
+	heap_deform_tuple_decompress(newtup, newtupdesc, toast_values, toast_isnull,
+								 recompress);
 	if (oldtup != NULL)
 		heap_deform_tuple(oldtup, tupleDesc, toast_oldvalues, toast_oldisnull);
 
@@ -695,6 +697,28 @@ toast_insert_or_update(Relation rel, HeapTuple newtup, HeapTuple oldtup,
 				toast_free[i] = true;
 				need_change = true;
 				need_free = true;
+			}
+
+			if (recompress[i])
+			{
+				if (OidIsValid(att[i]->attcompression))
+				{
+					struct varlena * compressed_value = (struct varlena *)
+							tuple_compress_attr(tupleDesc, i,
+												PointerGetDatum(new_value));
+					if (compressed_value != new_value)
+					{
+						new_value = compressed_value;
+						toast_oldexternal[i] = NULL;
+						if (toast_free[i])
+							pfree(DatumGetPointer(toast_values[i]));
+						toast_values[i] = PointerGetDatum(new_value);
+						toast_free[i] = true;
+						need_free = true;
+						Assert(!VARATT_IS_EXTERNAL(new_value));
+					}
+				}
+				need_change = true;
 			}
 
 			/*
@@ -1666,7 +1690,8 @@ toast_save_datum(Relation rel, Datum value,
 		memcpy(VARDATA(&chunk_data), data_p, chunk_size);
 		toasttup = heap_form_tuple(toasttupDesc, t_values, t_isnull);
 
-		heap_insert(toastrel, toasttup, mycid, options, NULL);
+		heap_insert(toastrel, toasttup, RelationGetDescr(toastrel),
+					mycid, options, NULL);
 
 		/*
 		 * Create the index entry.  We cheat a little here by not using

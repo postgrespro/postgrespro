@@ -105,7 +105,7 @@ typedef IndexAttributeBitMapData *IndexAttributeBitMap;
 	( \
 		(tupleDesc)->attrs[(attnum)-1]->attcacheoff >= 0 ? \
 		( \
-			fetchatt((tupleDesc)->attrs[(attnum)-1], \
+			fetchatt(tupleDesc, (attnum) - 1, \
 			(char *) (tup) + IndexInfoFindDataOffset((tup)->t_info) \
 			+ (tupleDesc)->attrs[(attnum)-1]->attcacheoff) \
 		) \

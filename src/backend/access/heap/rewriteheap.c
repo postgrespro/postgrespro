@@ -648,10 +648,18 @@ raw_heap_insert(RewriteState state, HeapTuple tup)
 		heaptup = tup;
 	}
 	else if (HeapTupleHasExternal(tup) || tup->t_len > TOAST_TUPLE_THRESHOLD)
-		heaptup = toast_insert_or_update(state->rs_new_rel, tup, NULL,
+	{
+		TupleDesc tupdesc = RelationGetDescr(state->rs_new_rel);
+		bool *recompress = palloc0(sizeof(bool) * tupdesc->natts);
+		heaptup = toast_insert_or_update(state->rs_new_rel,
+										 tupdesc,
+										 tup, NULL,
 										 HEAP_INSERT_SKIP_FSM |
 										 (state->rs_use_wal ?
-										  0 : HEAP_INSERT_SKIP_WAL));
+										  0 : HEAP_INSERT_SKIP_WAL),
+										 recompress);
+		pfree(recompress);
+	}
 	else
 		heaptup = tup;
 

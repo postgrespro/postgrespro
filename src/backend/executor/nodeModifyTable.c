@@ -506,6 +506,7 @@ ExecInsert(ModifyTableState *mtstate,
 
 			/* insert the tuple, with the speculative token */
 			newId = heap_insert(resultRelationDesc, tuple,
+								slot->tts_tupleDescriptor,
 								estate->es_output_cid,
 								HEAP_INSERT_SPECULATIVE,
 								NULL);
@@ -552,6 +553,7 @@ ExecInsert(ModifyTableState *mtstate,
 			 * in the t_self field.
 			 */
 			newId = heap_insert(resultRelationDesc, tuple,
+								slot->tts_tupleDescriptor,
 								estate->es_output_cid,
 								0, NULL);
 
@@ -1004,6 +1006,7 @@ lreplace:;
 		 * mode transactions.
 		 */
 		result = heap_update(resultRelationDesc, tupleid, tuple,
+							 slot->tts_tupleDescriptor,
 							 estate->es_output_cid,
 							 estate->es_crosscheck_snapshot,
 							 true /* wait for commit */ ,

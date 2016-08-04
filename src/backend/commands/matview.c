@@ -501,6 +501,7 @@ transientrel_receive(TupleTableSlot *slot, DestReceiver *self)
 
 	heap_insert(myState->transientrel,
 				tuple,
+				slot->tts_tupleDescriptor,
 				myState->output_cid,
 				myState->hi_options,
 				myState->bistate);
