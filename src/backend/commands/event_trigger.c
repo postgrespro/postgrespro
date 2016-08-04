@@ -91,6 +91,7 @@ static event_trigger_support_data event_trigger_support[] = {
 	{"CAST", true},
 	{"CONSTRAINT", true},
 	{"COLLATION", true},
+	{"COMPRESSION METHOD", true},
 	{"CONVERSION", true},
 	{"DATABASE", false},
 	{"DOMAIN", true},
@@ -1085,6 +1086,7 @@ EventTriggerSupportsObjectType(ObjectType obtype)
 		case OBJECT_CAST:
 		case OBJECT_COLUMN:
 		case OBJECT_COLLATION:
+		case OBJECT_COMPRESSION_METHOD:
 		case OBJECT_CONVERSION:
 		case OBJECT_DEFACL:
 		case OBJECT_DEFAULT:
@@ -1176,6 +1178,7 @@ EventTriggerSupportsObjectClass(ObjectClass objclass)
 		case OCLASS_PUBLICATION_REL:
 		case OCLASS_SUBSCRIPTION:
 		case OCLASS_STATISTIC_EXT:
+		case OCLASS_COMPRESSION_METHOD:
 			return true;
 	}
 

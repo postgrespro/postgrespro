@@ -3340,6 +3340,8 @@ static const char *const no_priv_msg[MAX_ACL_KIND] =
 	gettext_noop("permission denied for publication %s"),
 	/* ACL_KIND_SUBSCRIPTION */
 	gettext_noop("permission denied for subscription %s"),
+	/* ACL_KIND_COMPRESSION_METHOD */
+	gettext_noop("permission denied for compression method %s"),
 };
 
 static const char *const not_owner_msg[MAX_ACL_KIND] =

@@ -120,6 +120,12 @@ DECLARE_UNIQUE_INDEX(pg_collation_name_enc_nsp_index, 3164, on pg_collation usin
 DECLARE_UNIQUE_INDEX(pg_collation_oid_index, 3085, on pg_collation using btree(oid oid_ops));
 #define CollationOidIndexId  3085
 
+DECLARE_UNIQUE_INDEX(pg_compression_oid_index, 3409, on pg_compression using btree(oid oid_ops));
+#define CompressionMethodOidIndexId  3409
+DECLARE_UNIQUE_INDEX(pg_compression_name_index, 3410, on pg_compression using btree(cmname name_ops));
+#define CompressionMethodNameIndexId  3410
+
+
 DECLARE_INDEX(pg_constraint_conname_nsp_index, 2664, on pg_constraint using btree(conname name_ops, connamespace oid_ops));
 #define ConstraintNameNspIndexId  2664
 DECLARE_INDEX(pg_constraint_conrelid_index, 2665, on pg_constraint using btree(conrelid oid_ops));

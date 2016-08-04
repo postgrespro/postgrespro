@@ -712,6 +712,8 @@ DATA(insert OID = 3310 ( tsm_handler	PGNSP PGUID  4 t p P f t \054 0 0 0 tsm_han
 #define TSM_HANDLEROID	3310
 DATA(insert OID = 3831 ( anyrange		PGNSP PGUID  -1 f p P f t \054 0 0 0 anyrange_in anyrange_out - - - - - d x f 0 -1 0 0 _null_ _null_ _null_ ));
 #define ANYRANGEOID		3831
+DATA(insert OID = 3411 ( compression_handler PGNSP PGUID  4 t p P f t \054 0 0 0 compression_handler_in compression_handler_out - - - - - i p f 0 -1 0 0 _null_ _null_ _null_ ));
+#define COMPRESSION_HANDLEROID	3411
 
 
 /*

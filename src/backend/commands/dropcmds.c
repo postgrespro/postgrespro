@@ -275,6 +275,10 @@ does_not_exist_skipping(ObjectType objtype, Node *object)
 				name = NameListToString(castNode(List, object));
 			}
 			break;
+		case OBJECT_COMPRESSION_METHOD:
+			msg = gettext_noop("compression method \"%s\" does not exist, skipping");
+			name = strVal((Value *) object);
+			break;
 		case OBJECT_CONVERSION:
 			if (!schema_does_not_exist_skipping(castNode(List, object), &msg, &name))
 			{

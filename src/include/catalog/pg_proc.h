@@ -3826,6 +3826,10 @@ DATA(insert OID = 3311 (  tsm_handler_in	PGNSP PGUID 12 1 0 0 0 f f f f f f i s 
 DESCR("I/O");
 DATA(insert OID = 3312 (  tsm_handler_out	PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 2275 "3310" _null_ _null_ _null_ _null_ _null_ tsm_handler_out _null_ _null_ _null_ ));
 DESCR("I/O");
+DATA(insert OID = 3412 (  compression_handler_in	PGNSP PGUID 12 1 0 0 0 f f f f f f i s 1 0 3411 "2275" _null_ _null_ _null_ _null_ _null_ compression_handler_in _null_ _null_ _null_ ));
+DESCR("I/O");
+DATA(insert OID = 3413 (  compression_handler_out	PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 2275 "3411" _null_ _null_ _null_ _null_ _null_ compression_handler_out _null_ _null_ _null_ ));
+DESCR("I/O");
 
 /* tablesample method handlers */
 DATA(insert OID = 3313 (  bernoulli			PGNSP PGUID 12 1 0 0 0 f f f f t f v s 1 0 3310 "2281" _null_ _null_ _null_ _null_ _null_ tsm_bernoulli_handler _null_ _null_ _null_ ));

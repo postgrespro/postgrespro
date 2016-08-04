@@ -614,8 +614,8 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 	CACHE CALLED CASCADE CASCADED CASE CAST CATALOG_P CHAIN CHAR_P
 	CHARACTER CHARACTERISTICS CHECK CHECKPOINT CLASS CLOSE
 	CLUSTER COALESCE COLLATE COLLATION COLUMN COLUMNS COMMENT COMMENTS COMMIT
-	COMMITTED CONCURRENTLY CONFIGURATION CONFLICT CONNECTION CONSTRAINT
-	CONSTRAINTS CONTENT_P CONTINUE_P CONVERSION_P COPY COST CREATE
+	COMMITTED COMPRESSION CONCURRENTLY CONFIGURATION CONFLICT CONNECTION
+	CONSTRAINT CONSTRAINTS CONTENT_P CONTINUE_P CONVERSION_P COPY COST CREATE
 	CROSS CSV CUBE CURRENT_P
 	CURRENT_CATALOG CURRENT_DATE CURRENT_ROLE CURRENT_SCHEMA
 	CURRENT_TIME CURRENT_TIMESTAMP CURRENT_USER CURSOR CYCLE
@@ -5656,6 +5656,15 @@ DefineStmt:
 					n->if_not_exists = true;
 					$$ = (Node *)n;
 				}
+			| CREATE COMPRESSION METHOD any_name HANDLER handler_name
+				{
+					DefineStmt *n = makeNode(DefineStmt);
+					n->kind = OBJECT_COMPRESSION_METHOD;
+					n->args = NIL;
+					n->defnames = $4;
+					n->definition = list_make1(makeDefElem("handler", (Node *) $6, @6));
+					$$ = (Node *) n;
+				}
 		;
 
 definition: '(' def_list ')'						{ $$ = $2; }
@@ -6168,6 +6177,7 @@ drop_type_any_name:
 /* object types taking name_list */
 drop_type_name:
 			ACCESS METHOD							{ $$ = OBJECT_ACCESS_METHOD; }
+			| COMPRESSION METHOD					{ $$ = OBJECT_COMPRESSION_METHOD; }
 			| EVENT TRIGGER							{ $$ = OBJECT_EVENT_TRIGGER; }
 			| EXTENSION								{ $$ = OBJECT_EXTENSION; }
 			| FOREIGN DATA_P WRAPPER				{ $$ = OBJECT_FDW; }
@@ -6231,7 +6241,7 @@ opt_restart_seqs:
  *	The COMMENT ON statement can take different forms based upon the type of
  *	the object associated with the comment. The form of the statement is:
  *
- *	COMMENT ON [ [ ACCESS METHOD | CONVERSION | COLLATION |
+ *	COMMENT ON [ [ ACCESS METHOD | COMPRESSION METHOD | CONVERSION | COLLATION |
  *                 DATABASE | DOMAIN |
  *                 EXTENSION | EVENT TRIGGER | FOREIGN DATA WRAPPER |
  *                 FOREIGN TABLE | INDEX | [PROCEDURAL] LANGUAGE |
@@ -6421,6 +6431,7 @@ comment_type_any_name:
 /* object types taking name */
 comment_type_name:
 			ACCESS METHOD						{ $$ = OBJECT_ACCESS_METHOD; }
+			| COMPRESSION METHOD				{ $$ = OBJECT_COMPRESSION_METHOD; }
 			| DATABASE							{ $$ = OBJECT_DATABASE; }
 			| EVENT TRIGGER						{ $$ = OBJECT_EVENT_TRIGGER; }
 			| EXTENSION							{ $$ = OBJECT_EXTENSION; }
@@ -14647,6 +14658,7 @@ unreserved_keyword:
 			| COMMENTS
 			| COMMIT
 			| COMMITTED
+			| COMPRESSION
 			| CONFIGURATION
 			| CONFLICT
 			| CONNECTION

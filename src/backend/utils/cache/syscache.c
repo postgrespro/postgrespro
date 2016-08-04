@@ -31,6 +31,7 @@
 #include "catalog/pg_authid.h"
 #include "catalog/pg_cast.h"
 #include "catalog/pg_collation.h"
+#include "catalog/pg_compression.h"
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_conversion.h"
 #include "catalog/pg_database.h"
@@ -303,6 +304,28 @@ static const struct cachedesc cacheinfo[] = {
 		1,
 		{
 			ObjectIdAttributeNumber,
+			0,
+			0,
+			0
+		},
+		8
+	},
+	{CompressionMethodRelationId,		/* COMPRESSIONMETHODOID */
+		CompressionMethodOidIndexId,
+		1,
+		{
+			ObjectIdAttributeNumber,
+			0,
+			0,
+			0
+		},
+		8
+	},
+	{CompressionMethodRelationId,		/* COMPRESSIONMETHODNAME */
+		CompressionMethodNameIndexId,
+		1,
+		{
+			Anum_pg_compression_cmname,
 			0,
 			0,
 			0

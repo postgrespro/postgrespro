@@ -236,6 +236,7 @@ void_send(PG_FUNCTION_ARGS)
 	PG_RETURN_BYTEA_P(pq_endtypsend(&buf));
 }
 
+
 /*
  * shell_in		- input routine for "shell" types (those not yet filled in).
  */
@@ -418,3 +419,4 @@ PSEUDOTYPE_DUMMY_IO_FUNCS(internal);
 PSEUDOTYPE_DUMMY_IO_FUNCS(opaque);
 PSEUDOTYPE_DUMMY_IO_FUNCS(anyelement);
 PSEUDOTYPE_DUMMY_IO_FUNCS(anynonarray);
+PSEUDOTYPE_DUMMY_IO_FUNCS(compression_handler);

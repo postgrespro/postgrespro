@@ -202,6 +202,7 @@ typedef enum AclObjectKind
 	ACL_KIND_EXTENSION,			/* pg_extension */
 	ACL_KIND_PUBLICATION,		/* pg_publication */
 	ACL_KIND_SUBSCRIPTION,		/* pg_subscription */
+	ACL_KIND_COMPRESSION_METHOD,/* pg_compression */
 	MAX_ACL_KIND				/* MUST BE LAST */
 } AclObjectKind;
 

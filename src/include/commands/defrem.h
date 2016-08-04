@@ -148,6 +148,12 @@ extern Oid	get_index_am_oid(const char *amname, bool missing_ok);
 extern Oid	get_am_oid(const char *amname, bool missing_ok);
 extern char *get_am_name(Oid amOid);
 
+/* commands/compressioncmds.c */
+extern ObjectAddress DefineCompressionMethod(List *names, List *parameters);
+extern void RemoveCompressionMethodById(Oid amOid);
+extern Oid get_compression_method_oid(const char *cmname, bool missing_ok);
+extern char *get_compression_method_name(Oid cmOid);
+
 /* support routines in commands/define.c */
 
 extern char *defGetString(DefElem *def);

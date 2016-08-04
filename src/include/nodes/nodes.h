@@ -497,7 +497,8 @@ typedef enum NodeTag
 	T_FdwRoutine,				/* in foreign/fdwapi.h */
 	T_IndexAmRoutine,			/* in access/amapi.h */
 	T_TsmRoutine,				/* in access/tsmapi.h */
-	T_ForeignKeyCacheInfo		/* in utils/rel.h */
+	T_ForeignKeyCacheInfo,		/* in utils/rel.h */
+	T_CompressionMethodRoutine,	/* in access/compression.h */
 } NodeTag;
 
 /*

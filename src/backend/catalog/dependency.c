@@ -28,6 +28,7 @@
 #include "catalog/pg_cast.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_collation_fn.h"
+#include "catalog/pg_compression.h"
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_constraint_fn.h"
 #include "catalog/pg_conversion.h"
@@ -173,7 +174,8 @@ static const Oid object_classes[] = {
 	PublicationRelationId,		/* OCLASS_PUBLICATION */
 	PublicationRelRelationId,	/* OCLASS_PUBLICATION_REL */
 	SubscriptionRelationId,		/* OCLASS_SUBSCRIPTION */
-	TransformRelationId			/* OCLASS_TRANSFORM */
+	TransformRelationId,		/* OCLASS_TRANSFORM */
+	CompressionMethodRelationId	/* OCLASS_COMPRESSION_METHOD */
 };
 
 
@@ -1267,6 +1269,10 @@ doDeletion(const ObjectAddress *object, int flags)
 
 		case OCLASS_STATISTIC_EXT:
 			RemoveStatisticsById(object->objectId);
+			break;
+
+		case OCLASS_COMPRESSION_METHOD:
+			RemoveCompressionMethodById(object->objectId);
 			break;
 
 		default:
@@ -2446,6 +2452,9 @@ getObjectClass(const ObjectAddress *object)
 
 		case TransformRelationId:
 			return OCLASS_TRANSFORM;
+
+		case CompressionMethodRelationId:
+			return OCLASS_COMPRESSION_METHOD;
 	}
 
 	/* shouldn't get here */
