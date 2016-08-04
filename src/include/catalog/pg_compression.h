@@ -59,4 +59,14 @@ typedef FormData_pg_compression *Form_pg_compression;
  * ----------------
  */
 
+DATA(insert OID = 3451 (  json_null		json_null_cm_handler	0 ));
+DESCR("json null compression method");
+#define JSON_NULL_CM_OID 3451
+DATA(insert OID = 3452 (  jsonb_null	jsonb_null_cm_handler	0 ));
+DESCR("jsonb null compression method");
+#define JSONB_NULL_CM_OID 3452
+DATA(insert OID = 3403 (  jsonb			jsonb_handler			0 ));
+DESCR("jsonb compression method");
+#define JSONB_CM_OID 3403
+
 #endif   /* PG_COMPRESSION_H */

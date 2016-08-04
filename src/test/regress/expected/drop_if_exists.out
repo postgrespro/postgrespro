@@ -232,6 +232,11 @@ DROP ACCESS METHOD no_such_am;
 ERROR:  access method "no_such_am" does not exist
 DROP ACCESS METHOD IF EXISTS no_such_am;
 NOTICE:  access method "no_such_am" does not exist, skipping
+-- compression method
+DROP COMPRESSION METHOD no_such_cm;
+ERROR:  compression method "no_such_cm" does not exist
+DROP COMPRESSION METHOD IF EXISTS no_such_cm;
+NOTICE:  compression method "no_such_cm" does not exist, skipping
 -- drop the table
 DROP TABLE IF EXISTS test_exists;
 DROP TABLE test_exists;

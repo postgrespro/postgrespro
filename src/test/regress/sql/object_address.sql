@@ -133,6 +133,8 @@ SELECT pg_get_object_address('publication', '{one}', '{}');
 SELECT pg_get_object_address('publication', '{one,two}', '{}');
 SELECT pg_get_object_address('subscription', '{one}', '{}');
 SELECT pg_get_object_address('subscription', '{one,two}', '{}');
+SELECT pg_get_object_address('compression method', '{one}', '{}');
+SELECT pg_get_object_address('compression method', '{one,two}', '{}');
 
 -- test successful cases
 WITH objects (type, name, args) AS (VALUES
@@ -187,7 +189,8 @@ WITH objects (type, name, args) AS (VALUES
 				('publication', '{addr_pub}', '{}'),
 				('publication relation', '{addr_nsp, gentable}', '{addr_pub}'),
 				('subscription', '{addr_sub}', '{}'),
-				('statistics', '{addr_nsp, gentable_stat}', '{}')
+				('statistics', '{addr_nsp, gentable_stat}', '{}'),
+				('compression method', '{jsonb}', '{}')
         )
 SELECT (pg_identify_object(addr1.classid, addr1.objid, addr1.objsubid)).*,
 	-- test roundtrip through pg_identify_object_as_address

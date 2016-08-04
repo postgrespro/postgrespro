@@ -721,12 +721,11 @@ JsonToJsonValue(Json *json, JsonValue *jv)
 	return JsonValueInitBinary(jv, &json->root);
 }
 
-#define JSON_FLATTEN_INTO_TARGET
-/*
+/* #define JSON_FLATTEN_INTO_TARGET */
+
 #define JSON_FLATTEN_INTO_JSONEXT
 #define JSON_FLATTEN_INTO_JSONB
 #define flatContainerOps &jsonbContainerOps
-*/
 
 #ifdef JSON_FLATTEN_INTO_JSONEXT
 typedef struct varatt_extended_json

@@ -27,13 +27,13 @@
 #ifdef JSON_FLATTEN_INTO_TARGET
 # define JsonxGetDatum(json)	\
 		PointerGetDatum(cstring_to_text(JsonToCString(JsonRoot(json))))
-#else
+#elif defined(JSON_FLATTEN_EOH_INTO_TARGET)
 # define JsonxGetDatum(json)	JsontGetDatum(json)
 #endif
 
 #include "utils/json_generic.h"
 
-#ifndef JSON_FLATTEN_INTO_TARGET
+#ifdef JSON_FLATTEN_EOH_INTO_TARGET
 static inline Datum
 JsontGetDatum(Json *json)
 {

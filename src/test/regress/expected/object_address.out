@@ -358,6 +358,10 @@ SELECT pg_get_object_address('subscription', '{one}', '{}');
 ERROR:  subscription "one" does not exist
 SELECT pg_get_object_address('subscription', '{one,two}', '{}');
 ERROR:  name list length must be exactly 1
+SELECT pg_get_object_address('compression method', '{one}', '{}');
+ERROR:  compression method "one" does not exist
+SELECT pg_get_object_address('compression method', '{one,two}', '{}');
+ERROR:  name list length must be exactly 1
 -- test successful cases
 WITH objects (type, name, args) AS (VALUES
 				('table', '{addr_nsp, gentable}'::text[], '{}'::text[]),
@@ -411,7 +415,8 @@ WITH objects (type, name, args) AS (VALUES
 				('publication', '{addr_pub}', '{}'),
 				('publication relation', '{addr_nsp, gentable}', '{addr_pub}'),
 				('subscription', '{addr_sub}', '{}'),
-				('statistics', '{addr_nsp, gentable_stat}', '{}')
+				('statistics', '{addr_nsp, gentable_stat}', '{}'),
+				('compression method', '{jsonb}', '{}')
         )
 SELECT (pg_identify_object(addr1.classid, addr1.objid, addr1.objsubid)).*,
 	-- test roundtrip through pg_identify_object_as_address
@@ -460,6 +465,7 @@ SELECT (pg_identify_object(addr1.classid, addr1.objid, addr1.objsubid)).*,
  operator family           | pg_catalog | integer_ops       | pg_catalog.integer_ops USING btree                                   | t
  policy                    |            |                   | genpol on addr_nsp.gentable                                          | t
  statistics                | addr_nsp   | gentable_stat     | addr_nsp.gentable_stat                                               | t
+ compression method        |            | jsonb             | jsonb                                                                | t
  collation                 | pg_catalog | "default"         | pg_catalog."default"                                                 | t
  transform                 |            |                   | for integer on language sql                                          | t
  text search dictionary    | addr_nsp   | addr_ts_dict      | addr_nsp.addr_ts_dict                                                | t
@@ -469,7 +475,7 @@ SELECT (pg_identify_object(addr1.classid, addr1.objid, addr1.objsubid)).*,
  subscription              |            | addr_sub          | addr_sub                                                             | t
  publication               |            | addr_pub          | addr_pub                                                             | t
  publication relation      |            |                   | gentable in publication addr_pub                                     | t
-(46 rows)
+(47 rows)
 
 ---
 --- Cleanup resources

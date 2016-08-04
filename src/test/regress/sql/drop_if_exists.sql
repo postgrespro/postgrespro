@@ -231,6 +231,10 @@ DROP OPERATOR FAMILY IF EXISTS test_operator_family USING no_such_am;
 DROP ACCESS METHOD no_such_am;
 DROP ACCESS METHOD IF EXISTS no_such_am;
 
+-- compression method
+DROP COMPRESSION METHOD no_such_cm;
+DROP COMPRESSION METHOD IF EXISTS no_such_cm;
+
 -- drop the table
 
 DROP TABLE IF EXISTS test_exists;

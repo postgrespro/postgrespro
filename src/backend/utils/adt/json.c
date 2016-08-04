@@ -68,7 +68,7 @@
 #ifdef JSON_FLATTEN_INTO_TARGET
 # define JsonxGetDatum(json)	\
 		PointerGetDatum(cstring_to_text(JsonToCString(JsonRoot(json))))
-#else
+#elif defined(JSON_FLATTEN_EOH_INTO_TARGET)
 # define JsonxGetDatum(json)	JsontGetDatum(json)
 #endif
 
@@ -95,7 +95,7 @@
 #include "utils/typcache.h"
 #include "utils/syscache.h"
 
-#ifndef JSON_FLATTEN_INTO_TARGET
+#ifdef JSON_FLATTEN_EOH_INTO_TARGET
 static inline Datum
 JsontGetDatum(Json *json)
 {
@@ -3032,3 +3032,28 @@ jsontContainerOps =
 	jsontToString,
 	JsonCopyFlat,
 };
+
+static Datum
+jsontCompress(Datum value, CompressionOptions options)
+{
+	Json *json = DatumGetJsont(value);
+	char *str = JsonToCString(JsonRoot(json));
+	text *text = cstring_to_text(str);
+	pfree(str);
+	return PointerGetDatum(text);
+}
+
+Datum
+json_null_cm_handler(PG_FUNCTION_ARGS)
+{
+	CompressionMethodRoutine *cmr = makeNode(CompressionMethodRoutine);
+
+	cmr->flags = CM_EXTENDED_REPRESENTATION;
+	cmr->options = NULL;
+	cmr->addAttr = NULL;
+	cmr->dropAttr = NULL;
+	cmr->compress = jsontCompress;
+	cmr->decompress = NULL;
+
+	PG_RETURN_POINTER(cmr);
+}

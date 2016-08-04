@@ -78,6 +78,7 @@ test: updatable_views
 test: rolenames
 test: roleattributes
 test: create_am
+test: create_cm
 test: sanity_check
 test: errors
 test: select

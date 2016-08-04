@@ -15,12 +15,14 @@
 #include "miscadmin.h"
 #include "access/compression.h"
 #include "access/hash.h"
+#include "catalog/pg_type.h"
 #include "catalog/pg_collation.h"
 #include "miscadmin.h"
 #include "utils/builtins.h"
 #define JSONB_UTIL_C
 #include "utils/jsonb.h"
 #include "utils/json_generic.h"
+#include "utils/lsyscache.h"
 #include "utils/memutils.h"
 #include "utils/varlena.h"
 
@@ -2155,3 +2157,96 @@ jsonbContainerOps =
 	JsonbToCStringRaw,
 	JsonCopyFlat,
 };
+
+static void
+jsonbAddAttr(Form_pg_attribute attr, List *options)
+{
+	if (getBaseType(attr->atttypid) != JSONOID)
+		elog(ERROR, "jsonb compression method is only applicable to json type");
+
+	if (options != NIL)
+		elog(ERROR, "jsonb compression method has no options");
+}
+
+static Datum
+jsonbCompressJsont(Datum value, CompressionOptions options)
+{
+#ifdef JSON_FULL_DECOMPRESSION
+	text	   *js = DatumGetTextP(value);
+	JsonValue  *jv = JsonValueFromCString(VARDATA(js), VARSIZE(js) - VARHDRSZ);
+	Jsonb	   *jb = JsonbValueToJsonb(jv);
+	pfree(jv);
+#else
+	Json	   *json = DatumGetJsont(value);
+	JsonValue	jv;
+	Jsonb	   *jb = JsonValueToJsonb(JsonToJsonValue(json, &jv));
+	JsonFreeIfCopy(json, value);
+#endif
+	return PointerGetDatum(jb);
+}
+
+static Datum
+jsonbCompressJsonb(Datum value, CompressionOptions options)
+{
+#ifdef JSON_FULL_DECOMPRESSION
+	Jsonb	   *jb = DatumGetJsonb(value);
+#else
+	Json	   *json = DatumGetJsonb(value);
+	JsonValue	jv;
+	Jsonb	   *jb = JsonValueToJsonb(JsonToJsonValue(json, &jv));
+	JsonFreeIfCopy(json, value);
+#endif
+	return PointerGetDatum(jb);
+}
+
+static Datum
+jsonbDecompress(Datum value, CompressionOptions options)
+{
+#ifdef JSON_FULL_DECOMPRESSION
+	JsonContainerData	jsc;
+	char			   *json;
+	Datum				text;
+
+	jsonbInit(&jsc, value);
+
+	json = JsonToCString(&jsc);
+	text = PointerGetDatum(cstring_to_text(json));
+
+	pfree(json);
+
+	return text;
+#else
+	Json *json = DatumGetJsonb(value);
+	return JsonGetDatum(json);
+#endif
+}
+
+Datum
+jsonb_null_cm_handler(PG_FUNCTION_ARGS)
+{
+	CompressionMethodRoutine *cmr = makeNode(CompressionMethodRoutine);
+
+	cmr->flags = CM_EXTENDED_REPRESENTATION;
+	cmr->options = NULL;
+	cmr->addAttr = NULL;
+	cmr->dropAttr = NULL;
+	cmr->compress = jsonbCompressJsonb;
+	cmr->decompress = NULL;
+
+	PG_RETURN_POINTER(cmr);
+}
+
+Datum
+jsonb_handler(PG_FUNCTION_ARGS)
+{
+	CompressionMethodRoutine *cmr = makeNode(CompressionMethodRoutine);
+
+	cmr->flags = CM_EXTENDED_REPRESENTATION;
+	cmr->options = NULL;
+	cmr->addAttr = jsonbAddAttr;
+	cmr->dropAttr = NULL;
+	cmr->compress = jsonbCompressJsont;
+	cmr->decompress = jsonbDecompress;
+
+	PG_RETURN_POINTER(cmr);
+}
