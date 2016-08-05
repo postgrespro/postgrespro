@@ -51,6 +51,13 @@ typedef enum					/* type categories for datum_to_jsonb */
 	JSONBTYPE_OTHER				/* all else */
 } JsonbTypeCategory;
 
+typedef enum
+{
+	JsonFormatCanonical,
+	JsonFormatNormal,
+	JsonFormatIndented
+} JsonFormat;
+
 typedef struct JsonbAggState
 {
 	JsonbInState *res;
@@ -85,7 +92,8 @@ static void datum_to_jsonb(Datum val, bool is_null, JsonbInState *result,
 			   bool key_scalar);
 static void add_jsonb(Datum val, bool is_null, JsonbInState *result,
 		  Oid val_type, bool key_scalar);
-static char *JsonbToCStringWorker(StringInfo out, JsonbContainer *in, int estimated_len, bool indent);
+static char *JsonbToCStringWorker(StringInfo out, JsonbContainer *in,
+								  int estimated_len, JsonFormat format);
 static void add_indent(StringInfo out, bool indent, int level);
 
 /*
@@ -399,7 +407,7 @@ jsonb_in_scalar(void *pstate, char *token, JsonTokenType tokentype)
 char *
 JsonbToCString(StringInfo out, JsonbContainer *in, int estimated_len)
 {
-	return JsonbToCStringWorker(out, in, estimated_len, false);
+	return JsonbToCStringWorker(out, in, estimated_len, JsonFormatNormal);
 }
 
 /*
@@ -408,14 +416,21 @@ JsonbToCString(StringInfo out, JsonbContainer *in, int estimated_len)
 char *
 JsonbToCStringIndent(StringInfo out, JsonbContainer *in, int estimated_len)
 {
-	return JsonbToCStringWorker(out, in, estimated_len, true);
+	return JsonbToCStringWorker(out, in, estimated_len, JsonFormatIndented);
+}
+
+char *
+JsonbToCStringCanonical(StringInfo out, JsonbContainer *in, int estimated_len)
+{
+	return JsonbToCStringWorker(out, in, estimated_len, JsonFormatCanonical);
 }
 
 /*
  * common worker for above two functions
  */
 static char *
-JsonbToCStringWorker(StringInfo out, JsonbContainer *in, int estimated_len, bool indent)
+JsonbToCStringWorker(StringInfo out, JsonbContainer *in, int estimated_len,
+					 JsonFormat format)
 {
 	bool		first = true;
 	JsonbIterator *it;
@@ -425,7 +440,8 @@ JsonbToCStringWorker(StringInfo out, JsonbContainer *in, int estimated_len, bool
 	bool		redo_switch = false;
 
 	/* If we are indenting, don't add a space after a comma */
-	int			ispaces = indent ? 1 : 2;
+	int			ispaces = format == JsonFormatNormal ? 2 : 1;
+	bool		indent = format == JsonFormatIndented;
 
 	/*
 	 * Don't indent the very first item. This gets set to the indent flag at
