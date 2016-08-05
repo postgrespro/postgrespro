@@ -782,7 +782,7 @@ const wchar_t* make_wc_name(const char* name) {
 const char* make_utf8_path(const wchar_t* s) {
 	int len;
 	size_t size = (size_t)wcslen(s) + 1;
-	char *p = (char*)malloc(size * sizeof(wchar_t));
+	char *p = (char*)malloc(size * 6);
 	len = WideCharToMultiByte(CP_UTF8,0,s,size,p,size * sizeof(wchar_t),NULL,NULL);
 	return p;
 }
