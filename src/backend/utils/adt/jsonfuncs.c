@@ -1768,7 +1768,7 @@ each_worker_jsonb(FunctionCallInfo fcinfo, const char *funcname, bool as_text)
 				/* Not in text mode, just return the Jsonb */
 				Jsonb	   *val = JsonbValueToJsonb(&v);
 
-				values[1] = PointerGetDatum(val);
+				values[1] = JsonbGetDatum(val);
 			}
 
 			tuple = heap_form_tuple(ret_tdesc, values, nulls);
@@ -2041,7 +2041,7 @@ elements_worker_jsonb(FunctionCallInfo fcinfo, const char *funcname,
 			{
 				Jsonb	   *val = JsonbValueToJsonb(&v);
 
-				values[0] = PointerGetDatum(val);
+				values[0] = JsonbGetDatum(val);
 			}
 			else
 			{
@@ -3904,7 +3904,7 @@ jsonb_strip_nulls(PG_FUNCTION_ARGS)
 	bool		last_was_key = false;
 
 	if (JB_ROOT_IS_SCALAR(jb))
-		PG_RETURN_POINTER(jb);
+		PG_RETURN_JSONB(jb);
 
 	it = JsonbIteratorInit(&jb->root);
 
@@ -3941,7 +3941,7 @@ jsonb_strip_nulls(PG_FUNCTION_ARGS)
 
 	Assert(res != NULL);
 
-	PG_RETURN_POINTER(JsonbValueToJsonb(res));
+	PG_RETURN_JSONB(JsonbValueToJsonb(res));
 }
 
 /*
