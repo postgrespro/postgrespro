@@ -11,7 +11,7 @@
     <para>This release is based on <productname>PostgreSQL</productname>
       9.5.4</para>
     <para>Major enhancement over the <productname>PostgresPro</productname>
-      9.5.4.1 include:</para>
+      9.5.3.2 include:</para>
     <itemizedlist>
       <listitem>
         <para>Changed the distance semantic of the FTS phrase operator: less-or-equal
