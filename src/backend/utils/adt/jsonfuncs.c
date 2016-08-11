@@ -1426,7 +1426,7 @@ get_jsonb_path_all(FunctionCallInfo fcinfo, bool as_text)
 		{
 			PG_RETURN_TEXT_P(cstring_to_text(JsonbToCString(NULL,
 															container,
-															VARSIZE(jb))));
+															JsonbGetSize(jb))));
 		}
 		else
 		{
@@ -1523,8 +1523,8 @@ get_jsonb_path_all(FunctionCallInfo fcinfo, bool as_text)
 	if (as_text)
 	{
 		PG_RETURN_TEXT_P(cstring_to_text(JsonbToCString(NULL,
-														&res->root,
-														VARSIZE(res))));
+														JsonbRoot(res),
+														JsonbGetSize(res))));
 	}
 	else
 	{
@@ -3995,7 +3995,7 @@ jsonb_pretty(PG_FUNCTION_ARGS)
 	Jsonb	   *jb = PG_GETARG_JSONB(0);
 	StringInfo	str = makeStringInfo();
 
-	JsonbToCStringIndent(str, &jb->root, VARSIZE(jb));
+	JsonbToCStringIndent(str, JsonbRoot(jb), JsonbGetSize(jb));
 
 	PG_RETURN_TEXT_P(cstring_to_text_with_len(str->data, str->len));
 }
@@ -4006,7 +4006,7 @@ jsonb_canonical(PG_FUNCTION_ARGS)
 	Jsonb	   *jb = PG_GETARG_JSONB(0);
 	StringInfo	str = makeStringInfo();
 
-	JsonbToCStringCanonical(str, &jb->root, VARSIZE(jb));
+	JsonbToCStringCanonical(str, JsonbRoot(jb), JsonbGetSize(jb));
 
 	PG_RETURN_TEXT_P(cstring_to_text_with_len(str->data, str->len));
 }
