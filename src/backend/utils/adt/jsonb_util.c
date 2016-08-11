@@ -82,8 +82,6 @@ static void convertJsonbArray(StringInfo buffer, JEntry *header, const JsonbValu
 static void convertJsonbObject(StringInfo buffer, JEntry *header, const JsonbValue *val, int level);
 static void convertJsonbScalar(StringInfo buffer, JEntry *header, const JsonbValue *scalarVal);
 
-static int	reserveFromBuffer(StringInfo buffer, int len);
-static void appendToBuffer(StringInfo buffer, const char *data, int len);
 static void copyToBuffer(StringInfo buffer, int offset, const char *data, int len);
 static short padBufferToInt(StringInfo buffer);
 
@@ -1426,7 +1424,7 @@ compareJsonbScalarValue(const JsonbValue *aScalar, const JsonbValue *bScalar)
  * Returns the offset to the reserved area. The caller is expected to fill
  * the reserved area later with copyToBuffer().
  */
-static int
+int
 reserveFromBuffer(StringInfo buffer, int len)
 {
 	int			offset;
@@ -1461,7 +1459,7 @@ copyToBuffer(StringInfo buffer, int offset, const char *data, int len)
 /*
  * A shorthand for reserveFromBuffer + copyToBuffer.
  */
-static void
+void
 appendToBuffer(StringInfo buffer, const char *data, int len)
 {
 	int			offset;
