@@ -321,15 +321,16 @@ typedef struct JsonbIterator JsonbIterator;
 
 /* Support functions */
 extern int	compareJsonbContainers(JsonbContainer *a, JsonbContainer *b);
-extern JsonbValue *findJsonbValueFromContainer(JsonbContainer *sheader,
+extern JsonbValue *findJsonbValueFromContainer(const JsonbContainer *sheader,
 							uint32 flags,
 							JsonbValue *key);
 extern JsonbValue *getIthJsonbValueFromContainer(JsonbContainer *sheader,
 							  uint32 i);
 extern JsonbValue *pushJsonbValue(JsonbParseState **pstate,
-			   JsonbIteratorToken seq, JsonbValue *jbVal);
+								  JsonbIteratorToken seq,
+								  const JsonbValue *jbVal);
 extern JsonbValue *pushScalarJsonbValue(JsonbParseState **pstate,
-										   JsonbValue *jbval, bool isKey);
+										const JsonbValue *jbval, bool isKey);
 extern JsonbParseState *JsonbParseStateClone(JsonbParseState *state);
 extern JsonbIterator *JsonbIteratorInit(JsonbContainer *container);
 extern JsonbIteratorToken JsonbIteratorNext(JsonbIterator **it, JsonbValue *val,
