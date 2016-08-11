@@ -68,7 +68,6 @@ typedef struct JsonbAggState
 } JsonbAggState;
 
 static inline Datum jsonb_from_cstring(char *json, int len);
-static size_t checkStringLen(size_t len);
 static void jsonb_in_object_start(void *pstate);
 static void jsonb_in_object_end(void *pstate);
 static void jsonb_in_array_start(void *pstate);
@@ -255,18 +254,6 @@ jsonb_from_cstring(char *json, int len)
 	PG_RETURN_JSONB(JsonbValueToJsonb(state.res));
 }
 
-static size_t
-checkStringLen(size_t len)
-{
-	if (len > JENTRY_OFFLENMASK)
-		ereport(ERROR,
-				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
-				 errmsg("string too long to represent as jsonb string"),
-				 errdetail("Due to an implementation restriction, jsonb strings cannot exceed %d bytes.",
-						   JENTRY_OFFLENMASK)));
-
-	return len;
-}
 
 static void
 jsonb_in_object_start(void *pstate)
@@ -308,7 +295,7 @@ jsonb_in_object_field_start(void *pstate, char *fname, bool isnull)
 
 	Assert(fname != NULL);
 	v.type = jbvString;
-	v.val.string.len = checkStringLen(strlen(fname));
+	v.val.string.len = strlen(fname);
 	v.val.string.val = fname;
 
 	_state->res = pushJsonbValue(&_state->parseState, WJB_KEY, &v);
@@ -357,7 +344,7 @@ jsonb_in_scalar(void *pstate, char *token, JsonTokenType tokentype)
 		case JSON_TOKEN_STRING:
 			Assert(token != NULL);
 			v.type = jbvString;
-			v.val.string.len = checkStringLen(strlen(token));
+			v.val.string.len = strlen(token);
 			v.val.string.val = token;
 			break;
 		case JSON_TOKEN_NUMBER:
@@ -899,7 +886,7 @@ datum_to_jsonb(Datum val, bool is_null, JsonbInState *result,
 			default:
 				outputstr = OidOutputFunctionCall(outfuncoid, val);
 				jb.type = jbvString;
-				jb.val.string.len = checkStringLen(strlen(outputstr));
+				jb.val.string.len = strlen(outputstr);
 				jb.val.string.val = outputstr;
 				break;
 		}
