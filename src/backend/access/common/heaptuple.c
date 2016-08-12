@@ -229,6 +229,8 @@ heap_fill_tuple(TupleDesc tupleDesc,
 													  att[i]->attalign);
 					data_length = EOH_get_flat_size(eoh);
 					EOH_flatten_into(eoh, data, data_length);
+					if (VARATT_IS_EXTERNAL(data))
+						*infomask |= HEAP_HASEXTERNAL;
 				}
 				else
 				{
@@ -747,8 +749,12 @@ heap_form_tuple(TupleDesc tupleDescriptor,
 			if (!tupleDescriptor->tdcmroutines)
 				break;
 		}
-		else if (/* XXX compress && */
-				 OidIsValid(tupleDescriptor->attrs[i]->attcompression))
+		else if ((OidIsValid(tupleDescriptor->attrs[i]->attcompression) ||
+				  (tupleDescriptor->attrs[i]->attlen == -1 &&
+				   OidIsValid(tupleDescriptor->attrs[i]->attrelid) &&
+				   tupleDescriptor->tdcmroutines &&
+				   tupleDescriptor->tdcmroutines[i] &&
+				   VARATT_IS_EXTERNAL(DatumGetPointer(values[i])))))
 		{
 			if (!oldValues)
 			{

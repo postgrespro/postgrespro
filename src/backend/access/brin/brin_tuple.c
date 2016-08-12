@@ -175,6 +175,7 @@ brin_form_tuple(BrinDesc *brdesc, BlockNumber blkno, BrinMemTuple *tuple,
 	/* Assert that hoff fits in the space available */
 	Assert((rettuple->bt_info & BRIN_OFFSET_MASK) == hoff);
 
+	/* FIXME compressed/extended attributes */
 	/*
 	 * The infomask and null bitmap as computed by heap_fill_tuple are useless
 	 * to us.  However, that function will not accept a null infomask; and we

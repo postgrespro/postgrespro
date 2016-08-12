@@ -81,7 +81,23 @@ index_form_tuple(TupleDesc tupleDescriptor,
 			untoasted_values[i] =
 				PointerGetDatum(heap_tuple_fetch_attr((struct varlena *)
 												DatumGetPointer(values[i])));
-			untoasted_free[i] = true;
+
+			if (untoasted_values[i] != values[i])
+				untoasted_free[i] = true;
+
+			if (VARATT_IS_EXTERNAL_EXTENDED(DatumGetPointer(values[i])))
+			{
+				untoasted_values[i] = PointerGetDatum(
+						tuple_compress_attr(tupleDescriptor, i, values[i]));
+
+				Assert(untoasted_values[i] != values[i]);
+
+				if (untoasted_values[i] != values[i])
+				{
+					untoasted_free[i] = true;
+					Assert(!VARATT_IS_EXTERNAL(untoasted_values[i]));
+				}
+			}
 		}
 
 		/*

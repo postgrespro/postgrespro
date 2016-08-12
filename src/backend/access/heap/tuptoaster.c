@@ -220,7 +220,11 @@ heap_tuple_untoast_attr(struct varlena * attr)
 		 */
 		attr = heap_tuple_fetch_attr(attr);
 		/* flatteners are not allowed to produce compressed/short output */
-		Assert(!VARATT_IS_EXTENDED(attr));
+		Assert(!VARATT_IS_EXTENDED(attr) || VARATT_IS_EXTERNAL_EXTENDED(attr));
+	}
+	else if (VARATT_IS_EXTERNAL_EXTENDED(attr))
+	{
+		/* This is an extended datum --- return it */
 	}
 	else if (VARATT_IS_COMPRESSED(attr))
 	{
@@ -438,6 +442,10 @@ toast_datum_size(Datum value)
 	else if (VARATT_IS_EXTERNAL_EXPANDED(attr))
 	{
 		result = EOH_get_flat_size(DatumGetEOHP(value));
+	}
+	else if (VARATT_IS_EXTERNAL_EXTENDED(attr))
+	{
+		result = VARSIZE_ANY(attr);
 	}
 	else if (VARATT_IS_SHORT(attr))
 	{
@@ -672,6 +680,8 @@ toast_insert_or_update(Relation rel, TupleDesc newtupdesc, HeapTuple newtup,
 		 */
 		if (att[i]->attlen == -1)
 		{
+			bool need_compress = false;
+
 			/*
 			 * If the table's attribute says PLAIN always, force it so.
 			 */
@@ -688,37 +698,65 @@ toast_insert_or_update(Relation rel, TupleDesc newtupdesc, HeapTuple newtup,
 			 */
 			if (VARATT_IS_EXTERNAL(new_value))
 			{
-				toast_oldexternal[i] = new_value;
-				if (att[i]->attstorage == 'p')
-					new_value = heap_tuple_untoast_attr(new_value);
+				if (VARATT_IS_EXTERNAL_EXPANDED(new_value))
+				{
+					Assert(recompress[i]);
+					need_compress = true;
+				}
 				else
-					new_value = heap_tuple_fetch_attr(new_value);
-				toast_values[i] = PointerGetDatum(new_value);
-				toast_free[i] = true;
-				need_change = true;
-				need_free = true;
+				{
+					struct varlena *untoasted_value =
+							att[i]->attstorage == 'p'
+								? heap_tuple_untoast_attr(new_value)
+								: heap_tuple_fetch_attr(new_value);
+
+					if (untoasted_value != new_value)
+					{
+						toast_oldexternal[i] = new_value;
+						new_value = untoasted_value;
+						toast_values[i] = PointerGetDatum(new_value);
+						toast_free[i] = true;
+						need_change = true;
+						need_free = true;
+					}
+
+					if (VARATT_IS_EXTERNAL_EXTENDED(new_value))
+					{
+						Assert(recompress[i] ||
+							   !OidIsValid(newtupdesc->attrs[i]->attrelid));
+
+						if (!recompress[i] || !OidIsValid(att[i]->attcompression))
+							need_compress = true;
+					}
+				}
 			}
 
 			if (recompress[i])
 			{
 				if (OidIsValid(att[i]->attcompression))
+					need_compress = true;
+				else
+					need_change = true;
+			}
+
+			if (need_compress)
+			{
+				struct varlena *compressed_value = (struct varlena *)
+						tuple_compress_attr(tupleDesc, i,
+											PointerGetDatum(new_value));
+
+				if (compressed_value != new_value)
 				{
-					struct varlena * compressed_value = (struct varlena *)
-							tuple_compress_attr(tupleDesc, i,
-												PointerGetDatum(new_value));
-					if (compressed_value != new_value)
-					{
-						new_value = compressed_value;
-						toast_oldexternal[i] = NULL;
-						if (toast_free[i])
-							pfree(DatumGetPointer(toast_values[i]));
-						toast_values[i] = PointerGetDatum(new_value);
-						toast_free[i] = true;
-						need_free = true;
-						Assert(!VARATT_IS_EXTERNAL(new_value));
-					}
+					new_value = compressed_value;
+					toast_oldexternal[i] = NULL;
+					if (toast_free[i])
+						pfree(DatumGetPointer(toast_values[i]));
+					toast_values[i] = PointerGetDatum(new_value);
+					toast_free[i] = true;
+					need_free = true;
+					need_change = true;
+					Assert(!VARATT_IS_EXTERNAL(new_value));
 				}
-				need_change = true;
 			}
 
 			/*
@@ -1254,9 +1292,33 @@ toast_flatten_tuple_to_datum(HeapTupleHeader tup,
 			if (VARATT_IS_EXTERNAL(new_value) ||
 				VARATT_IS_COMPRESSED(new_value))
 			{
-				new_value = heap_tuple_untoast_attr(new_value);
-				toast_values[i] = PointerGetDatum(new_value);
-				toast_free[i] = true;
+				struct varlena *untoasted_value =
+						heap_tuple_untoast_attr(new_value);
+				if (untoasted_value != new_value)
+				{
+					new_value = untoasted_value;
+					toast_values[i] = PointerGetDatum(new_value);
+					toast_free[i] = true;
+				}
+			}
+
+			if (OidIsValid(att[i]->attcompression) ||
+				(att[i]->attlen == -1 &&
+				 OidIsValid(att[i]->attrelid) &&
+				 VARATT_IS_EXTERNAL_EXTENDED(DatumGetPointer(new_value))))
+			{
+				void *compressed_value = DatumGetPointer(
+					tuple_compress_attr(tupleDesc, i,
+										PointerGetDatum(new_value)));
+
+				if (compressed_value != new_value)
+				{
+					if (toast_free[i])
+						pfree(DatumGetPointer(toast_values[i]));
+					new_value = compressed_value;
+					toast_values[i] = PointerGetDatum(new_value);
+					toast_free[i] = true;
+				}
 			}
 		}
 	}
