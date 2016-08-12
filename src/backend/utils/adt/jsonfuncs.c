@@ -29,6 +29,7 @@
 #include "utils/json.h"
 #include "utils/jsonapi.h"
 #include "utils/jsonb.h"
+#include "utils/json_generic.h"
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
 #include "utils/syscache.h"
@@ -438,12 +439,6 @@ static Datum populate_array(ArrayIOData	   *aio, const char *colname,
 							MemoryContext	mcxt, JsValue *jsv);
 static Datum populate_domain(DomainIOData   *io, Oid typid,	const char *colname,
 							 MemoryContext	mcxt, JsValue *jsv,	bool isnull);
-
-/* Worker that takes care of common setup for us */
-static JsonbValue *findJsonbValueFromContainerLen(JsonbContainer *container,
-							   uint32 flags,
-							   char *key,
-							   uint32 keylen);
 
 /* functions supporting jsonb_delete, jsonb_set and jsonb_concat */
 static JsonbValue *IteratorConcat(JsonbIterator **it1, JsonbIterator **it2,
@@ -1467,10 +1462,13 @@ get_jsonb_path_all(FunctionCallInfo fcinfo, bool as_text)
 				uint32		nelements;
 
 				/* Container must be array, but make sure */
+
 				if (!JsonContainerIsArray(container))
 					elog(ERROR, "not a jsonb array");
 
-				nelements = JsonContainerSize(container);
+				nelements = JsonContainerSize(container) >= 0 ?
+							JsonContainerSize(container) :
+							JsonGetArraySize(container);
 
 				if (-lindex > nelements)
 					PG_RETURN_NULL();
@@ -2801,7 +2799,7 @@ populate_scalar(ScalarIOData *io, Oid typid, int32 typmod, JsValue *jsv)
 			 * to json string, preserving quotes around top-level strings.
 			 */
 			Jsonb *jsonb = JsonbValueToJsonb(jbv);
-			str = JsonbToCString(NULL, &jsonb->root, VARSIZE(jsonb));
+			str = JsonbToCString(NULL, &jsonb->root, -1);
 		}
 		else if (jbv->type == jbvString) /* quotes are stripped */
 			str = pnstrdup(jbv->val.string.val, jbv->val.string.len);
@@ -3232,7 +3230,7 @@ populate_record_worker(FunctionCallInfo fcinfo, const char *funcname,
 		/* fill binary jsonb value pointing to jb */
 		jbv.type = jbvBinary;
 		jbv.val.binary.data = &jb->root;
-		jbv.val.binary.len = VARSIZE(jb) - VARHDRSZ;
+		jbv.val.binary.len = jb->root.len;
 	}
 
 	rettuple = populate_composite(&cache->io, tupType, tupTypmod,
@@ -3739,22 +3737,6 @@ populate_recordset_object_field_end(void *state, char *fname, bool isnull)
 		/* must have had a scalar instead */
 		hashentry->val = _state->saved_scalar;
 	}
-}
-
-/*
- * findJsonbValueFromContainer() wrapper that sets up JsonbValue key string.
- */
-static JsonbValue *
-findJsonbValueFromContainerLen(JsonbContainer *container, uint32 flags,
-							   char *key, uint32 keylen)
-{
-	JsonbValue	k;
-
-	k.type = jbvString;
-	k.val.string.val = key;
-	k.val.string.len = keylen;
-
-	return findJsonbValueFromContainer(container, flags, &k);
 }
 
 /*
