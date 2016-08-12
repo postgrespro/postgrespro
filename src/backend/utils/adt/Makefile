@@ -17,6 +17,7 @@ OBJS = acl.o amutils.o arrayfuncs.o array_expanded.o array_selfuncs.o \
 	geo_ops.o geo_selfuncs.o geo_spgist.o inet_cidr_ntop.o inet_net_pton.o \
 	int.o int8.o json.o jsonb.o jsonb_gin.o jsonb_op.o jsonb_util.o \
 	jsonfuncs.o json_generic.o json_gin.o json_op.o \
+	jsonbc_util.o jsonbc_dict.o \
 	like.o lockfuncs.o mac.o mac8.o misc.o nabstime.o name.o \
 	network.o network_gist.o network_selfuncs.o network_spgist.o \
 	numeric.o numutils.o oid.o oracle_compat.o \

@@ -41,6 +41,7 @@
 #include "catalog/pg_foreign_data_wrapper.h"
 #include "catalog/pg_foreign_server.h"
 #include "catalog/pg_init_privs.h"
+#include "catalog/pg_jsonbc_dict.h"
 #include "catalog/pg_language.h"
 #include "catalog/pg_largeobject.h"
 #include "catalog/pg_namespace.h"
@@ -81,6 +82,7 @@
 #include "storage/lmgr.h"
 #include "utils/fmgroids.h"
 #include "utils/guc.h"
+#include "utils/jsonbc_dict.h"
 #include "utils/lsyscache.h"
 #include "utils/syscache.h"
 #include "utils/tqual.h"
@@ -175,7 +177,8 @@ static const Oid object_classes[] = {
 	PublicationRelRelationId,	/* OCLASS_PUBLICATION_REL */
 	SubscriptionRelationId,		/* OCLASS_SUBSCRIPTION */
 	TransformRelationId,		/* OCLASS_TRANSFORM */
-	CompressionMethodRelationId	/* OCLASS_COMPRESSION_METHOD */
+	CompressionMethodRelationId,/* OCLASS_COMPRESSION_METHOD */
+	JsonbcDictionaryRelationId	/* OCLASS_JSONBC_DICT */
 };
 
 
@@ -1275,6 +1278,10 @@ doDeletion(const ObjectAddress *object, int flags)
 			RemoveCompressionMethodById(object->objectId);
 			break;
 
+		case OCLASS_JSONBC_DICT:
+			jsonbcDictRemoveEntryById(object->objectId, object->objectSubId);
+			break;
+
 		default:
 			elog(ERROR, "unrecognized object class: %u",
 				 object->classId);
@@ -2332,6 +2339,7 @@ getObjectClass(const ObjectAddress *object)
 {
 	/* only pg_class entries can have nonzero objectSubId */
 	if (object->classId != RelationRelationId &&
+		object->classId != JsonbcDictionaryRelationId &&
 		object->objectSubId != 0)
 		elog(ERROR, "invalid non-zero objectSubId for object class %u",
 			 object->classId);
@@ -2455,6 +2463,9 @@ getObjectClass(const ObjectAddress *object)
 
 		case CompressionMethodRelationId:
 			return OCLASS_COMPRESSION_METHOD;
+
+		case JsonbcDictionaryRelationId:
+			return OCLASS_JSONBC_DICT;
 	}
 
 	/* shouldn't get here */

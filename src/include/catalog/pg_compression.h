@@ -68,5 +68,8 @@ DESCR("jsonb null compression method");
 DATA(insert OID = 3403 (  jsonb			jsonb_handler			0 ));
 DESCR("jsonb compression method");
 #define JSONB_CM_OID 3403
+DATA(insert OID = 3417 (  jsonbc		jsonbc_handler			0 ));
+DESCR("jsonbc compression method");
+#define JSONBC_CM_OID 3417
 
 #endif   /* PG_COMPRESSION_H */

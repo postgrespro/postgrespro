@@ -38,28 +38,6 @@ SELECT
 	substring(js5::text for 100)
 FROM jstest;
 
--- check page items size
-CREATE EXTENSION pageinspect;
-
-SELECT
-	lp, lp_off, lp_flags, lp_len,
-	CASE lp WHEN 5 THEN NULL ELSE t_data END
-FROM
-	heap_page_items(get_raw_page('jstest', 0));
-
-SELECT
-	lp,
-	length(unnest(t_attrs)),
-	CASE lp WHEN 5 THEN NULL ELSE unnest(t_attrs) END
-FROM
-	heap_page_item_attrs(
-		get_raw_page('jstest', 0),
-		'jstest'::regclass,
-		false
-	);
-
-DROP EXTENSION pageinspect;
-
 -- copy json values with different compression
 
 INSERT INTO jstest SELECT js1, js2, js3, js4, js5 FROM jstest LIMIT 5;
@@ -76,7 +54,108 @@ SELECT
 	substring(js5::text for 100)
 FROM jstest;
 
+-- check column sizes
+SELECT
+	pg_column_size(js1),
+	pg_column_size(js2),
+	pg_column_size(js3),
+	pg_column_size(js4),
+	pg_column_size(js5)
+FROM jstest;
 
+CREATE FUNCTION jsonbc_dict_contents() RETURNS TABLE (dict name, id integer, name text)
+LANGUAGE sql AS '
+SELECT
+	c.relname dict, d.id, d.name
+FROM
+	pg_jsonbc_dict d LEFT JOIN pg_class c ON d.dict = c.oid
+ORDER BY 1, 2, 3';
+
+CREATE FUNCTION jsonbc_dict_deps() RETURNS TABLE (relname name, attnum integer, cmname name)
+LANGUAGE sql AS '
+SELECT
+	d.objid::regclass::name relname, d.objsubid attnum, c.cmname
+FROM
+	pg_depend d JOIN pg_compression c ON d.refobjid = c.oid
+WHERE
+	classid = ''pg_class''::regclass AND
+	refclassid = ''pg_compression''::regclass
+ORDER BY 1, 2';
+
+SELECT * FROM jsonbc_dict_contents();
+
+-- alter column compression methods
+
+SELECT relname, relkind FROM pg_class WHERE relname LIKE 'jstest%';
+
+ALTER TABLE jstest ALTER js1 SET COMPRESSED jsonbc;
+SELECT relname, relkind FROM pg_class WHERE relname LIKE 'jstest%';
+SELECT * FROM jsonbc_dict_contents();
+SELECT * FROM jsonbc_dict_deps() WHERE relname = 'jstest';
+
+ALTER TABLE jstest ALTER js2 SET NOT COMPRESSED;
+SELECT relname, relkind FROM pg_class WHERE relname LIKE 'jstest%';
+SELECT * FROM jsonbc_dict_contents();
+SELECT * FROM jsonbc_dict_deps() WHERE relname = 'jstest';
+
+ALTER TABLE jstest ALTER js3 SET NOT COMPRESSED;
+SELECT relname, relkind FROM pg_class WHERE relname LIKE 'jstest%';
+SELECT * FROM jsonbc_dict_contents();
+SELECT * FROM jsonbc_dict_deps() WHERE relname = 'jstest';
+
+ALTER TABLE jstest ALTER js3 SET COMPRESSED jsonb2;
+SELECT relname, relkind FROM pg_class WHERE relname LIKE 'jstest%';
+SELECT * FROM jsonbc_dict_contents();
+SELECT * FROM jsonbc_dict_deps() WHERE relname = 'jstest';
+
+ALTER TABLE jstest ADD js6 json COMPRESSED jsonbc;
+UPDATE jstest SET js6 = js1;
+SELECT relname, relkind FROM pg_class WHERE relname LIKE 'jstest%';
+SELECT * FROM jsonbc_dict_contents();
+SELECT * FROM jsonbc_dict_deps() WHERE relname = 'jstest';
+
+-- try to use existing jsonbc dictionary
+DO
+$$
+DECLARE
+	dict_id oid;
+BEGIN
+	SELECT substring(attcmoptions[1] from 9)
+	INTO STRICT dict_id
+	FROM pg_attribute
+	WHERE attrelid = (SELECT oid FROM pg_class WHERE relname = 'jstest')
+	AND attname = 'js6';
+
+	EXECUTE 'ALTER TABLE jstest ADD js7 json COMPRESSED jsonbc WITH (dict_id ''' || dict_id || ''')';
+END
+$$;
+
+SELECT relname, relkind FROM pg_class WHERE relname LIKE 'jstest%';
+SELECT * FROM jsonbc_dict_contents();
+SELECT * FROM jsonbc_dict_deps() WHERE relname = 'jstest';
+
+-- should fail
+ALTER TABLE jstest DROP js6;
+SELECT relname, relkind FROM pg_class WHERE relname LIKE 'jstest%';
+SELECT * FROM jsonbc_dict_contents();
+SELECT * FROM jsonbc_dict_deps() WHERE relname = 'jstest';
+
+ALTER TABLE jstest ALTER js6 SET NOT COMPRESSED;
+ALTER TABLE jstest DROP js6;
+SELECT relname, relkind FROM pg_class WHERE relname LIKE 'jstest%';
+SELECT * FROM jsonbc_dict_contents();
+SELECT * FROM jsonbc_dict_deps() WHERE relname = 'jstest';
+
+ALTER TABLE jstest ALTER js7 SET COMPRESSED jsonb2;
+SELECT relname, relkind FROM pg_class WHERE relname LIKE 'jstest%';
+SELECT * FROM jsonbc_dict_contents();
+SELECT * FROM jsonbc_dict_deps() WHERE relname = 'jstest';
+
+-- manually drop remaining dictionary
+DROP SEQUENCE jstest_js6_jsonbc_dict_seq;
+SELECT relname, relkind FROM pg_class WHERE relname LIKE 'jstest%';
+SELECT * FROM jsonbc_dict_contents();
+SELECT * FROM jsonbc_dict_deps() WHERE relname = 'jstest';
 
 -- Try to drop compression method: fail because of dependent objects
 DROP COMPRESSION METHOD jsonb2;
@@ -87,6 +166,11 @@ DROP COMPRESSION METHOD jsonb2 CASCADE;
 SELECT * FROM jstest LIMIT 0;
 
 DROP TABLE jstest;
+
+SELECT relname, relkind FROM pg_class WHERE relname LIKE 'jstest%';
+
+SELECT * FROM jsonbc_dict_contents();
+SELECT * FROM jsonbc_dict_deps() WHERE relname = 'jstest';
 
 -- Test ALTER TYPE SET COMPRESSED
 ALTER TYPE json SET COMPRESSED jsonb;

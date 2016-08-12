@@ -1179,6 +1179,7 @@ EventTriggerSupportsObjectClass(ObjectClass objclass)
 		case OCLASS_SUBSCRIPTION:
 		case OCLASS_STATISTIC_EXT:
 		case OCLASS_COMPRESSION_METHOD:
+		case OCLASS_JSONBC_DICT:
 			return true;
 	}
 

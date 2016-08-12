@@ -166,10 +166,11 @@ typedef enum ObjectClass
 	OCLASS_PUBLICATION_REL,		/* pg_publication_rel */
 	OCLASS_SUBSCRIPTION,		/* pg_subscription */
 	OCLASS_TRANSFORM,			/* pg_transform */
-	OCLASS_COMPRESSION_METHOD	/* pg_compression */
+	OCLASS_COMPRESSION_METHOD,	/* pg_compression */
+	OCLASS_JSONBC_DICT			/* pg_jsonbc_dict */
 } ObjectClass;
 
-#define LAST_OCLASS		OCLASS_COMPRESSION_METHOD
+#define LAST_OCLASS		OCLASS_JSONBC_DICT
 
 /* flag bits for performDeletion/performMultipleDeletions: */
 #define PERFORM_DELETION_INTERNAL			0x0001		/* internal action */

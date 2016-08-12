@@ -124,6 +124,7 @@ pg_foreign_table|t
 pg_index|t
 pg_inherits|t
 pg_init_privs|t
+pg_jsonbc_dict|t
 pg_language|t
 pg_largeobject|t
 pg_largeobject_metadata|t

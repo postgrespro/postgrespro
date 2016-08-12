@@ -44,6 +44,7 @@
 #include "catalog/pg_foreign_data_wrapper.h"
 #include "catalog/pg_foreign_server.h"
 #include "catalog/pg_foreign_table.h"
+#include "catalog/pg_jsonbc_dict.h"
 #include "catalog/pg_language.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_opclass.h"
@@ -991,7 +992,29 @@ static const struct cachedesc cacheinfo[] = {
 			0
 		},
 		2
-	}
+	},
+	{JsonbcDictionaryRelationId,	/* JSONBCDICTID */
+			JsonbcDictionaryIdIndexId,
+			2,
+			{
+					Anum_pg_jsonbc_dict_dict,
+					Anum_pg_jsonbc_dict_id,
+					0,
+					0,
+			},
+			128
+	},
+	{JsonbcDictionaryRelationId,	/* JSONBCDICTNAME */
+			JsonbcDictionaryNameIndexId,
+			2,
+			{
+					Anum_pg_jsonbc_dict_dict,
+					Anum_pg_jsonbc_dict_name,
+					0,
+					0,
+			},
+			128
+	},
 };
 
 #define SysCacheSize	((int) lengthof(cacheinfo))

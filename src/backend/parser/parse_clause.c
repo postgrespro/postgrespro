@@ -24,6 +24,7 @@
 #include "catalog/pg_am.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_constraint_fn.h"
+#include "catalog/pg_jsonbc_dict.h"
 #include "catalog/pg_type.h"
 #include "commands/defrem.h"
 #include "nodes/makefuncs.h"
@@ -3116,7 +3117,8 @@ transformOnConflictArbiter(ParseState *pstate,
 	 * To simplify certain aspects of its design, speculative insertion into
 	 * system catalogs is disallowed
 	 */
-	if (IsCatalogRelation(pstate->p_target_relation))
+	if (IsCatalogRelation(pstate->p_target_relation) &&
+		pstate->p_target_relation->rd_id != JsonbcDictionaryRelationId)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 		   errmsg("ON CONFLICT is not supported with system catalog tables"),
