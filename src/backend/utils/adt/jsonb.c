@@ -74,7 +74,9 @@ static void jsonb_in_object_end(void *pstate);
 static void jsonb_in_array_start(void *pstate);
 static void jsonb_in_array_end(void *pstate);
 static void jsonb_in_object_field_start(void *pstate, char *fname, bool isnull);
+#ifndef JSON_C
 static void jsonb_put_escaped_value(StringInfo out, JsonbValue *scalarVal);
+#endif
 static void jsonb_in_scalar(void *pstate, char *token, JsonTokenType tokentype);
 static void jsonb_categorize_type(Oid typoid,
 					  JsonbTypeCategory *tcategory,
@@ -92,9 +94,11 @@ static void datum_to_jsonb(Datum val, bool is_null, JsonbInState *result,
 			   bool key_scalar);
 static void add_jsonb(Datum val, bool is_null, JsonbInState *result,
 		  Oid val_type, bool key_scalar);
+#ifndef JSON_C
 static char *JsonbToCStringWorker(StringInfo out, JsonbContainer *in,
 								  int estimated_len, JsonFormat format);
 static void add_indent(StringInfo out, bool indent, int level);
+#endif
 
 /*
  * jsonb type input function
@@ -222,6 +226,7 @@ jsonb_typeof(PG_FUNCTION_ARGS)
 	PG_RETURN_TEXT_P(cstring_to_text(result));
 }
 
+#ifndef JSON_C
 JsonbValue *
 JsonValueFromCString(char *json, int len)
 {
@@ -247,6 +252,7 @@ JsonValueFromCString(char *json, int len)
 	/* after parsing, the item member has the composed jsonb structure */
 	return state.res;
 }
+#endif
 
 /*
  * jsonb_from_cstring
@@ -307,6 +313,7 @@ jsonb_in_object_field_start(void *pstate, char *fname, bool isnull)
 	_state->res = pushJsonbValue(&_state->parseState, WJB_KEY, &v);
 }
 
+#ifndef JSON_C
 static void
 jsonb_put_escaped_value(StringInfo out, JsonbValue *scalarVal)
 {
@@ -333,7 +340,7 @@ jsonb_put_escaped_value(StringInfo out, JsonbValue *scalarVal)
 			elog(ERROR, "unknown jsonb scalar type");
 	}
 }
-
+#endif
 
 /*
  * For jsonb we always want the de-escaped value - that's what's in token
@@ -386,6 +393,7 @@ jsonb_in_scalar(void *pstate, char *token, JsonTokenType tokentype)
 	_state->res = pushScalarJsonbValue(&_state->parseState, &v, false);
 }
 
+#ifndef JSON_C
 /*
  * JsonbToCString
  *	   Converts jsonb value to a C-string.
@@ -559,7 +567,7 @@ add_indent(StringInfo out, bool indent, int level)
 			appendBinaryStringInfo(out, "    ", 4);
 	}
 }
-
+#endif
 
 /*
  * Determine how we want to render values of a given type in datum_to_jsonb.
@@ -833,7 +841,10 @@ datum_to_jsonb(Datum val, bool is_null, JsonbInState *result,
 				}
 				break;
 			case JSONBTYPE_JSONCAST:
+#ifndef JSON_GENERIC
 			case JSONBTYPE_JSON:
+
+#endif
 				{
 					/* parse the json right into the existing result object */
 					JsonLexContext *lex;
@@ -857,9 +868,18 @@ datum_to_jsonb(Datum val, bool is_null, JsonbInState *result,
 
 				}
 				break;
+#ifdef JSON_GENERIC
+			case JSONBTYPE_JSON:
+#endif
 			case JSONBTYPE_JSONB:
 				{
+#ifndef JSON_GENERIC
 					Jsonb	   *jsonb = DatumGetJsonb(val);
+#else
+					Jsonb	   *jsonb = tcategory == JSONBTYPE_JSON
+											? DatumGetJsont(val)
+											: DatumGetJsonb(val);
+#endif
 					JsonbIterator *it;
 
 					it = JsonbIteratorInit(&jsonb->root);

@@ -314,7 +314,11 @@ Datum
 json_to_tsvector_byid(PG_FUNCTION_ARGS)
 {
 	Oid					cfgId = PG_GETARG_OID(0);
+#ifndef JSON_GENERIC
 	text				*json = PG_GETARG_TEXT_P(1);
+#else
+	Jsonb				*json = DatumGetJsont(PG_GETARG_DATUM(1));
+#endif
 	TSVectorBuildState	state;
 	ParsedText			*prs = (ParsedText *) palloc(sizeof(ParsedText));
 
@@ -323,7 +327,11 @@ json_to_tsvector_byid(PG_FUNCTION_ARGS)
 	state.cfgId = cfgId;
 	state.prs = prs;
 
+#ifndef JSON_GENERIC
 	iterate_json_string_values(json, &state, (JsonIterateStringValuesAction) add_to_tsvector);
+#else
+	iterate_jsonb_string_values(json, &state, (JsonIterateStringValuesAction) add_to_tsvector);
+#endif
 
 	PG_FREE_IF_COPY(json, 1);
 	if (state.result == NULL)
