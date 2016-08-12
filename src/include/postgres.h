@@ -104,6 +104,17 @@ typedef struct varatt_expanded
 	ExpandedObjectHeader *eohptr;
 } varatt_expanded;
 
+typedef struct varatt_extended_hdr
+{
+	uint32	size;
+} varatt_extended_hdr;
+
+typedef struct varatt_extended
+{
+	varatt_extended_hdr	hdr;
+	char				data[FLEXIBLE_ARRAY_MEMBER];
+} varatt_extended;
+
 /*
  * Type tag for the various sorts of "TOAST pointer" datums.  The peculiar
  * value for VARTAG_ONDISK comes from a requirement for on-disk compatibility
@@ -114,6 +125,7 @@ typedef enum vartag_external
 	VARTAG_INDIRECT = 1,
 	VARTAG_EXPANDED_RO = 2,
 	VARTAG_EXPANDED_RW = 3,
+	VARTAG_EXTENDED = 4,
 	VARTAG_ONDISK = 18
 } vartag_external;
 
@@ -121,10 +133,15 @@ typedef enum vartag_external
 #define VARTAG_IS_EXPANDED(tag) \
 	(((tag) & ~1) == VARTAG_EXPANDED_RO)
 
-#define VARTAG_SIZE(tag) \
+#define VARTAG_SIZE_EXTENDED(dataSize) \
+	(/*offsetof(varatt_extended, data) +*/ (dataSize))
+
+#define VARTAG_SIZE(tag, ptr) \
 	((tag) == VARTAG_INDIRECT ? sizeof(varatt_indirect) : \
 	 VARTAG_IS_EXPANDED(tag) ? sizeof(varatt_expanded) : \
 	 (tag) == VARTAG_ONDISK ? sizeof(varatt_external) : \
+	 (tag) == VARTAG_EXTENDED ? VARTAG_SIZE_EXTENDED( \
+			 ReadUnalignedUInt32(&((varatt_extended *)(ptr))->hdr.size)) : \
 	 TrapMacro(true, "unrecognized TOAST vartag"))
 
 /*
@@ -232,6 +249,14 @@ typedef struct
 #define SET_VARTAG_1B_E(PTR,tag) \
 	(((varattrib_1b_e *) (PTR))->va_header = 0x80, \
 	 ((varattrib_1b_e *) (PTR))->va_tag = (tag))
+
+#define ReadUnalignedUInt16(ptr) \
+	((uint16)(((const uint8 *)(ptr))[1] | \
+			 (((const uint8 *)(ptr))[0] << 8)))
+
+#define ReadUnalignedUInt32(ptr) \
+	((uint32)(ReadUnalignedUInt16((const uint8 *)(ptr) + 2) | \
+			 (ReadUnalignedUInt16(ptr) << 16)))
 #else							/* !WORDS_BIGENDIAN */
 
 #define VARATT_IS_4B(PTR) \
@@ -264,6 +289,15 @@ typedef struct
 #define SET_VARTAG_1B_E(PTR,tag) \
 	(((varattrib_1b_e *) (PTR))->va_header = 0x01, \
 	 ((varattrib_1b_e *) (PTR))->va_tag = (tag))
+
+#define ReadUnalignedUInt16(ptr) \
+	((uint16)(((const uint8 *)(ptr))[0] | \
+			 (((const uint8 *)(ptr))[1] << 8)))
+
+#define ReadUnalignedUInt32(ptr) \
+	((uint32)(ReadUnalignedUInt16(ptr) | \
+			 (ReadUnalignedUInt16((const uint8 *)(ptr) + 2) << 16)))
+
 #endif   /* WORDS_BIGENDIAN */
 
 #define VARHDRSZ_SHORT			offsetof(varattrib_1b, va_data)
@@ -307,7 +341,9 @@ typedef struct
 #define VARDATA_SHORT(PTR)					VARDATA_1B(PTR)
 
 #define VARTAG_EXTERNAL(PTR)				VARTAG_1B_E(PTR)
-#define VARSIZE_EXTERNAL(PTR)				(VARHDRSZ_EXTERNAL + VARTAG_SIZE(VARTAG_EXTERNAL(PTR)))
+#define VARSIZE_EXTERNAL(PTR)				(VARHDRSZ_EXTERNAL + \
+											 VARTAG_SIZE(VARTAG_EXTERNAL(PTR), \
+														 VARDATA_EXTERNAL(PTR)))
 #define VARDATA_EXTERNAL(PTR)				VARDATA_1B_E(PTR)
 
 #define VARATT_IS_COMPRESSED(PTR)			VARATT_IS_4B_C(PTR)
@@ -322,6 +358,9 @@ typedef struct
 	(VARATT_IS_EXTERNAL(PTR) && VARTAG_EXTERNAL(PTR) == VARTAG_EXPANDED_RW)
 #define VARATT_IS_EXTERNAL_EXPANDED(PTR) \
 	(VARATT_IS_EXTERNAL(PTR) && VARTAG_IS_EXPANDED(VARTAG_EXTERNAL(PTR)))
+#define VARATT_IS_EXTERNAL_EXTENDED(PTR) \
+	(VARATT_IS_EXTERNAL(PTR) && VARTAG_EXTERNAL(PTR) == VARTAG_EXTENDED)
+
 #define VARATT_IS_SHORT(PTR)				VARATT_IS_1B(PTR)
 #define VARATT_IS_EXTENDED(PTR)				(!VARATT_IS_4B_U(PTR))
 
