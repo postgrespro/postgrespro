@@ -228,7 +228,7 @@ typedef struct
 #define JB_ROOT_IS_ARRAY(jbp_)	((*(uint32 *) VARDATA(jbp_) & JB_FARRAY) != 0)
 
 
-enum jbvType
+typedef enum jbvType
 {
 	/* Scalar types */
 	jbvNull = 0x0,
@@ -240,7 +240,7 @@ enum jbvType
 	jbvObject,
 	/* Binary (i.e. struct Jsonb) jbvArray/jbvObject */
 	jbvBinary
-};
+} JsonbValueType;
 
 /*
  * JsonbValue:	In-memory representation of Jsonb.  This is a convenient
