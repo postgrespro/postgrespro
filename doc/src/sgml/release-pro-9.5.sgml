@@ -23,7 +23,7 @@
           predecence than <literal>&amp;</literal> (AND) operator.</para>
       </listitem>
     </itemizedlist>
-    <para>On Microsoft Windows platforms:</para>
+    <para>On Microsoft Windows systems:</para>
     <itemizedlist>
       <listitem>
         <para>The WinEditLine library is integrated to implement autocomplete
