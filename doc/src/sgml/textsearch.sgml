@@ -295,35 +295,6 @@ SELECT 'fat cats ate fat rats'::tsvector @@ to_tsquery('fat &amp; rat');
    </para>
 
    <para>
-    Phrase search is made possible with the help of the <literal>&lt;-&gt;</>
-    (FOLLOWED BY) operator, which enforces lexeme order. This allows you
-    to discard strings not containing the desired phrase, for example:
-
-<programlisting>
-SELECT q @@ to_tsquery('fatal &lt;-&gt; error')
-FROM unnest(array[to_tsvector('fatal error'),
-                  to_tsvector('error is not fatal')]) AS q;
- ?column?
-----------
- t
- f
-</programlisting>
-
-    A more generic version of the FOLLOWED BY operator takes form of
-    <literal>&lt;N&gt;</>, where N stands for the greatest allowed distance
-    between the specified lexemes. The <literal>phraseto_tsquery</>
-    function makes use of this behavior in order to construct a
-    <literal>tsquery</> capable of matching the provided phrase:
-
-<programlisting>
-SELECT phraseto_tsquery('cat ate some rats');
-       phraseto_tsquery
--------------------------------
- ( 'cat' &lt;-&gt; 'ate' ) &lt;2&gt; 'rat'
-</programlisting>
-   </para>
-
-   <para>
     The <literal>@@</literal> operator also
     supports <type>text</type> input, allowing explicit conversion of a text
     string to <type>tsvector</type> or <type>tsquery</> to be skipped
