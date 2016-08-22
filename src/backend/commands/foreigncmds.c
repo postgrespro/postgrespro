@@ -61,7 +61,7 @@ static void import_error_callback(void *arg);
  * processing, hence any validation should be done before this
  * conversion.
  */
-static Datum
+Datum
 optionListToArray(List *options)
 {
 	ArrayBuildState *astate = NULL;

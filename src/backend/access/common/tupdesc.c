@@ -24,10 +24,12 @@
 #include "catalog/pg_collation.h"
 #include "catalog/pg_type.h"
 #include "commands/defrem.h"
+#include "commands/tablecmds.h"
 #include "miscadmin.h"
 #include "parser/parse_type.h"
 #include "utils/acl.h"
 #include "utils/builtins.h"
+#include "utils/datum.h"
 #include "utils/resowner_private.h"
 #include "utils/syscache.h"
 
@@ -91,7 +93,7 @@ CreateTemplateTupleDesc(int natts, bool hasoid)
 	 */
 	desc->natts = natts;
 	desc->constr = NULL;
-	desc->tdcmroutines = NULL;
+	desc->tdcompression = NULL;
 	desc->tdtypeid = RECORDOID;
 	desc->tdtypmod = -1;
 	desc->tdhasoid = hasoid;
@@ -125,13 +127,42 @@ CreateTupleDesc(int natts, bool hasoid, Form_pg_attribute *attrs)
 	desc->attrs = attrs;
 	desc->natts = natts;
 	desc->constr = NULL;
-	desc->tdcmroutines = NULL;
+	desc->tdcompression = NULL;
 	desc->tdtypeid = RECORDOID;
 	desc->tdtypmod = -1;
 	desc->tdhasoid = hasoid;
 	desc->tdrefcount = -1;		/* assume not reference-counted */
 
 	return desc;
+}
+
+static AttributeCompression *
+TupleDescCopyCompression(TupleDesc tupdesc)
+{
+	AttributeCompression   *src = tupdesc->tdcompression;
+	AttributeCompression   *dst = (AttributeCompression *)
+									palloc0(sizeof(*dst) * tupdesc->natts);
+	int						i;
+
+	for (i = 0; i < tupdesc->natts; i++)
+		if (src[i].routine)
+		{
+			dst[i].routine = palloc(sizeof(*dst[i].routine));
+
+			memcpy(dst[i].routine, src[i].routine, sizeof(*dst[i].routine));
+
+			if (DatumGetPointer(src[i].optionsDatum) != NULL)
+				dst[i].optionsDatum = datumCopy(src[i].optionsDatum, false, -1);
+			else
+				dst[i].optionsDatum = src[i].optionsDatum;
+
+			dst[i].options = src[i].routine->options &&
+							 src[i].routine->options->copy ?
+							 src[i].routine->options->copy(src[i].options) :
+							 src[i].options;
+		}
+
+	return dst;
 }
 
 /*
@@ -160,6 +191,9 @@ CreateTupleDescCopy(TupleDesc tupdesc)
 	desc->tdtypeid = tupdesc->tdtypeid;
 	desc->tdtypmod = tupdesc->tdtypmod;
 
+	if (tupdesc->tdcompression)
+		desc->tdcompression = TupleDescCopyCompression(tupdesc);
+
 	return desc;
 }
 
@@ -173,7 +207,6 @@ CreateTupleDescCopyConstr(TupleDesc tupdesc)
 {
 	TupleDesc	desc;
 	TupleConstr *constr = tupdesc->constr;
-	CompressionMethodRoutine **cmroutines = tupdesc->tdcmroutines;
 	int			i;
 
 	desc = CreateTemplateTupleDesc(tupdesc->natts, tupdesc->tdhasoid);
@@ -218,20 +251,8 @@ CreateTupleDescCopyConstr(TupleDesc tupdesc)
 		desc->constr = cpy;
 	}
 
-	if (cmroutines)
-	{
-		CompressionMethodRoutine **cmrs = (CompressionMethodRoutine **)
-				palloc0(sizeof(*cmrs) * tupdesc->natts);
-
-		for (i = 0; i < tupdesc->natts; i++)
-			if (cmroutines[i])
-			{
-				cmrs[i] = palloc(sizeof(**cmrs));
-				memcpy(cmrs[i], cmroutines[i], sizeof(**cmrs));
-			}
-
-		desc->tdcmroutines = cmrs;
-	}
+	if (tupdesc->tdcompression)
+		desc->tdcompression = TupleDescCopyCompression(tupdesc);
 
 	desc->tdtypeid = tupdesc->tdtypeid;
 	desc->tdtypmod = tupdesc->tdtypmod;
@@ -279,6 +300,7 @@ TupleDescCopyEntry(TupleDesc dst, AttrNumber dstAttno,
 	dst->attrs[dstAttno - 1]->attnotnull = false;
 	dst->attrs[dstAttno - 1]->atthasdef = false;
 	dst->attrs[dstAttno - 1]->attidentity = '\0';
+	dst->attrs[dstAttno - 1]->attcompression = InvalidOid;
 }
 
 /*
@@ -324,12 +346,20 @@ FreeTupleDesc(TupleDesc tupdesc)
 		pfree(tupdesc->constr);
 	}
 
-	if (tupdesc->tdcmroutines)
+	if (tupdesc->tdcompression)
 	{
 		for (i = 0; i < tupdesc->natts; i++)
-			if (tupdesc->tdcmroutines[i])
-				pfree(tupdesc->tdcmroutines[i]);
-		pfree(tupdesc->tdcmroutines);
+			if (tupdesc->tdcompression[i].routine)
+			{
+				CompressionMethodRoutine *cmr = tupdesc->tdcompression[i].routine;
+
+				if (cmr->options && cmr->options->free)
+					cmr->options->free(tupdesc->tdcompression[i].options);
+
+				pfree(cmr);
+			}
+
+		pfree(tupdesc->tdcompression);
 	}
 
 	pfree(tupdesc);
@@ -506,8 +536,33 @@ equalTupleDescs(TupleDesc tupdesc1, TupleDesc tupdesc2)
 	else if (tupdesc2->constr != NULL)
 		return false;
 
-	if (tupdesc1->tdcmroutines != tupdesc2->tdcmroutines) /* FIXME compare cmroutines[*] */
+	if ((tupdesc1->tdcompression == NULL) != (tupdesc2->tdcompression == NULL))
 		return false;
+
+	if (tupdesc1->tdcompression == NULL)
+		return true;
+
+	for (i = 0; i < tupdesc1->natts; i++)
+	{
+		AttributeCompression 		*ac1 = &tupdesc1->tdcompression[i];
+		AttributeCompression		*ac2 = &tupdesc2->tdcompression[i];
+		CompressionMethodRoutine	*cmr1 = ac1->routine;
+		CompressionMethodRoutine	*cmr2 = ac2->routine;
+
+		if (!cmr1 != !cmr2)
+			return false;
+
+		if (!cmr1)
+			continue;
+
+		if (memcmp(cmr1, cmr2, sizeof(*cmr1)))
+			return false;
+
+		if (cmr1->options && cmr1->options->equal
+				? !cmr1->options->equal(ac1->options, ac2->options)
+				: ac1->options != ac2->options)
+			return false;
+	}
 
 	return true;
 }
@@ -702,6 +757,27 @@ TupleDescInitEntryCollation(TupleDesc desc,
 	desc->attrs[attributeNumber - 1]->attcollation = collationid;
 }
 
+void
+TupleDescInitAttrCompression(TupleDesc desc,
+							 AttrNumber attnum,
+							 CompressionMethodRoutine *cmr,
+							 List *optionsList,
+							 Datum optionsDatum)
+{
+	AttributeCompression *ac;
+
+	if (!desc->tdcompression)
+		desc->tdcompression = (AttributeCompression *)
+				palloc0(desc->natts * sizeof(AttributeCompression));
+
+	ac = &desc->tdcompression[attnum - 1];
+
+	ac->routine = cmr;
+	ac->optionsDatum = optionsDatum;
+	ac->options = cmr->options && cmr->options->convert ?
+				  cmr->options->convert(desc->attrs[attnum - 1], optionsList) :
+				  optionsList;
+}
 
 /*
  * BuildDescForRelation
@@ -737,8 +813,11 @@ BuildDescForRelation(List *schema)
 
 	foreach(l, schema)
 	{
-		ColumnDef  *entry = lfirst(l);
-		AclResult	aclresult;
+		ColumnDef				   *entry = lfirst(l);
+		AclResult					aclresult;
+		CompressionMethodRoutine   *cmroutine;
+		List					   *cmoptionsList;
+		Datum						cmoptionsDatum;
 
 		/*
 		 * for each entry in the list, get the name and type information from
@@ -777,21 +856,15 @@ BuildDescForRelation(List *schema)
 		desc->attrs[attnum - 1]->attislocal = entry->is_local;
 		desc->attrs[attnum - 1]->attinhcount = entry->inhcount;
 
-		if (entry->compression)
-		{
-			/* Get compression method OID, throwing an error if it doesn't exist. */
-			Oid cmoid = GetCompressionMethodOid(entry->compression->methodName,
-												false);
-			CompressionMethodRoutine *cmr =
-					GetCompressionMethodRoutineByCmId(cmoid);
+		/* entry->compression is handled in subsequent ALTER TABLE statement */
+		GetAttributeCompression(NULL,
+								desc->attrs[attnum - 1],
+								&desc->attrs[attnum - 1]->attcompression,
+								&cmroutine, &cmoptionsList, &cmoptionsDatum);
 
-			desc->attrs[attnum - 1]->attcompression = cmoid;
-
-			if (cmr->addAttr)
-				(*cmr->addAttr)(desc->attrs[attnum - 1]);
-
-			/* TODO attcmoptions */
-		}
+		if (OidIsValid(desc->attrs[attnum - 1]->attcompression))
+			TupleDescInitAttrCompression(desc, attnum, cmroutine,
+										 cmoptionsList, cmoptionsDatum);
 	}
 
 	if (has_not_null)

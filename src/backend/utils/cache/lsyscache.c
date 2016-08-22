@@ -952,6 +952,37 @@ get_atttypetypmodcoll(Oid relid, AttrNumber attnum,
 	ReleaseSysCache(tp);
 }
 
+/*
+ * get_attcmoptions
+ *
+ *  	Given the relation id and the attribute number,
+ *		return the "attcmoptions" field from the attribute relation.
+ */
+Datum
+get_attcmoptions(Oid relid, AttrNumber attnum)
+{
+	HeapTuple	tp;
+	Datum		opts;
+	bool		isnull;
+
+	tp = SearchSysCache2(ATTNUM,
+						 ObjectIdGetDatum(relid),
+						 Int16GetDatum(attnum));
+
+	if (!HeapTupleIsValid(tp))
+		elog(ERROR, "cache lookup failed for attribute %d of relation %u",
+			 attnum, relid);
+
+	opts = SysCacheGetAttr(ATTNUM, tp, Anum_pg_attribute_attcmoptions, &isnull);
+
+	if (!isnull)
+		opts = datumCopy(opts, false, -1);
+
+	ReleaseSysCache(tp);
+
+	return isnull ? PointerGetDatum(NULL) : opts;
+}
+
 /*				---------- COLLATION CACHE ----------					 */
 
 /*

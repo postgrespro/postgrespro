@@ -583,7 +583,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 %type <partrange_datum>	PartitionRangeDatum
 %type <list>		range_datum_list
 
-%type <node>	optColumnCompression
+%type <node>	columnCompression optColumnCompression
 
 /*
  * Non-keyword token types.  These are hard-wired into the "flex" lexer.
@@ -2177,6 +2177,24 @@ alter_table_cmd:
 					n->missing_ok = true;
 					$$ = (Node *)n;
 				}
+			/* ALTER TABLE <name> ALTER [COLUMN] <colname> SET COMPRESSED <cm> [WITH (<options>)] */
+			| ALTER opt_column ColId SET columnCompression
+				{
+					AlterTableCmd *n = makeNode(AlterTableCmd);
+					n->subtype = AT_AlterColumnCompression;
+					n->name = $3;
+					n->def = $5;
+					$$ = (Node *)n;
+				}
+			/* ALTER TABLE <name> ALTER [COLUMN] <colname> SET NOT COMPRESSED */
+			| ALTER opt_column ColId SET NOT COMPRESSED
+				{
+					AlterTableCmd *n = makeNode(AlterTableCmd);
+					n->subtype = AT_AlterColumnCompression;
+					n->name = $3;
+					n->def = NULL;
+					$$ = (Node *)n;
+				}
 			/* ALTER TABLE <name> DROP [COLUMN] IF EXISTS <colname> [RESTRICT|CASCADE] */
 			| DROP opt_column IF_P EXISTS ColId opt_drop_behavior
 				{
@@ -3310,7 +3328,7 @@ columnOptions:	ColId ColQualList
 				}
 		;
 
-optColumnCompression:
+columnCompression:
 			COMPRESSED name optCompressionParameters
 				{
 					ColumnCompression *n = makeNode(ColumnCompression);
@@ -3318,6 +3336,10 @@ optColumnCompression:
 					n->options = (List *) $3;
 					$$ = (Node *) n;
 				}
+		;
+
+optColumnCompression:
+			columnCompression
 			| /*EMPTY*/	{ $$ = NULL; }
 		;
 

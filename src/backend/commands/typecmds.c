@@ -2110,7 +2110,7 @@ DefineCompositeType(RangeVar *typevar, List *coldeflist)
 	 * Finally create the relation.  This also creates the type.
 	 */
 	DefineRelation(createStmt, RELKIND_COMPOSITE_TYPE, InvalidOid, &address,
-				   NULL);
+				   NULL, NULL);
 
 	return address;
 }

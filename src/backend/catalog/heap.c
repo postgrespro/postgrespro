@@ -29,8 +29,10 @@
  */
 #include "postgres.h"
 
+#include "access/compression.h"
 #include "access/htup_details.h"
 #include "access/multixact.h"
+#include "access/reloptions.h"
 #include "access/sysattr.h"
 #include "access/transam.h"
 #include "access/xact.h"
@@ -599,7 +601,8 @@ CheckAttributeType(const char *attname,
 void
 InsertPgAttributeTuple(Relation pg_attribute_rel,
 					   Form_pg_attribute new_attribute,
-					   CatalogIndexState indstate)
+					   CatalogIndexState indstate,
+					   Datum compressionOptions)
 {
 	Datum		values[Natts_pg_attribute];
 	bool		nulls[Natts_pg_attribute];
@@ -629,12 +632,14 @@ InsertPgAttributeTuple(Relation pg_attribute_rel,
 	values[Anum_pg_attribute_attinhcount - 1] = Int32GetDatum(new_attribute->attinhcount);
 	values[Anum_pg_attribute_attcollation - 1] = ObjectIdGetDatum(new_attribute->attcollation);
 	values[Anum_pg_attribute_attcompression - 1] = ObjectIdGetDatum(new_attribute->attcompression);
+	values[Anum_pg_attribute_attcmoptions - 1] = compressionOptions;
 
 	/* start out with empty permissions and empty options */
 	nulls[Anum_pg_attribute_attacl - 1] = true;
 	nulls[Anum_pg_attribute_attoptions - 1] = true;
 	nulls[Anum_pg_attribute_attfdwoptions - 1] = true;
-	nulls[Anum_pg_attribute_attcmoptions - 1] = true;
+	nulls[Anum_pg_attribute_attcmoptions - 1] =
+			!PointerIsValid(DatumGetPointer(compressionOptions));
 
 	tup = heap_form_tuple(RelationGetDescr(pg_attribute_rel), values, nulls);
 
@@ -682,6 +687,8 @@ AddNewAttributeTuples(Oid new_rel_oid,
 	 */
 	for (i = 0; i < natts; i++)
 	{
+		Datum compressionOptions;
+
 		attr = tupdesc->attrs[i];
 		/* Fill in the correct relation OID */
 		attr->attrelid = new_rel_oid;
@@ -689,7 +696,12 @@ AddNewAttributeTuples(Oid new_rel_oid,
 		attr->attstattarget = -1;
 		attr->attcacheoff = -1;
 
-		InsertPgAttributeTuple(rel, attr, indstate);
+		compressionOptions =
+				OidIsValid(attr->attcompression)
+					? tupdesc->tdcompression[i].optionsDatum
+					: PointerGetDatum(NULL);
+
+		InsertPgAttributeTuple(rel, attr, indstate, compressionOptions);
 
 		/* Add dependency info */
 		myself.classId = RelationRelationId;
@@ -746,7 +758,8 @@ AddNewAttributeTuples(Oid new_rel_oid,
 				attStruct.attinhcount = oidinhcount;
 			}
 
-			InsertPgAttributeTuple(rel, &attStruct, indstate);
+			InsertPgAttributeTuple(rel, &attStruct, indstate,
+								   PointerGetDatum(NULL));
 		}
 	}
 
@@ -1462,6 +1475,37 @@ DeleteRelationTuple(Oid relid)
 	heap_close(pg_class_desc, RowExclusiveLock);
 }
 
+static void
+DropAttributeCompression(HeapTuple tuple)
+{
+	Form_pg_attribute			att = (Form_pg_attribute) GETSTRUCT(tuple);
+	CompressionMethodRoutine   *cmr =
+						GetCompressionMethodRoutineByCmId(att->attcompression);
+
+	if (cmr->dropAttr)
+	{
+		List *options = NIL;
+		bool		attisdropped = att->attisdropped;
+
+		if (cmr->options)
+		{
+			bool	isnull;
+			Datum	cmoptions = SysCacheGetAttr(ATTNUM,
+												tuple,
+												Anum_pg_attribute_attcmoptions,
+												&isnull);
+			if (!isnull)
+				options = untransformRelOptions(cmoptions);
+		}
+
+		att->attisdropped = true;
+
+		cmr->dropAttr(att, options);
+
+		att->attisdropped = attisdropped;
+	}
+}
+
 /*
  *		DeleteAttributeTuples
  *
@@ -1492,7 +1536,12 @@ DeleteAttributeTuples(Oid relid)
 
 	/* Delete all the matching tuples */
 	while ((atttup = systable_getnext(scan)) != NULL)
+	{
+		if (OidIsValid(((Form_pg_attribute) GETSTRUCT(atttup))->attcompression))
+			DropAttributeCompression(atttup);
+
 		CatalogTupleDelete(attrel, &atttup->t_self);
+	}
 
 	/* Clean up after the scan */
 	systable_endscan(scan);
@@ -1585,6 +1634,33 @@ RemoveAttributeById(Oid relid, AttrNumber attnum)
 	else
 	{
 		/* Dropping user attributes is lots harder */
+		if (OidIsValid(attStruct->attcompression))
+		{
+			bool isnull;
+
+			DropAttributeCompression(tuple);
+
+			SysCacheGetAttr(ATTNUM, tuple, Anum_pg_attribute_attcmoptions, &isnull);
+
+			if (!isnull)
+			{
+				Datum	values[Natts_pg_attribute];
+				bool	nulls[Natts_pg_attribute];
+				bool	replace[Natts_pg_attribute];
+
+				memset(values, 0, sizeof(values));
+				memset(nulls, false, sizeof(nulls));
+				memset(replace, false, sizeof(replace));
+
+				nulls[Anum_pg_attribute_attcmoptions - 1] = true;
+				replace[Anum_pg_attribute_attcmoptions - 1] = true;
+
+				tuple = heap_modify_tuple(tuple, RelationGetDescr(attr_rel),
+										  values, nulls, replace);
+
+				attStruct = (Form_pg_attribute) GETSTRUCT(tuple);
+			}
+		}
 
 		/* Mark the attribute as dropped */
 		attStruct->attisdropped = true;

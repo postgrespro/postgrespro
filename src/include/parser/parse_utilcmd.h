@@ -27,5 +27,7 @@ extern void transformRuleStmt(RuleStmt *stmt, const char *queryString,
 extern List *transformCreateSchemaStmt(CreateSchemaStmt *stmt);
 extern Node *transformPartitionBound(ParseState *pstate, Relation parent,
 						Node *bound);
+extern void transformColumnCompression(ColumnDef *column, RangeVar *relation,
+									   AlterTableStmt **alterStmt);
 
 #endif   /* PARSE_UTILCMD_H */

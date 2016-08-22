@@ -14,6 +14,7 @@
 #ifndef TUPDESC_H
 #define TUPDESC_H
 
+#include "postgres.h"
 #include "access/attnum.h"
 #include "catalog/pg_attribute.h"
 #include "nodes/pg_list.h"
@@ -42,6 +43,13 @@ typedef struct tupleConstr
 	uint16		num_check;
 	bool		has_not_null;
 } TupleConstr;
+
+typedef struct
+{
+	struct CompressionMethodRoutine *routine;
+	Datum			optionsDatum;
+	const void	   *options;
+} AttributeCompression;
 
 /*
  * This struct is passed around within the backend to describe the structure
@@ -74,7 +82,7 @@ typedef struct tupleDesc
 	Form_pg_attribute *attrs;
 	/* attrs[N] is a pointer to the description of Attribute Number N+1 */
 	TupleConstr *constr;		/* constraints, or NULL if none */
-	struct CompressionMethodRoutine **tdcmroutines;
+	AttributeCompression *tdcompression;
 	Oid			tdtypeid;		/* composite type ID for tuple type */
 	int32		tdtypmod;		/* typmod for tuple type */
 	bool		tdhasoid;		/* tuple has oid attribute in its header */
@@ -130,6 +138,12 @@ extern void TupleDescInitBuiltinEntry(TupleDesc desc,
 extern void TupleDescInitEntryCollation(TupleDesc desc,
 							AttrNumber attributeNumber,
 							Oid collationid);
+
+extern void TupleDescInitAttrCompression(TupleDesc desc,
+										 AttrNumber attnum,
+										 struct CompressionMethodRoutine *cmr,
+										 List *optionsList,
+										 Datum optionsDatum);
 
 extern TupleDesc BuildDescForRelation(List *schema);
 

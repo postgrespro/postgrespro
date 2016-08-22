@@ -683,30 +683,30 @@ heap_copy_tuple_as_datum(HeapTuple tuple, TupleDesc tupleDesc)
 	return PointerGetDatum(td);
 }
 
-static inline CompressionMethodRoutine *
-TupleDescGetCompressionMethodRoutine(TupleDesc tupdesc, AttrNumber attnum)
+static inline AttributeCompression *
+TupleDescGetAttributeCompression(TupleDesc tupdesc, AttrNumber attnum)
 {
-	CompressionMethodRoutine *cmr;
-	Assert(tupdesc->tdcmroutines);
-	cmr = tupdesc->tdcmroutines[attnum];
-	Assert(cmr);
-	return cmr;
+	AttributeCompression *compression;
+	Assert(tupdesc->tdcompression);
+	compression = &tupdesc->tdcompression[attnum];
+	Assert(compression->routine);
+	return compression;
 }
 
 Datum
 tuple_compress_attr(TupleDesc tupdesc, AttrNumber attnum, Datum value)
 {
-	CompressionMethodRoutine *cmr =
-			TupleDescGetCompressionMethodRoutine(tupdesc, attnum);
-	return (*cmr->compress)(value, tupdesc->attrs[attnum]);
+	AttributeCompression *compression =
+			TupleDescGetAttributeCompression(tupdesc, attnum);
+	return compression->routine->compress(value, compression->options);
 }
 
 Datum
 tuple_decompress_attr(TupleDesc tupdesc, int attnum, Datum value)
 {
-	CompressionMethodRoutine *cmr =
-			TupleDescGetCompressionMethodRoutine(tupdesc, attnum);
-	return (*cmr->decompress)(value, tupdesc->attrs[attnum]);
+	AttributeCompression *compression =
+			TupleDescGetAttributeCompression(tupdesc, attnum);
+	return compression->routine->decompress(value, compression->options);
 }
 
 /*
@@ -746,14 +746,14 @@ heap_form_tuple(TupleDesc tupleDescriptor,
 		{
 			hasnull = true;
 
-			if (!tupleDescriptor->tdcmroutines)
+			if (!tupleDescriptor->tdcompression)
 				break;
 		}
 		else if ((OidIsValid(tupleDescriptor->attrs[i]->attcompression) ||
 				  (tupleDescriptor->attrs[i]->attlen == -1 &&
 				   OidIsValid(tupleDescriptor->attrs[i]->attrelid) &&
-				   tupleDescriptor->tdcmroutines &&
-				   tupleDescriptor->tdcmroutines[i] &&
+				   tupleDescriptor->tdcompression &&
+				   tupleDescriptor->tdcompression[i].routine &&
 				   VARATT_IS_EXTERNAL(DatumGetPointer(values[i])))))
 		{
 			if (!oldValues)

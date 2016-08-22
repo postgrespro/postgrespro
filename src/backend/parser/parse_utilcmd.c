@@ -483,6 +483,33 @@ generateSerialExtraStmts(CreateStmtContext *cxt, ColumnDef *column,
 		*sname_p = sname;
 }
 
+void
+transformColumnCompression(ColumnDef *column, RangeVar *relation,
+						   AlterTableStmt **alterStmt)
+{
+	if (column->compression)
+	{
+		AlterTableCmd *cmd;
+
+		cmd = makeNode(AlterTableCmd);
+		cmd->subtype = AT_AlterColumnCompression;
+		cmd->name = column->colname;
+		cmd->def = (Node *) column->compression;
+		cmd->behavior = DROP_RESTRICT;
+		cmd->missing_ok = false;
+
+		if (!*alterStmt)
+		{
+			*alterStmt = makeNode(AlterTableStmt);
+			(*alterStmt)->relation = relation;
+			(*alterStmt)->relkind = OBJECT_TABLE;
+			(*alterStmt)->cmds = NIL;
+		}
+
+		(*alterStmt)->cmds = lappend((*alterStmt)->cmds, cmd);
+	}
+}
+
 /*
  * transformColumnDefinition -
  *		transform a single ColumnDef within CREATE TABLE
@@ -782,6 +809,16 @@ transformColumnDefinition(CreateStmtContext *cxt, ColumnDef *column)
 		stmt->cmds = lappend(stmt->cmds, cmd);
 
 		cxt->alist = lappend(cxt->alist, stmt);
+	}
+
+	if (cxt->isalter)
+	{
+		AlterTableStmt *stmt = NULL;
+
+		transformColumnCompression(column, cxt->relation, &stmt);
+
+		if (stmt)
+			cxt->alist = lappend(cxt->alist, stmt);
 	}
 }
 

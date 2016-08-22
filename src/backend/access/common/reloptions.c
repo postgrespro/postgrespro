@@ -940,6 +940,25 @@ untransformRelOptions(Datum options)
 	return result;
 }
 
+char *
+formatRelOptions(List *options)
+{
+	StringInfoData	buf;
+	ListCell	   *cell;
+
+	initStringInfo(&buf);
+
+	foreach(cell, options)
+	{
+		DefElem    *def = (DefElem *) lfirst(cell);
+
+		appendStringInfo(&buf, "%s%s=%s", buf.len > 0 ? ", " : "",
+						 def->defname, defGetString(def));
+	}
+
+	return buf.data;
+}
+
 /*
  * Extract and parse reloptions from a pg_class tuple.
  *

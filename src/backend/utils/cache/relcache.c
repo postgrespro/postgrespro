@@ -77,6 +77,7 @@
 #include "storage/smgr.h"
 #include "utils/array.h"
 #include "utils/builtins.h"
+#include "utils/datum.h"
 #include "utils/fmgroids.h"
 #include "utils/inval.h"
 #include "utils/lsyscache.h"
@@ -495,7 +496,6 @@ RelationBuildTupleDesc(Relation relation)
 	TupleConstr *constr;
 	AttrDefault *attrdef = NULL;
 	int			ndef = 0;
-	CompressionMethodRoutine **cmroutines = NULL;
 
 	/* copy some fields from pg_class row to rd_att */
 	relation->rd_att->tdtypeid = relation->rd_rel->reltype;
@@ -570,15 +570,18 @@ RelationBuildTupleDesc(Relation relation)
 
 		if (!attp->attisdropped && OidIsValid(attp->attcompression))
 		{
-			MemoryContext oldctx = MemoryContextSwitchTo(CacheMemoryContext);
+			MemoryContext	oldctx = MemoryContextSwitchTo(CacheMemoryContext);
+			Datum			optionsDatum;
+			List		   *optionsList;
+			CompressionMethodRoutine *cmr;
 
-			if (!cmroutines)
-				cmroutines = (CompressionMethodRoutine **)
-									palloc0(relation->rd_rel->relnatts *
-											sizeof(CompressionMethodRoutine *));
+			cmr = GetCompressionMethodRoutineByCmId(attp->attcompression);
+			optionsDatum = get_attcmoptions(RelationGetRelid(relation),
+											attp->attnum);
+			optionsList = untransformRelOptions(optionsDatum);
 
-			cmroutines[attp->attnum - 1] =
-					GetCompressionMethodRoutineByCmId(attp->attcompression);
+			TupleDescInitAttrCompression(relation->rd_att, attp->attnum,
+										 cmr, optionsList, optionsDatum);
 
 			MemoryContextSwitchTo(oldctx);
 		}
@@ -656,8 +659,6 @@ RelationBuildTupleDesc(Relation relation)
 		pfree(constr);
 		relation->rd_att->constr = NULL;
 	}
-
-	relation->rd_att->tdcmroutines = cmroutines;
 }
 
 /*

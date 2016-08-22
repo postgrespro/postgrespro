@@ -209,7 +209,8 @@ DefineSequence(ParseState *pstate, CreateSeqStmt *seq)
 	stmt->tablespacename = NULL;
 	stmt->if_not_exists = seq->if_not_exists;
 
-	address = DefineRelation(stmt, RELKIND_SEQUENCE, seq->ownerId, NULL, NULL);
+	address = DefineRelation(stmt, RELKIND_SEQUENCE, seq->ownerId, NULL, NULL,
+							 NULL);
 	seqoid = address.objectId;
 	Assert(seqoid != InvalidOid);
 
