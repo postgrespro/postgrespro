@@ -27,6 +27,7 @@ typedef struct CompressionMethodOptionsRoutines
 	void				(*free)(CompressionOptions options);
 	CompressionOptions	(*copy)(CompressionOptions options);
 	bool				(*equal)(CompressionOptions o1, CompressionOptions o2);
+	Size				(*decode)(const void *buf, CompressionOptions *options);
 } CompressionMethodOptionsRoutines;
 
 typedef Datum (*CompressionRoutine)  (Datum value, CompressionOptions options);

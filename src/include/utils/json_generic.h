@@ -16,6 +16,7 @@
 #define JSON_GENERIC
 
 #include "postgres.h"
+#include "access/compression.h"
 #include "lib/stringinfo.h"
 #include "utils/expandeddatum.h"
 #include "utils/jsonb.h"
@@ -31,6 +32,7 @@ typedef struct JsonContainerData
 {
 	JsonContainerOps   *ops;
 	void			   *data;
+	void			   *options;
 	int					len;
 	int					size;
 	JsonValueType		type;
@@ -51,6 +53,13 @@ struct JsonIteratorData
 	JsonIteratorNextFunc	next;
 };
 
+typedef struct JsonCompressionOptionsOps
+{
+	Size	(*encodeOptions)(JsonContainer *, void *buf);
+	Size	(*decodeOptions)(const void *buf, CompressionOptions *);
+	bool	(*optionsAreEqual)(JsonContainer *, CompressionOptions);
+} JsonCompressionOptionsOps;
+
 typedef enum JsonContainerTypes
 {
 	JsonContainerUnknown = 0,
@@ -64,7 +73,10 @@ typedef Oid JsonContainerType;
 struct JsonContainerOps
 {
 	JsonContainerType type;
-	void			(*init)(JsonContainerData *jc, Datum value);
+	JsonCompressionOptionsOps *compressionOps;
+
+	void			(*init)(JsonContainerData *jc, Datum value,
+							CompressionOptions options);
 	JsonIterator   *(*iteratorInit)(JsonContainer *jc);
 	JsonValue	   *(*findKeyInObject)(JsonContainer *object,
 									   const JsonValue *key);
@@ -80,6 +92,7 @@ typedef struct CompressedObject
 {
 	ExpandedObjectHeader	eoh;
 	Datum					compressed;
+	CompressionOptions	   	options;
 } CompressedObject;
 
 typedef struct Json
@@ -95,7 +108,7 @@ typedef struct Json
 #endif
 
 #define JsonFlattenToJsonbDatum(json) \
-		PointerGetDatum(JsonFlatten(json, JsonbEncode, &jsonbContainerOps))
+		PointerGetDatum(JsonFlatten(json, JsonbEncode, &jsonbContainerOps, NULL))
 
 #define JsonGetEOHDatum(json)		EOHPGetRODatum(&(json)->obj.eoh)
 
@@ -115,9 +128,9 @@ typedef struct Json
 #define JsonGetDatum(json)			JsonxGetDatum(json)
 
 #undef DatumGetJsonb
-#define DatumGetJsonb(datum)		DatumGetJson(datum, &jsonbContainerOps)
-#define DatumGetJsont(datum)		DatumGetJson(datum, &jsontContainerOps)
-#define DatumGetJsonx(datum)		DatumGetJson(datum, JsonxContainerOps)
+#define DatumGetJsonb(datum)		DatumGetJson(datum, &jsonbContainerOps, NULL)
+#define DatumGetJsont(datum)		DatumGetJson(datum, &jsontContainerOps, NULL)
+#define DatumGetJsonx(datum)		DatumGetJson(datum, JsonxContainerOps, NULL)
 
 #undef PG_RETURN_JSONB
 #define PG_RETURN_JSONB(x)			PG_RETURN_DATUM(JsonGetDatum(x))
@@ -211,7 +224,8 @@ JsonIteratorNext(JsonIterator **it, JsonValue *val, bool skipNested)
 #define compareJsonbContainers			JsonCompareContainers
 #define equalsJsonbScalarValue			JsonValueScalarEquals
 
-extern Json *DatumGetJson(Datum value, JsonContainerOps *ops);
+extern Json *DatumGetJson(Datum val, JsonContainerOps *ops,
+						  CompressionOptions options);
 
 extern JsonValue *JsonFindValueInContainer(JsonContainer *json, uint32 flags,
 										   JsonValue *key);
@@ -280,24 +294,28 @@ extern JsonValue   *jsonGetArrayElement(JsonContainer *array, uint32 index);
 extern bool JsonValueScalarEquals(const JsonValue *aScalar,
 								  const JsonValue *bScalar);
 
-typedef void (*JsonValueEncoder)(StringInfo, const JsonValue *);
+typedef void (*JsonValueEncoder)(StringInfo, const JsonValue *,
+								 CompressionOptions);
 
 extern void *JsonContainerFlatten(JsonContainer *jc, JsonValueEncoder encoder,
-								  JsonContainerOps *ops, const JsonValue *binary);
+								  JsonContainerOps *ops,
+								  CompressionOptions options,
+								  const JsonValue *binary);
 
 extern void *JsonValueFlatten(const JsonValue *val, JsonValueEncoder encoder,
-							  JsonContainerOps *ops);
+							  JsonContainerOps *ops, CompressionOptions opts);
 
 static inline void *
-JsonFlatten(Json *json, JsonValueEncoder encoder, JsonContainerOps *ops)
+JsonFlatten(Json *json, JsonValueEncoder encoder, JsonContainerOps *ops,
+			CompressionOptions options)
 {
-	return JsonContainerFlatten(JsonRoot(json), encoder, ops, NULL);
+	return JsonContainerFlatten(JsonRoot(json), encoder, ops, options, NULL);
 }
 
-extern void JsonbEncode(StringInfo, const JsonValue *);
+extern void JsonbEncode(StringInfo, const JsonValue *, CompressionOptions);
 
 #define JsonValueToJsonb(val) \
-		JsonValueFlatten(val, JsonbEncode, &jsonbContainerOps)
+		JsonValueFlatten(val, JsonbEncode, &jsonbContainerOps, NULL)
 
 extern int lengthCompareJsonbStringValue(const void *a, const void *b);
 

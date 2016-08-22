@@ -13,6 +13,7 @@
  */
 #include "postgres.h"
 
+#include "access/compression.h"
 #include "access/hash.h"
 #include "catalog/pg_collation.h"
 #include "miscadmin.h"
@@ -78,7 +79,8 @@ static void fillJsonbValue(const JsonbContainer *container, int index,
 			   char *base_addr, uint32 offset,
 			   JsonbValue *result);
 static int	compareJsonbScalarValue(const JsonbValue *a, const JsonbValue *b);
-static void *convertToJsonb(const JsonbValue *val, JsonValueEncoder encoder);
+static void *convertToJsonb(const JsonbValue *val, JsonValueEncoder encoder,
+							CompressionOptions options);
 static void convertJsonbValue(StringInfo buffer, JEntry *header, const JsonbValue *val, int level);
 static void convertJsonbArray(StringInfo buffer, JEntry *header, const JsonbValue *val, int level);
 static void convertJsonbObject(StringInfo buffer, JEntry *header, const JsonbValue *val, int level);
@@ -112,11 +114,14 @@ JsonValueUnpackBinary(const JsonValue *jbv)
 
 void *
 JsonContainerFlatten(JsonContainer *jc, JsonValueEncoder encoder,
-					 JsonContainerOps *ops, const JsonValue *binary)
+					 JsonContainerOps *ops, CompressionOptions options,
+					 const JsonValue *binary)
 {
 	JsonbValue jbv;
 
-	if (jc->ops == ops)
+	if (jc->ops == ops &&
+		(!jc->ops->compressionOps ||
+		  jc->ops->compressionOps->optionsAreEqual(jc, options)))
 	{
 		int		size = jc->len;
 		void   *out = palloc(VARHDRSZ + size);
@@ -135,7 +140,7 @@ JsonContainerFlatten(JsonContainer *jc, JsonValueEncoder encoder,
 		binary = &jbv;
 	}
 
-	return convertToJsonb(binary, encoder);
+	return convertToJsonb(binary, encoder, options);
 }
 
 /*
@@ -153,10 +158,11 @@ JsonContainerFlatten(JsonContainer *jc, JsonValueEncoder encoder,
  */
 void *
 JsonValueFlatten(const JsonValue *val, JsonValueEncoder encoder,
-				 JsonContainerOps *ops)
+				 JsonContainerOps *ops, CompressionOptions options)
 {
 	if (val->type == jbvBinary)
-		return JsonContainerFlatten(val->val.binary.data, encoder, ops, val);
+		return JsonContainerFlatten(val->val.binary.data, encoder, ops, options,
+									val);
 
 	if (IsAJsonbScalar(val))
 	{
@@ -168,7 +174,7 @@ JsonValueFlatten(const JsonValue *val, JsonValueEncoder encoder,
 		Assert(val->type == jbvObject || val->type == jbvArray);
 	}
 
-	return convertToJsonb(val, encoder);
+	return convertToJsonb(val, encoder, options);
 }
 
 /*
@@ -1580,7 +1586,8 @@ padBufferToInt(StringInfo buffer)
 }
 
 void
-JsonbEncode(StringInfoData *buffer, const JsonbValue *val)
+JsonbEncode(StringInfoData *buffer, const JsonbValue *val,
+			CompressionOptions options)
 {
 	JEntry	jentry;
 
@@ -1591,7 +1598,8 @@ JsonbEncode(StringInfoData *buffer, const JsonbValue *val)
  * Given a JsonbValue, convert to Jsonb. The result is palloc'd.
  */
 static void *
-convertToJsonb(const JsonbValue *val, JsonValueEncoder encoder)
+convertToJsonb(const JsonbValue *val, JsonValueEncoder encoder,
+			   CompressionOptions options)
 {
 	StringInfoData	buffer;
 	void		   *res;
@@ -1602,7 +1610,7 @@ convertToJsonb(const JsonbValue *val, JsonValueEncoder encoder)
 	/* Make room for the varlena header */
 	reserveFromBuffer(&buffer, VARHDRSZ);
 
-	(*encoder)(&buffer, val);
+	(*encoder)(&buffer, val, options);
 
 	/*
 	 * Note: the JEntry of the root is discarded. Therefore the root
@@ -2039,7 +2047,7 @@ jsonbInitContainer(JsonContainerData *jc, JsonbContainer *jbc, int len)
 }
 
 static void
-jsonbInit(JsonContainerData *jc, Datum value)
+jsonbInit(JsonContainerData *jc, Datum value, CompressionOptions options)
 {
 	Jsonb  *jb = (Jsonb *) DatumGetPointer(value);
 	jsonbInitContainer(jc, &jb->root, VARSIZE_ANY_EXHDR(jb));
@@ -2049,6 +2057,7 @@ JsonContainerOps
 jsonbContainerOps =
 {
 	JsonContainerJsonb,
+	NULL,
 	jsonbInit,
 	JsonbIteratorInit,
 	jsonbFindKeyInObject,

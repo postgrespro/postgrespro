@@ -72,6 +72,7 @@
 
 #include "postgres.h"
 
+#include "access/compression.h"
 #include "access/htup_details.h"
 #include "access/transam.h"
 #include "catalog/pg_type.h"
@@ -2627,7 +2628,7 @@ jsontInitContainer(JsonContainerData *jc, char *json, int len,
 }
 
 static void
-jsontInit(JsonContainerData *jc, Datum value)
+jsontInit(JsonContainerData *jc, Datum value, CompressionOptions options)
 {
 	text		   *json = DatumGetTextP(value);
 	JsonLexContext *lex = makeJsonLexContext(json, false);
@@ -3027,6 +3028,7 @@ JsonContainerOps
 jsontContainerOps =
 {
 	JsonContainerJsont,
+	NULL,
 	jsontInit,
 	JsontIteratorInit,
 	jsonFindLastKeyInObject,
