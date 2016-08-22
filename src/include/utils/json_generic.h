@@ -227,6 +227,9 @@ JsonIteratorNext(JsonIterator **it, JsonValue *val, bool skipNested)
 extern Json *DatumGetJson(Datum val, JsonContainerOps *ops,
 						  CompressionOptions options);
 
+#define JsonContainerAlloc() \
+	((JsonContainerData *) palloc(sizeof(JsonContainerData)))
+
 extern JsonValue *JsonFindValueInContainer(JsonContainer *json, uint32 flags,
 										   JsonValue *key);
 
