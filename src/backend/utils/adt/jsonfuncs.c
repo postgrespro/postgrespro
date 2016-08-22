@@ -4052,7 +4052,7 @@ addJsonbToParseState(JsonbParseState **jbps, Jsonb *jb)
 		(void) JsonbIteratorNext(&it, &v, false);		/* skip array header */
 		(void) JsonbIteratorNext(&it, &v, false);		/* fetch scalar value */
 
-		(void) pushScalarJsonbValue(jbps, &v, false);
+		(void) pushScalarJsonbValue(jbps, &v, false, true);
 	}
 	else
 	{
