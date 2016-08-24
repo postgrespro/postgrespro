@@ -2571,7 +2571,7 @@ heap_insert(Relation relation, HeapTuple tup, TupleDesc tupdesc,
 	return HeapTupleGetOid(tup);
 }
 
-static inline bool
+bool
 tuple_attr_compression_equals(TupleDesc td1, TupleDesc td2, AttrNumber attidx)
 {
 	if (td1->attrs[attidx]->attcompression !=
