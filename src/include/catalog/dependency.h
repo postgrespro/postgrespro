@@ -231,6 +231,7 @@ extern long deleteDependencyRecordsFor(Oid classId, Oid objectId,
 						   bool skipExtensionDeps);
 
 extern long deleteDependencyRecordsForClass(Oid classId, Oid objectId,
+								int32 objectSubId,
 								Oid refclassId, char deptype);
 
 extern long changeDependencyFor(Oid classId, Oid objectId,

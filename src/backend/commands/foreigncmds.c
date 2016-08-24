@@ -800,6 +800,7 @@ AlterForeignDataWrapper(AlterFdwStmt *stmt)
 		 */
 		deleteDependencyRecordsForClass(ForeignDataWrapperRelationId,
 										fdwId,
+										0,
 										ProcedureRelationId,
 										DEPENDENCY_NORMAL);
 

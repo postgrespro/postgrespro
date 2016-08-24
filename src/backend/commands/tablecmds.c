@@ -6129,7 +6129,7 @@ ATExecDropIdentity(Relation rel, const char *colName, bool missing_ok, LOCKMODE 
 
 	/* drop the internal sequence */
 	seqid = getOwnedSequence(RelationGetRelid(rel), attnum);
-	deleteDependencyRecordsForClass(RelationRelationId, seqid,
+	deleteDependencyRecordsForClass(RelationRelationId, seqid, 0,
 									RelationRelationId, DEPENDENCY_INTERNAL);
 	CommandCounterIncrement();
 	seqaddress.classId = RelationRelationId;

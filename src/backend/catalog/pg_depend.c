@@ -238,14 +238,15 @@ deleteDependencyRecordsFor(Oid classId, Oid objectId,
  * extension membership).
  */
 long
-deleteDependencyRecordsForClass(Oid classId, Oid objectId,
+deleteDependencyRecordsForClass(Oid classId, Oid objectId, int32 objectSubId,
 								Oid refclassId, char deptype)
 {
 	long		count = 0;
 	Relation	depRel;
-	ScanKeyData key[2];
+	ScanKeyData key[3];
 	SysScanDesc scan;
 	HeapTuple	tup;
+	int			nkeys;
 
 	depRel = heap_open(DependRelationId, RowExclusiveLock);
 
@@ -257,9 +258,19 @@ deleteDependencyRecordsForClass(Oid classId, Oid objectId,
 				Anum_pg_depend_objid,
 				BTEqualStrategyNumber, F_OIDEQ,
 				ObjectIdGetDatum(objectId));
+	if (objectSubId != 0)
+	{
+		ScanKeyInit(&key[2],
+					Anum_pg_depend_objsubid,
+					BTEqualStrategyNumber, F_INT4EQ,
+					Int32GetDatum(objectSubId));
+		nkeys = 3;
+	}
+	else
+		nkeys = 2;
 
 	scan = systable_beginscan(depRel, DependDependerIndexId, true,
-							  NULL, 2, key);
+							  NULL, nkeys, key);
 
 	while (HeapTupleIsValid(tup = systable_getnext(scan)))
 	{

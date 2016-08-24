@@ -1727,7 +1727,7 @@ process_owned_by(Relation seqrel, List *owned_by, bool for_identity)
 	 * dependencies for the sequence, then optionally add a new one.
 	 */
 	deleteDependencyRecordsForClass(RelationRelationId, RelationGetRelid(seqrel),
-									RelationRelationId, deptype);
+									0, RelationRelationId, deptype);
 
 	if (tablerel)
 	{

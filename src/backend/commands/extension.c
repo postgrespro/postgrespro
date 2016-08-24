@@ -3115,7 +3115,7 @@ ApplyExtensionUpdates(Oid extensionOid,
 		/*
 		 * Remove and recreate dependencies on prerequisite extensions
 		 */
-		deleteDependencyRecordsForClass(ExtensionRelationId, extensionOid,
+		deleteDependencyRecordsForClass(ExtensionRelationId, extensionOid, 0,
 										ExtensionRelationId,
 										DEPENDENCY_NORMAL);
 
@@ -3257,7 +3257,7 @@ ExecAlterExtensionContentsStmt(AlterExtensionContentsStmt *stmt,
 		/*
 		 * OK, drop the dependency.
 		 */
-		if (deleteDependencyRecordsForClass(object.classId, object.objectId,
+		if (deleteDependencyRecordsForClass(object.classId, object.objectId, 0,
 											ExtensionRelationId,
 											DEPENDENCY_EXTENSION) != 1)
 			elog(ERROR, "unexpected number of extension dependency records");

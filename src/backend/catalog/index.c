@@ -1191,7 +1191,7 @@ index_constraint_create(Relation heapRelation,
 	 * index into a UNIQUE or PRIMARY KEY constraint.
 	 */
 	if (remove_old_dependencies)
-		deleteDependencyRecordsForClass(RelationRelationId, indexRelationId,
+		deleteDependencyRecordsForClass(RelationRelationId, indexRelationId, 0,
 										RelationRelationId, DEPENDENCY_AUTO);
 
 	/*
