@@ -798,8 +798,10 @@ extern Datum heap_getsysattr(HeapTuple tup, int attnum, TupleDesc tupleDesc,
 extern HeapTuple heap_copytuple(HeapTuple tuple);
 extern void heap_copytuple_with_tuple(HeapTuple src, HeapTuple dest);
 extern Datum heap_copy_tuple_as_datum(HeapTuple tuple, TupleDesc tupleDesc);
-extern HeapTuple heap_form_tuple(TupleDesc tupleDescriptor,
-				Datum *values, bool *isnull);
+extern HeapTuple heap_form_tuple_compress(TupleDesc tupleDescriptor,
+				Datum *values, bool *isnull, bool *compress);
+#define heap_form_tuple(tupdesc, values, isnull) \
+		heap_form_tuple_compress(tupdesc, values, isnull, NULL)
 extern HeapTuple heap_modify_tuple(HeapTuple tuple,
 				  TupleDesc tupleDesc,
 				  Datum *replValues,
