@@ -22,6 +22,7 @@
 #include "access/tuptoaster.h"
 #include "access/valid.h"
 #include "access/xact.h"
+#include "catalog/pg_collation.h"
 #include "catalog/pg_operator.h"
 #include "catalog/pg_type.h"
 #include "miscadmin.h"
@@ -961,7 +962,7 @@ CatalogCacheInitializeCache(CatCache *cache)
 		cache->cc_skey[i].sk_strategy = BTEqualStrategyNumber;
 		cache->cc_skey[i].sk_subtype = InvalidOid;
 		/* Currently, there are no catcaches on collation-aware data types */
-		cache->cc_skey[i].sk_collation = InvalidOid;
+		cache->cc_skey[i].sk_collation = DEFAULT_COLLATION_OID;
 
 		CACHE4_elog(DEBUG2, "CatalogCacheInitializeCache %s %d %p",
 					cache->cc_relname,
