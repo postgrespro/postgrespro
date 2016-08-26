@@ -751,7 +751,7 @@ AlterObjectNamespace_internal(Relation rel, Oid objid, Oid nspOid)
 
 	/* update dependencies to point to the new schema */
 	changeDependencyFor(classId, objid,
-						NamespaceRelationId, oldNspOid, nspOid);
+						NamespaceRelationId, oldNspOid, 0, nspOid, NULL);
 
 	InvokeObjectPostAlterHook(classId, objid, 0);
 

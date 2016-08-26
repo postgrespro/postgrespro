@@ -304,10 +304,11 @@ deleteDependencyRecordsForClass(Oid classId, Oid objectId, int32 objectSubId,
  */
 long
 changeDependencyFor(Oid classId, Oid objectId,
-					Oid refClassId, Oid oldRefObjectId,
-					Oid newRefObjectId)
+					Oid refClassId, Oid oldRefObjectId, int32 oldRefObjectSubId,
+					Oid newRefObjectId, long *pTotalInternalRefCount)
 {
 	long		count = 0;
+	long		totalInternalRefCount = 0;
 	Relation	depRel;
 	ScanKeyData key[2];
 	SysScanDesc scan;
@@ -325,7 +326,7 @@ changeDependencyFor(Oid classId, Oid objectId,
 	 */
 	objAddr.classId = refClassId;
 	objAddr.objectId = oldRefObjectId;
-	objAddr.objectSubId = 0;
+	objAddr.objectSubId = oldRefObjectSubId;
 
 	if (isObjectPinned(&objAddr, depRel))
 		ereport(ERROR,
@@ -337,9 +338,15 @@ changeDependencyFor(Oid classId, Oid objectId,
 	 * We can handle adding a dependency on something pinned, though, since
 	 * that just means deleting the dependency entry.
 	 */
-	objAddr.objectId = newRefObjectId;
+	if (OidIsValid(newRefObjectId))
+	{
+		objAddr.objectId = newRefObjectId;
+		objAddr.objectSubId = 0;
 
-	newIsPinned = isObjectPinned(&objAddr, depRel);
+		newIsPinned = isObjectPinned(&objAddr, depRel);
+	}
+	else
+		newIsPinned = true;
 
 	/* Now search for dependency records */
 	ScanKeyInit(&key[0],
@@ -359,7 +366,9 @@ changeDependencyFor(Oid classId, Oid objectId,
 		Form_pg_depend depform = (Form_pg_depend) GETSTRUCT(tup);
 
 		if (depform->refclassid == refClassId &&
-			depform->refobjid == oldRefObjectId)
+			depform->refobjid == oldRefObjectId &&
+			(oldRefObjectSubId == 0 ||
+			 depform->refobjsubid == oldRefObjectSubId))
 		{
 			if (newIsPinned)
 				CatalogTupleDelete(depRel, &tup->t_self);
@@ -370,6 +379,7 @@ changeDependencyFor(Oid classId, Oid objectId,
 				depform = (Form_pg_depend) GETSTRUCT(tup);
 
 				depform->refobjid = newRefObjectId;
+				depform->refobjsubid = 0;
 
 				CatalogTupleUpdate(depRel, &tup->t_self, tup);
 
@@ -378,11 +388,17 @@ changeDependencyFor(Oid classId, Oid objectId,
 
 			count++;
 		}
+
+		if (depform->deptype == DEPENDENCY_INTERNAL)
+			totalInternalRefCount++;
 	}
 
 	systable_endscan(scan);
 
 	heap_close(depRel, RowExclusiveLock);
+
+	if (pTotalInternalRefCount)
+		*pTotalInternalRefCount = totalInternalRefCount;
 
 	return count;
 }

@@ -235,8 +235,8 @@ extern long deleteDependencyRecordsForClass(Oid classId, Oid objectId,
 								Oid refclassId, char deptype);
 
 extern long changeDependencyFor(Oid classId, Oid objectId,
-					Oid refClassId, Oid oldRefObjectId,
-					Oid newRefObjectId);
+					Oid refClassId, Oid oldRefObjectId, int32 oldRefObjectSubId,
+					Oid newRefObjectId, long *totalRefCount);
 
 extern Oid	getExtensionOfObject(Oid classId, Oid objectId);
 
