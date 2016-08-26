@@ -1502,3 +1502,16 @@ jsonbc_handler(PG_FUNCTION_ARGS)
 
 	PG_RETURN_POINTER(cmr);
 }
+
+PG_FUNCTION_INFO_V1(jsonbc_get_dict_id);
+
+Datum
+jsonbc_get_dict_id(PG_FUNCTION_ARGS)
+{
+	Json *json = DatumGetJsont(PG_GETARG_DATUM(0));
+
+	if (json->root.ops == &jsonbcContainerOps)
+		PG_RETURN_INT32(jsonbcGetDictId(JsonRoot(json)));
+	else
+		PG_RETURN_NULL();
+}

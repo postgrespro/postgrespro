@@ -4529,6 +4529,8 @@ DATA(insert OID = 3421 (  jsonbc_get_id_by_name	   PGNSP PGUID 12 1 0 0 0 f f f 
 DESCR("get name id from jsonbc dictionary");
 DATA(insert OID = 3998 (  jsonbc_get_name_by_id	   PGNSP PGUID 12 1 0 0 0 f f f f t f i s 2 0 25 "26 23" _null_ _null_ _null_ _null_ _null_ jsonbc_get_name_by_id _null_ _null_ _null_ ));
 DESCR("get name id from jsonbc dictionary");
+DATA(insert OID = 4001 (  jsonbc_get_dict_id	   PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 26 "114" _null_ _null_ _null_ _null_ _null_ jsonbc_get_dict_id _null_ _null_ _null_ ));
+DESCR("get jsonbc dictionary id from a json object");
 
 /* uuid */
 DATA(insert OID = 2952 (  uuid_in		   PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 2950 "2275" _null_ _null_ _null_ _null_ _null_ uuid_in _null_ _null_ _null_ ));
