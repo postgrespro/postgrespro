@@ -5004,6 +5004,7 @@ DATA(insert OID = 3487 (  gin_consistent_jsonb_path  PGNSP PGUID 12 1 0 0 0 f f 
 DESCR("GIN support");
 DATA(insert OID = 3489 (  gin_triconsistent_jsonb_path	PGNSP PGUID 12 1 0 0 0 f f f f t f i s 7 0 18 "2281 21 3802 23 2281 2281 2281" _null_ _null_ _null_ _null_ _null_ gin_triconsistent_jsonb_path _null_ _null_ _null_ ));
 DESCR("GIN support");
+
 DATA(insert OID = 3301 (  jsonb_concat	   PGNSP PGUID 12 1 0 0 0 f f f f t f i s 2 0 3802 "3802 3802" _null_ _null_ _null_ _null_ _null_ jsonb_concat _null_ _null_ _null_ ));
 DATA(insert OID = 3302 (  jsonb_delete	   PGNSP PGUID 12 1 0 0 0 f f f f t f i s 2 0 3802 "3802 25" _null_ _null_ _null_ _null_ _null_ jsonb_delete _null_ _null_ _null_ ));
 DATA(insert OID = 3303 (  jsonb_delete	   PGNSP PGUID 12 1 0 0 0 f f f f t f i s 2 0 3802 "3802 23" _null_ _null_ _null_ _null_ _null_ jsonb_delete_idx _null_ _null_ _null_ ));
@@ -5015,9 +5016,57 @@ DATA(insert OID = 3306 (  jsonb_pretty	   PGNSP PGUID 12 1 0 0 0 f f f f t f i s
 DESCR("Indented text from jsonb");
 DATA(insert OID = 3416 (  jsonb_canonical   PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 25 "3802" _null_ _null_ _null_ _null_ _null_ jsonb_canonical _null_ _null_ _null_ ));
 DESCR("Canonical text from jsonb");
-
 DATA(insert OID = 3579 (  jsonb_insert	  PGNSP PGUID 12 1 0 0 0 f f f f t f i s 4 0 3802 "3802 1009 3802 16" _null_ _null_ _null_ _null_ _null_ jsonb_insert _null_ _null_ _null_ ));
 DESCR("Insert value into a jsonb");
+
+DATA(insert OID = 4126 (  json_ne			PGNSP PGUID 12 1 0 0 0 f f f f t f i s 2 0 16 "114 114" _null_ _null_ _null_ _null_ _null_ json_ne _null_ _null_ _null_ ));
+DATA(insert OID = 4127 (  json_lt			PGNSP PGUID 12 1 0 0 0 f f f f t f i s 2 0 16 "114 114" _null_ _null_ _null_ _null_ _null_ json_lt _null_ _null_ _null_ ));
+DATA(insert OID = 4128 (  json_gt			PGNSP PGUID 12 1 0 0 0 f f f f t f i s 2 0 16 "114 114" _null_ _null_ _null_ _null_ _null_ json_gt _null_ _null_ _null_ ));
+DATA(insert OID = 4129 (  json_le			PGNSP PGUID 12 1 0 0 0 f f f f t f i s 2 0 16 "114 114" _null_ _null_ _null_ _null_ _null_ json_le _null_ _null_ _null_ ));
+DATA(insert OID = 4130 (  json_ge			PGNSP PGUID 12 1 0 0 0 f f f f t f i s 2 0 16 "114 114" _null_ _null_ _null_ _null_ _null_ json_ge _null_ _null_ _null_ ));
+DATA(insert OID = 4131 (  json_eq			PGNSP PGUID 12 1 0 0 0 f f f f t f i s 2 0 16 "114 114" _null_ _null_ _null_ _null_ _null_ json_eq _null_ _null_ _null_ ));
+DATA(insert OID = 4132 (  json_cmp			PGNSP PGUID 12 1 0 0 0 f f f f t f i s 2 0 23 "114 114" _null_ _null_ _null_ _null_ _null_ json_cmp _null_ _null_ _null_ ));
+DESCR("less-equal-greater");
+DATA(insert OID = 4133 (  json_hash			PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 23 "114" _null_ _null_ _null_ _null_ _null_ json_hash _null_ _null_ _null_ ));
+DESCR("hash");
+DATA(insert OID = 4134 (  json_contains		PGNSP PGUID 12 1 0 0 0 f f f f t f i s 2 0 16 "114 114" _null_ _null_ _null_ _null_ _null_ json_contains _null_ _null_ _null_ ));
+DATA(insert OID = 4135 (  json_exists		PGNSP PGUID 12 1 0 0 0 f f f f t f i s 2 0 16 "114 25" _null_ _null_ _null_ _null_ _null_ json_exists _null_ _null_ _null_ ));
+DATA(insert OID = 4136 (  json_exists_any	PGNSP PGUID 12 1 0 0 0 f f f f t f i s 2 0 16 "114 1009" _null_ _null_ _null_ _null_ _null_ json_exists_any _null_ _null_ _null_ ));
+DATA(insert OID = 4137 (  json_exists_all	PGNSP PGUID 12 1 0 0 0 f f f f t f i s 2 0 16 "114 1009" _null_ _null_ _null_ _null_ _null_ json_exists_all _null_ _null_ _null_ ));
+DATA(insert OID = 4138 (  json_contained	PGNSP PGUID 12 1 0 0 0 f f f f t f i s 2 0 16 "114 114" _null_ _null_ _null_ _null_ _null_ json_contained _null_ _null_ _null_ ));
+
+DATA(insert OID = 4139 (  json_concat		PGNSP PGUID 12 1 0 0 0 f f f f t f i s 2 0 114 "114 114" _null_ _null_ _null_ _null_ _null_ json_concat _null_ _null_ _null_ ));
+DATA(insert OID = 4140 (  json_delete		PGNSP PGUID 12 1 0 0 0 f f f f t f i s 2 0 114 "114 25" _null_ _null_ _null_ _null_ _null_ json_delete _null_ _null_ _null_ ));
+DATA(insert OID = 4141 (  json_delete		PGNSP PGUID 12 1 0 0 0 f f f f t f i s 2 0 114 "114 23" _null_ _null_ _null_ _null_ _null_ json_delete_idx _null_ _null_ _null_ ));
+DATA(insert OID = 4142 (  json_delete_path	PGNSP PGUID 12 1 0 0 0 f f f f t f i s 2 0 114 "114 1009" _null_ _null_ _null_ _null_ _null_ json_delete_path _null_ _null_ _null_ ));
+DATA(insert OID = 4143 (  json_set			PGNSP PGUID 12 1 0 0 0 f f f f t f i s 4 0 114 "114 1009 114 16" _null_ _null_ _null_ _null_ _null_ json_set _null_ _null_ _null_ ));
+DESCR("Set part of a json");
+DATA(insert OID = 4144 (  json_pretty		PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 25 "114" _null_ _null_ _null_ _null_ _null_ json_pretty _null_ _null_ _null_ ));
+DESCR("Indented text from json");
+DATA(insert OID = 4145 (  json_canonical	PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 25 "114" _null_ _null_ _null_ _null_ _null_ json_canonical _null_ _null_ _null_ ));
+DESCR("Canonical text from json");
+DATA(insert OID = 4146 (  json_insert		PGNSP PGUID 12 1 0 0 0 f f f f t f i s 4 0 114 "114 1009 114 16" _null_ _null_ _null_ _null_ _null_ json_insert _null_ _null_ _null_ ));
+DESCR("Insert value into a json");
+
+DATA(insert OID = 4149 (  gin_compare_json				PGNSP PGUID 12 1 0 0 0 f f f f t f i s 2 0 23 "25 25" _null_ _null_ _null_ _null_ _null_ gin_compare_json _null_ _null_ _null_ ));
+DESCR("GIN support");
+DATA(insert OID = 4150 (  gin_extract_json				PGNSP PGUID 12 1 0 0 0 f f f f t f i s 3 0 2281 "114 2281 2281" _null_ _null_ _null_ _null_ _null_ gin_extract_json _null_ _null_ _null_ ));
+DESCR("GIN support");
+DATA(insert OID = 4151 (  gin_extract_json_query		PGNSP PGUID 12 1 0 0 0 f f f f t f i s 7 0 2281 "114 2281 21 2281 2281 2281 2281" _null_ _null_ _null_ _null_ _null_ gin_extract_json_query _null_ _null_ _null_ ));
+DESCR("GIN support");
+DATA(insert OID = 4152 (  gin_consistent_json			PGNSP PGUID 12 1 0 0 0 f f f f t f i s 8 0 16 "2281 21 114 23 2281 2281 2281 2281" _null_ _null_ _null_ _null_ _null_ gin_consistent_json _null_ _null_ _null_ ));
+DESCR("GIN support");
+DATA(insert OID = 4153 (  gin_triconsistent_json		PGNSP PGUID 12 1 0 0 0 f f f f t f i s 7 0 18 "2281 21 114 23 2281 2281 2281" _null_ _null_ _null_ _null_ _null_ gin_triconsistent_json _null_ _null_ _null_ ));
+DESCR("GIN support");
+DATA(insert OID = 4154 (  gin_extract_json_path			PGNSP PGUID 12 1 0 0 0 f f f f t f i s 3 0 2281 "114 2281 2281" _null_ _null_ _null_ _null_ _null_ gin_extract_json_path _null_ _null_ _null_ ));
+DESCR("GIN support");
+DATA(insert OID = 4155 (  gin_extract_json_query_path	PGNSP PGUID 12 1 0 0 0 f f f f t f i s 7 0 2281 "114 2281 21 2281 2281 2281 2281" _null_ _null_ _null_ _null_ _null_ gin_extract_json_query_path _null_ _null_ _null_ ));
+DESCR("GIN support");
+DATA(insert OID = 4156 (  gin_consistent_json_path		PGNSP PGUID 12 1 0 0 0 f f f f t f i s 8 0 16 "2281 21 114 23 2281 2281 2281 2281" _null_ _null_ _null_ _null_ _null_ gin_consistent_json_path _null_ _null_ _null_ ));
+DESCR("GIN support");
+DATA(insert OID = 4157 (  gin_triconsistent_json_path	PGNSP PGUID 12 1 0 0 0 f f f f t f i s 7 0 18 "2281 21 114 23 2281 2281 2281" _null_ _null_ _null_ _null_ _null_ gin_triconsistent_json_path _null_ _null_ _null_ ));
+DESCR("GIN support");
+
 /* txid */
 DATA(insert OID = 2939 (  txid_snapshot_in			PGNSP PGUID 12 1  0 0 0 f f f f t f i s 1 0 2970 "2275" _null_ _null_ _null_ _null_ _null_ txid_snapshot_in _null_ _null_ _null_ ));
 DESCR("I/O");

@@ -1821,6 +1821,7 @@ DATA(insert OID = 3213 (  "#>"	   PGNSP PGUID b f f 3802 1009 3802 0 0 jsonb_ext
 DESCR("get value from jsonb with path elements");
 DATA(insert OID = 3206 (  "#>>"    PGNSP PGUID b f f 3802 1009 25 0 0 jsonb_extract_path_text - - ));
 DESCR("get value from jsonb as text with path elements");
+
 DATA(insert OID = 3240 (  "="	 PGNSP PGUID b t t 3802 3802  16 3240 3241 jsonb_eq eqsel eqjoinsel ));
 DESCR("equal");
 DATA(insert OID = 3241 (  "<>"	 PGNSP PGUID b f f 3802 3802  16 3241 3240 jsonb_ne neqsel neqjoinsel ));
@@ -1852,6 +1853,38 @@ DESCR("delete object fields");
 DATA(insert OID = 3286 (  "-"	   PGNSP PGUID b f f 3802 23 3802 0 0 3303 - - ));
 DESCR("delete array element");
 DATA(insert OID = 3287 (  "#-"	   PGNSP PGUID b f f 3802 1009 3802 0 0 jsonb_delete_path - - ));
+DESCR("delete path");
+
+
+DATA(insert OID = 3422 (  "="	PGNSP PGUID b t t 114 114 16 3422 3423 json_eq eqsel eqjoinsel ));
+DESCR("equal");
+DATA(insert OID = 3423 (  "<>"	PGNSP PGUID b f f 114 114 16 3423 3422 json_ne neqsel neqjoinsel ));
+DESCR("not equal");
+DATA(insert OID = 3424 (  "<"	PGNSP PGUID b f f 114 114 16 3425 3427 json_lt scalarltsel scalarltjoinsel ));
+DESCR("less than");
+DATA(insert OID = 3425 (  ">"	PGNSP PGUID b f f 114 114 16 3424 3426 json_gt scalargtsel scalargtjoinsel ));
+DESCR("greater than");
+DATA(insert OID = 3426 (  "<="	PGNSP PGUID b f f 114 114 16 3427 3425 json_le scalarltsel scalarltjoinsel ));
+DESCR("less than or equal");
+DATA(insert OID = 3427 (  ">="	PGNSP PGUID b f f 114 114 16 3426 3424 json_ge scalargtsel scalargtjoinsel ));
+DESCR("greater than or equal");
+DATA(insert OID = 3428 (  "@>"	PGNSP PGUID b f f 114 114 16 3432 0 json_contains contsel contjoinsel ));
+DESCR("contains");
+DATA(insert OID = 3429 (  "?"	PGNSP PGUID b f f 114 25 16 0 0 json_exists contsel contjoinsel ));
+DESCR("key exists");
+DATA(insert OID = 3430 (  "?|"	PGNSP PGUID b f f 114 1009 16 0 0 json_exists_any contsel contjoinsel ));
+DESCR("any key exists");
+DATA(insert OID = 3431 (  "?&"	PGNSP PGUID b f f 114 1009 16 0 0 json_exists_all contsel contjoinsel ));
+DESCR("all keys exist");
+DATA(insert OID = 3432 (  "<@"	PGNSP PGUID b f f 114 114 16 3428 0 json_contained contsel contjoinsel ));
+DESCR("is contained by");
+DATA(insert OID = 3433 (  "||"	PGNSP PGUID b f f 114 114 114 0 0 json_concat - - ));
+DESCR("concatenate");
+DATA(insert OID = 3434 (  "-"	PGNSP PGUID b f f 114 25 114 0 0 4140 - - ));
+DESCR("delete object field");
+DATA(insert OID = 3435 (  "-"	PGNSP PGUID b f f 114 23 114 0 0 4141 - - ));
+DESCR("delete array element");
+DATA(insert OID = 3436 (  "#-"	PGNSP PGUID b f f 114 1009 114 0 0 json_delete_path - - ));
 DESCR("delete path");
 
 #endif   /* PG_OPERATOR_H */

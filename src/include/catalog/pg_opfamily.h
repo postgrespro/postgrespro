@@ -158,6 +158,10 @@ DATA(insert OID = 4034 (	405		jsonb_ops		PGNSP PGUID ));
 DATA(insert OID = 4035 (	783		jsonb_ops		PGNSP PGUID ));
 DATA(insert OID = 4036 (	2742	jsonb_ops		PGNSP PGUID ));
 DATA(insert OID = 4037 (	2742	jsonb_path_ops	PGNSP PGUID ));
+DATA(insert OID = 3437 (	403		json_ops		PGNSP PGUID ));
+DATA(insert OID = 3438 (	405		json_ops		PGNSP PGUID ));
+DATA(insert OID = 4147 (	2742	json_ops		PGNSP PGUID ));
+DATA(insert OID = 4148 (	2742	json_path_ops	PGNSP PGUID ));
 
 DATA(insert OID = 4054 (	3580	integer_minmax_ops		PGNSP PGUID ));
 DATA(insert OID = 4055 (	3580	numeric_minmax_ops		PGNSP PGUID ));

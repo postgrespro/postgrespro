@@ -1091,6 +1091,14 @@ STRICT IMMUTABLE PARALLEL SAFE
 AS 'make_interval';
 
 CREATE OR REPLACE FUNCTION
+  json_set(json_in json, path text[] , replacement json,
+            create_if_missing boolean DEFAULT true)
+RETURNS json
+LANGUAGE INTERNAL
+STRICT IMMUTABLE PARALLEL SAFE
+AS 'json_set';
+
+CREATE OR REPLACE FUNCTION
   jsonb_set(jsonb_in jsonb, path text[] , replacement jsonb,
             create_if_missing boolean DEFAULT true)
 RETURNS jsonb
@@ -1104,6 +1112,14 @@ RETURNS text[]
 LANGUAGE INTERNAL
 STRICT IMMUTABLE PARALLEL SAFE
 AS 'parse_ident';
+
+CREATE OR REPLACE FUNCTION
+  json_insert(json_in json, path text[] , replacement json,
+            insert_after boolean DEFAULT false)
+RETURNS json
+LANGUAGE INTERNAL
+STRICT IMMUTABLE PARALLEL SAFE
+AS 'json_insert';
 
 CREATE OR REPLACE FUNCTION
   jsonb_insert(jsonb_in jsonb, path text[] , replacement jsonb,

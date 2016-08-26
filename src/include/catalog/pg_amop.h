@@ -828,6 +828,34 @@ DATA(insert (	4036   3802 1009 11 s 3249 2742 0 ));
 DATA(insert (	4037   3802 3802 7 s 3246 2742 0 ));
 
 /*
+ * btree json_ops
+ */
+DATA(insert (	3437   114  114  1 s	3424 403 0 ));
+DATA(insert (	3437   114  114  2 s	3426 403 0 ));
+DATA(insert (	3437   114  114  3 s	3422 403 0 ));
+DATA(insert (	3437   114  114  4 s	3427 403 0 ));
+DATA(insert (	3437   114  114  5 s	3425 403 0 ));
+
+/*
+ * hash jsonb_ops
+ */
+DATA(insert (	3438   114  114  1 s	3422 405 0 ));
+
+/*
+ * GIN json_ops
+ */
+DATA(insert (	4147   114  114  7 s 3428 2742 0 ));
+DATA(insert (	4147   114   25  9 s 3429 2742 0 ));
+DATA(insert (	4147   114 1009 10 s 3430 2742 0 ));
+DATA(insert (	4147   114 1009 11 s 3431 2742 0 ));
+
+/*
+ * GIN json_path_ops
+ */
+DATA(insert (	4148   114  114  7 s 3428 2742 0 ));
+
+
+/*
  * SP-GiST range_ops
  */
 DATA(insert (	3474   3831 3831 1 s	3893 4000 0 ));

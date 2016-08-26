@@ -149,6 +149,7 @@ DATA(insert (	3626   3614 3614 1 3622 ));
 DATA(insert (	3683   3615 3615 1 3668 ));
 DATA(insert (	3901   3831 3831 1 3870 ));
 DATA(insert (	4033   3802 3802 1 4044 ));
+DATA(insert (	3437    114  114 1 4132 ));
 
 
 /* hash */
@@ -188,6 +189,7 @@ DATA(insert (	3372   774 774 1 328 ));
 DATA(insert (	3523   3500 3500 1 3515 ));
 DATA(insert (	3903   3831 3831 1 3902 ));
 DATA(insert (	4034   3802 3802 1 4045 ));
+DATA(insert (	3438    114  114 1 4133 ));
 
 
 /* gist */
@@ -277,6 +279,17 @@ DATA(insert (	4037   3802 3802 2 3485 ));
 DATA(insert (	4037   3802 3802 3 3486 ));
 DATA(insert (	4037   3802 3802 4 3487 ));
 DATA(insert (	4037   3802 3802 6 3489 ));
+DATA(insert (	4147   114  114  1 4149 ));
+DATA(insert (	4147   114  114  2 4150 ));
+DATA(insert (	4147   114  114  3 4151 ));
+DATA(insert (	4147   114  114  4 4152 ));
+DATA(insert (	4147   114  114  6 4153 ));
+DATA(insert (	4148   114  114  1 351 ));
+DATA(insert (	4148   114  114  2 4154 ));
+DATA(insert (	4148   114  114  3 4155 ));
+DATA(insert (	4148   114  114  4 4156 ));
+DATA(insert (	4148   114  114  6 4157 ));
+
 
 /* sp-gist */
 DATA(insert (	3474   3831 3831 1 3469 ));
