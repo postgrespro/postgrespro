@@ -268,7 +268,7 @@ extern JsonContainer *JsonValueToContainer(const JsonValue *val);
 
 extern int JsonCompareContainers(JsonContainer *a, JsonContainer *b);
 
-extern bool JsonbDeepContains(JsonIterator **val, JsonIterator **mContained);
+extern bool JsonbDeepContains(JsonContainer *val, JsonContainer *mContained);
 
 extern JsonValue *JsonContainerExtractKeys(JsonContainer *jsc);
 
