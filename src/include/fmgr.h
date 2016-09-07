@@ -226,7 +226,9 @@ extern struct varlena *pg_detoast_datum_packed(struct varlena * datum);
  */
 #define PG_FREE_IF_COPY(ptr,n) \
 	do { \
-		if ((Pointer) (ptr) != PG_GETARG_POINTER(n)) \
+		if ((Pointer) (ptr) != PG_GETARG_POINTER(n) && \
+			(!VARATT_IS_EXTERNAL_EXPANDED(PG_GETARG_POINTER(n)) || \
+			 (Pointer) DatumGetEOHP(PG_GETARG_DATUM(n)) != (Pointer)(ptr))) \
 			pfree(ptr); \
 	} while (0)
 
