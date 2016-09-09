@@ -58,8 +58,7 @@ SUBDIRS = \
 		tsearch2	\
 		unaccent	\
 		vacuumlo    \
-		pg_pathman \
-		pg_query_state
+		pg_pathman
 
 ifeq ($(with_openssl),yes)
 SUBDIRS += sslinfo
