@@ -355,7 +355,7 @@ SetPtrackClearLSN(bool set_invalid)
 		ptr = InvalidXLogRecPtr;
 	else
 		ptr = GetXLogInsertRecPtr();
-	//LWLockAcquire(ControlFileLock, LW_EXCLUSIVE);
+	/* LWLockAcquire(ControlFileLock, LW_EXCLUSIVE); */
 	fd = BasicOpenFile("global/ptrack_control",
 					   O_RDWR | O_CREAT | PG_BINARY,
 					   S_IRUSR | S_IWUSR);
