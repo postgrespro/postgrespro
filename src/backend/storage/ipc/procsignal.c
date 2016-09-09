@@ -67,11 +67,16 @@ typedef struct
  */
 bool		set_latch_on_sigusr1;
 
+static bool CustomSignalPendings[NUM_CUSTOM_PROCSIGNALS];
+static ProcSignalHandler_type CustomHandlers[NUM_CUSTOM_PROCSIGNALS];
+
 static ProcSignalSlot *ProcSignalSlots = NULL;
 static volatile ProcSignalSlot *MyProcSignalSlot = NULL;
 
 static bool CheckProcSignal(ProcSignalReason reason);
 static void CleanupProcSignalState(int status, Datum arg);
+
+static void CustomSignalInterrupt(ProcSignalReason reason);
 
 /*
  * ProcSignalShmemSize
@@ -173,6 +178,57 @@ CleanupProcSignalState(int status, Datum arg)
 }
 
 /*
+ * RegisterCustomProcSignalHandler
+ * 		Assign specific handler of custom process signal with new ProcSignalReason key.
+ * 		Return INVALID_PROCSIGNAL if all custom signals have been assigned.
+ */
+ProcSignalReason
+RegisterCustomProcSignalHandler(ProcSignalHandler_type handler)
+{
+	ProcSignalReason reason;
+
+	/* iterate through custom signal keys to find free spot */
+	for (reason = PROCSIG_CUSTOM_1; reason <= PROCSIG_CUSTOM_N; reason++)
+		if (!CustomHandlers[reason - PROCSIG_CUSTOM_1])
+		{
+			CustomHandlers[reason - PROCSIG_CUSTOM_1] = handler;
+			return reason;
+		}
+	return INVALID_PROCSIGNAL;
+}
+
+/*
+ * AssignCustomProcSignalHandler
+ * 		Assign handler of custom process signal with specific ProcSignalReason key.
+ * 		Return old ProcSignal handler.
+ * 		Assume incoming reason is one of custom ProcSignals.
+ */
+ProcSignalHandler_type
+AssignCustomProcSignalHandler(ProcSignalReason reason, ProcSignalHandler_type handler)
+{
+	ProcSignalHandler_type old;
+
+	Assert(reason >= PROCSIG_CUSTOM_1 && reason <= PROCSIG_CUSTOM_N);
+
+	old = CustomHandlers[reason - PROCSIG_CUSTOM_1];
+	CustomHandlers[reason - PROCSIG_CUSTOM_1] = handler;
+	return old;
+}
+
+/*
+ * GetCustomProcSignalHandler
+ * 		Get handler of custom process signal.
+ *		Assume incoming reason is one of custom ProcSignals.
+ */
+ProcSignalHandler_type
+GetCustomProcSignalHandler(ProcSignalReason reason)
+{
+	Assert(reason >= PROCSIG_CUSTOM_1 && reason <= PROCSIG_CUSTOM_N);
+
+	return CustomHandlers[reason - PROCSIG_CUSTOM_1];
+}
+
+/*
  * SendProcSignal
  *		Send a signal to a Postgres process
  *
@@ -267,7 +323,8 @@ CheckProcSignal(ProcSignalReason reason)
 void
 procsignal_sigusr1_handler(SIGNAL_ARGS)
 {
-	int			save_errno = errno;
+	int					save_errno = errno;
+	ProcSignalReason 	reason;
 
 	if (CheckProcSignal(PROCSIG_CATCHUP_INTERRUPT))
 		HandleCatchupInterrupt();
@@ -296,10 +353,56 @@ procsignal_sigusr1_handler(SIGNAL_ARGS)
 	if (CheckProcSignal(PROCSIG_RECOVERY_CONFLICT_BUFFERPIN))
 		RecoveryConflictInterrupt(PROCSIG_RECOVERY_CONFLICT_BUFFERPIN);
 
+	for (reason = PROCSIG_CUSTOM_1; reason <= PROCSIG_CUSTOM_N; reason++)
+		if (CheckProcSignal(reason))
+			CustomSignalInterrupt(reason);
+
 	if (set_latch_on_sigusr1)
 		SetLatch(MyLatch);
 
 	latch_sigusr1_handler();
 
 	errno = save_errno;
+}
+
+/*
+ * Handle receipt of an interrupt indicating a custom process signal.
+ */
+static void
+CustomSignalInterrupt(ProcSignalReason reason)
+{
+	int	save_errno = errno;
+
+	Assert(reason >= PROCSIG_CUSTOM_1 && reason <= PROCSIG_CUSTOM_N);
+
+	/* set interrupt flags */
+	InterruptPending = true;
+	CustomSignalPendings[reason - PROCSIG_CUSTOM_1] = true;
+
+	/* make sure the event is processed in due course */
+	SetLatch(MyLatch);
+
+	errno = save_errno;
+}
+
+/*
+ * CheckAndHandleCustomSignals
+ * 		Check custom signal flags and call handler assigned to that signal if it is not NULL.
+ * 		This function is called within CHECK_FOR_INTERRUPTS if interrupt have been occurred.
+ */
+void
+CheckAndHandleCustomSignals(void)
+{
+	int i;
+
+	for (i = 0; i < NUM_CUSTOM_PROCSIGNALS; i++)
+		if (CustomSignalPendings[i])
+		{
+			ProcSignalHandler_type handler;
+
+			CustomSignalPendings[i] = false;
+			handler = CustomHandlers[i];
+			if (handler)
+				handler();
+		}
 }

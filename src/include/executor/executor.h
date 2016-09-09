@@ -95,6 +95,12 @@ extern PGDLLIMPORT ExecutorEnd_hook_type ExecutorEnd_hook;
 typedef bool (*ExecutorCheckPerms_hook_type) (List *, bool);
 extern PGDLLIMPORT ExecutorCheckPerms_hook_type ExecutorCheckPerms_hook;
 
+/* Hook for plugins to pre/post process ExecProcNode() */
+typedef void (*PreExecProcNode_hook_type) (PlanState *node);
+typedef void (*PostExecProcNode_hook_type) (PlanState *node, TupleTableSlot *result);
+extern PGDLLIMPORT PreExecProcNode_hook_type preExecProcNode_hook;
+extern PGDLLIMPORT PostExecProcNode_hook_type postExecProcNode_hook;
+
 
 /*
  * prototypes from functions in execAmi.c
