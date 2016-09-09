@@ -580,15 +580,12 @@ _bt_buildadd(BTWriteState *wstate, BTPageState *state, IndexTuple itup)
 		 * Save a copy of the minimum key for the new page.  We have to copy
 		 * it off the old page, not the new one, in case we are not at leaf
 		 * level.
-		 * If tuple contains non-key attributes, truncate them.
-		 * We perform truncation only for leaf pages,
-		 * beacuse all tuples at inner pages will be already
-		 * truncated by the time we handle them.
+		 * Despite oitup is already initialized, it's important to get high
+		 * key from the page, since we could have replaced it with truncated
+		 * copy. See comment above.
 		 */
-		if (indnkeyatts != indnatts && P_ISLEAF(opageop))
-			state->btps_minkey = index_truncate_tuple(wstate->index, oitup);
-		else
-			state->btps_minkey = CopyIndexTuple(oitup);
+		oitup = (IndexTuple) PageGetItem(opage,PageGetItemId(opage, P_HIKEY));
+		state->btps_minkey = CopyIndexTuple(oitup);
 
 		/*
 		 * Set the sibling links for both pages.

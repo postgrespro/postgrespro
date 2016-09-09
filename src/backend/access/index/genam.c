@@ -157,7 +157,8 @@ IndexScanEnd(IndexScanDesc scan)
  *
  * Construct a string describing the contents of an index entry, in the
  * form "(key_name, ...)=(key_value, ...)".  This is currently used
- * for building unique-constraint and exclusion-constraint error messages.
+ * for building unique-constraint and exclusion-constraint error messages,
+ * so only key columns of index are checked and printed.
  *
  * Note that if the user does not have permissions to view all of the
  * columns involved then a NULL is returned.  Returning a partial key seems
@@ -183,7 +184,6 @@ BuildIndexValueDescription(Relation indexRelation,
 	AclResult	aclresult;
 
 	indnkeyatts = IndexRelationGetNumberOfKeyAttributes(indexRelation);
-
 	/*
 	 * Check permissions- if the user does not have access to view all of the
 	 * key columns then return NULL to avoid leaking data.

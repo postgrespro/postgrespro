@@ -64,7 +64,7 @@ _bt_mkscankey(Relation rel, IndexTuple itup)
 {
 	ScanKey		skey;
 	TupleDesc	itupdesc;
-	int			indnatts,
+	int     	indnatts,
 				indnkeyatts;
 	int16	   *indoption;
 	int			i;
@@ -125,7 +125,7 @@ ScanKey
 _bt_mkscankey_nodata(Relation rel)
 {
 	ScanKey		skey;
-	int			indnkeyatts;
+	int     	indnkeyatts;
 	int16	   *indoption;
 	int			i;
 

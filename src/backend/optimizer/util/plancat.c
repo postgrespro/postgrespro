@@ -586,7 +586,7 @@ infer_arbiter_indexes(PlannerInfo *root)
 
 		/* Build BMS representation of plain (non expression) index attrs */
 		indexedAttrs = NULL;
-		for (natt = 0; natt < idxForm->indnatts; natt++)
+		for (natt = 0; natt < idxForm->indnkeyatts; natt++)
 		{
 			int			attno = idxRel->rd_index->indkey.values[natt];
 
