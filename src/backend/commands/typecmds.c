@@ -40,6 +40,7 @@
 #include "catalog/pg_am.h"
 #include "catalog/pg_authid.h"
 #include "catalog/pg_collation.h"
+#include "catalog/pg_compression.h"
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_constraint_fn.h"
 #include "catalog/pg_depend.h"
@@ -3623,6 +3624,66 @@ AlterTypeNamespaceInternal(Oid typeOid, Oid nspOid,
 	return oldNspOid;
 }
 
+
+/*
+ * Execute ALTER TYPE SET COMPRESSED <cm> [WITH (<option>, ...)]
+ */
+static void
+AlterTypeDefaultCompression(Oid typeid, ColumnCompression *compression)
+{
+	Oid				cmoid;
+	Type			oldtup = typeidType(typeid);
+	Form_pg_type	oldtype = (Form_pg_type) GETSTRUCT(oldtup);
+
+	cmoid = compression->methodName
+				? get_compression_method_oid(compression->methodName, false)
+				: InvalidOid;
+
+	if (oldtype->typdefaultcm != cmoid)
+	{
+		Relation	typrel;
+		HeapTuple	newtup;
+		Datum		values[Natts_pg_type];
+		bool		nulls[Natts_pg_type];
+		bool		replace[Natts_pg_type];
+
+		typrel = heap_open(TypeRelationId, RowExclusiveLock);
+
+		memset(replace, 0, sizeof(replace));
+
+		values[Anum_pg_type_typdefaultcm - 1] = ObjectIdGetDatum(cmoid);
+		nulls[Anum_pg_type_typdefaultcm - 1] = false;
+		replace[Anum_pg_type_typdefaultcm - 1] = true;
+
+		newtup = heap_modify_tuple(oldtup, RelationGetDescr(typrel),
+									values, nulls, replace);
+
+		CatalogTupleUpdate(typrel, &newtup->t_self, newtup);
+
+		heap_freetuple(newtup);
+
+		heap_close(typrel, RowExclusiveLock);
+
+		if (OidIsValid(oldtype->typdefaultcm))
+			deleteDependencyRecordsForClass(TypeRelationId, typeid, 0,
+											CompressionMethodRelationId,
+											DEPENDENCY_NORMAL);
+
+		if (OidIsValid(cmoid))
+		{
+			ObjectAddress	myself,
+							referenced;
+			ObjectAddressSet(myself, TypeRelationId, typeid);
+			ObjectAddressSet(referenced, CompressionMethodRelationId, cmoid);
+			recordDependencyOn(&myself, &referenced, DEPENDENCY_NORMAL);
+		}
+
+		InvokeObjectPostAlterHook(TypeRelationId, typeid, 0);
+	}
+
+	ReleaseSysCache(oldtup);
+}
+
 /*
  * Execute ALTER TYPE <typeName> <command>, ...
  */
@@ -3643,6 +3704,10 @@ AlterType(AlterTypeStmt *stmt)
 
 		switch (cmd->cmdtype)
 		{
+			case AT_AlterTypeCompression:
+				AlterTypeDefaultCompression(typeid,
+											(ColumnCompression *) cmd->def);
+				break;
 			default:
 				elog(ERROR, "unknown ALTER TYPE command %d", cmd->cmdtype);
 		}

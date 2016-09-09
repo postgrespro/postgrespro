@@ -487,6 +487,21 @@ void
 transformColumnCompression(ColumnDef *column, RangeVar *relation,
 						   AlterTableStmt **alterStmt)
 {
+	if (!column->compression && column->typeName)
+	{
+		Type	tup = typenameType(NULL, column->typeName, NULL);
+		Oid		cmoid = get_base_typdefaultcm(tup);
+
+		ReleaseSysCache(tup);
+
+		if (OidIsValid(cmoid))
+		{
+			column->compression = makeNode(ColumnCompression);
+			column->compression->methodName = get_compression_method_name(cmoid);
+			column->compression->options = NIL;
+		}
+	}
+
 	if (column->compression)
 	{
 		AlterTableCmd *cmd;

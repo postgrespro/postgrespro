@@ -2307,16 +2307,12 @@ getBaseType(Oid typid)
 }
 
 /*
- * getBaseTypeAndTypmod
- *		If the given type is a domain, return its base type and typmod;
- *		otherwise return the type's own OID, and leave *typmod unchanged.
- *
  * Note that the "applied typmod" should be -1 for every domain level
  * above the bottommost; therefore, if the passed-in typid is indeed
  * a domain, *typmod should be -1.
  */
-Oid
-getBaseTypeAndTypmod(Oid typid, int32 *typmod)
+static inline HeapTuple
+getBaseTypeTuple(Oid *typid, int32 *typmod)
 {
 	/*
 	 * We loop to find the bottom base type in a stack of domains.
@@ -2326,26 +2322,35 @@ getBaseTypeAndTypmod(Oid typid, int32 *typmod)
 		HeapTuple	tup;
 		Form_pg_type typTup;
 
-		tup = SearchSysCache1(TYPEOID, ObjectIdGetDatum(typid));
+		tup = SearchSysCache1(TYPEOID, ObjectIdGetDatum(*typid));
 		if (!HeapTupleIsValid(tup))
-			elog(ERROR, "cache lookup failed for type %u", typid);
+			elog(ERROR, "cache lookup failed for type %u", *typid);
 		typTup = (Form_pg_type) GETSTRUCT(tup);
 		if (typTup->typtype != TYPTYPE_DOMAIN)
-		{
 			/* Not a domain, so done */
-			ReleaseSysCache(tup);
-			break;
-		}
+			return tup;
 
 		Assert(*typmod == -1);
-		typid = typTup->typbasetype;
+		*typid = typTup->typbasetype;
 		*typmod = typTup->typtypmod;
 
 		ReleaseSysCache(tup);
 	}
-
-	return typid;
 }
+
+/*
+ * getBaseTypeAndTypmod
+ *		If the given type is a domain, return its base type and typmod;
+ *		otherwise return the type's own OID, and leave *typmod unchanged.
+ *
+ */
+Oid
+getBaseTypeAndTypmod(Oid typid, int32 *typmod)
+{
+	HeapTuple tup = getBaseTypeTuple(&typid, typmod);
+	ReleaseSysCache(tup);
+ 	return typid;
+ }
 
 /*
  * get_typavgwidth
@@ -2839,6 +2844,39 @@ type_is_collatable(Oid typid)
 	return OidIsValid(get_typcollation(typid));
 }
 
+/*
+ * get_base_typdefaultcm
+ *
+ *		Given the type tuple, return the base type's typdefaultlcm attribute.
+ */
+Oid
+get_base_typdefaultcm(HeapTuple	typtup)
+{
+	Oid	typid;
+	Oid	base;
+	Oid	cm = InvalidOid;
+
+	for (typid = (Oid) -1; !OidIsValid(cm) && OidIsValid(typid); typid = base)
+	{
+		Form_pg_type type;
+
+		if (typid != (Oid) -1)
+		{
+			typtup = SearchSysCache1(TYPEOID, ObjectIdGetDatum(typid));
+			if (!HeapTupleIsValid(typtup))
+				elog(ERROR, "cache lookup failed for type %u", typid);
+		}
+
+		type = (Form_pg_type) GETSTRUCT(typtup);
+		base = type->typtype == TYPTYPE_DOMAIN ? type->typbasetype : InvalidOid;
+		cm = type->typdefaultcm;
+
+		if (typid != (Oid) -1)
+			ReleaseSysCache(typtup);
+	}
+
+	return cm;
+}
 
 /*				---------- STATISTICS CACHE ----------					 */
 

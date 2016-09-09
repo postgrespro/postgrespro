@@ -2827,6 +2827,7 @@ _copyColumnCompression(const ColumnCompression *from)
 	ColumnCompression  *newnode = makeNode(ColumnCompression);
 
 	COPY_STRING_FIELD(methodName);
+	COPY_SCALAR_FIELD(methodOid);
 	COPY_NODE_FIELD(options);
 
 	return newnode;

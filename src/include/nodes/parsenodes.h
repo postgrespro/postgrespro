@@ -620,6 +620,7 @@ typedef struct ColumnCompression
 {
 	NodeTag		type;
 	char	   *methodName;
+	Oid			methodOid;
 	List	   *options;
 } ColumnCompression;
 
@@ -3410,7 +3411,7 @@ typedef struct DropSubscriptionStmt
 
 typedef enum AlterTypeCmdType
 {
-	AT_AlterTypeInvalidCommand
+	AT_AlterTypeCompression,	/* ALTER TYPE name COMPRESSED cm WITH (options) */
 } AlterTypeCmdType;
 
 typedef struct AlterTypeCmd

@@ -118,6 +118,7 @@ TypeShellMake(const char *typeName, Oid typeNamespace, Oid ownerId)
 	values[Anum_pg_type_typtypmod - 1] = Int32GetDatum(-1);
 	values[Anum_pg_type_typndims - 1] = Int32GetDatum(0);
 	values[Anum_pg_type_typcollation - 1] = ObjectIdGetDatum(InvalidOid);
+	values[Anum_pg_type_typdefaultcm - 1] = ObjectIdGetDatum(InvalidOid);
 	nulls[Anum_pg_type_typdefaultbin - 1] = true;
 	nulls[Anum_pg_type_typdefault - 1] = true;
 	nulls[Anum_pg_type_typacl - 1] = true;
@@ -362,6 +363,7 @@ TypeCreate(Oid newTypeOid,
 	values[Anum_pg_type_typtypmod - 1] = Int32GetDatum(typeMod);
 	values[Anum_pg_type_typndims - 1] = Int32GetDatum(typNDims);
 	values[Anum_pg_type_typcollation - 1] = ObjectIdGetDatum(typeCollation);
+	values[Anum_pg_type_typdefaultcm - 1] = ObjectIdGetDatum(InvalidOid);
 
 	/*
 	 * initialize the default binary value for this type.  Check for nulls of

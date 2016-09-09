@@ -2788,6 +2788,7 @@ _outColumnCompression(StringInfo str, const ColumnCompression *node)
 	WRITE_NODE_TYPE("COLUMNCOMPRESSION");
 
 	WRITE_STRING_FIELD(methodName);
+	WRITE_OID_FIELD(methodOid);
 	WRITE_NODE_FIELD(options);
 }
 
