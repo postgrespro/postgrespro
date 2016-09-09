@@ -2875,6 +2875,24 @@ _equalPartitionCmd(const PartitionCmd *a, const PartitionCmd *b)
 	return true;
 }
 
+static bool
+_equalAlterTypeStmt(const AlterTypeStmt *a, const AlterTypeStmt *b)
+{
+	COMPARE_NODE_FIELD(typeName);
+	COMPARE_NODE_FIELD(cmds);
+
+	return true;
+}
+
+static bool
+_equalAlterTypeCmd(const AlterTypeCmd *a, const AlterTypeCmd *b)
+{
+	COMPARE_SCALAR_FIELD(cmdtype);
+	COMPARE_NODE_FIELD(def);
+
+	return true;
+}
+
 /*
  * Stuff from pg_list.h
  */
@@ -3687,6 +3705,12 @@ equal(const void *a, const void *b)
 			break;
 		case T_PartitionCmd:
 			retval = _equalPartitionCmd(a, b);
+			break;
+		case T_AlterTypeStmt:
+			retval = _equalAlterTypeStmt(a, b);
+			break;
+		case T_AlterTypeCmd:
+			retval = _equalAlterTypeCmd(a, b);
 			break;
 
 		default:

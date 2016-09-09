@@ -4556,6 +4556,28 @@ _copyDropSubscriptionStmt(const DropSubscriptionStmt *from)
 	return newnode;
 }
 
+static AlterTypeStmt *
+_copyAlterTypeStmt(const AlterTypeStmt *from)
+{
+	AlterTypeStmt *newnode = makeNode(AlterTypeStmt);
+
+	COPY_NODE_FIELD(typeName);
+	COPY_NODE_FIELD(cmds);
+
+	return newnode;
+}
+
+static AlterTypeCmd *
+_copyAlterTypeCmd(const AlterTypeCmd *from)
+{
+	AlterTypeCmd *newnode = makeNode(AlterTypeCmd);
+
+	COPY_SCALAR_FIELD(cmdtype);
+	COPY_NODE_FIELD(def);
+
+	return newnode;
+}
+
 /* ****************************************************************
  *					pg_list.h copy functions
  * ****************************************************************
@@ -5548,6 +5570,14 @@ copyObjectImpl(const void *from)
 			 */
 		case T_ForeignKeyCacheInfo:
 			retval = _copyForeignKeyCacheInfo(from);
+			break;
+
+		case T_AlterTypeStmt:
+			retval = _copyAlterTypeStmt(from);
+			break;
+
+		case T_AlterTypeCmd:
+			retval = _copyAlterTypeCmd(from);
 			break;
 
 		default:

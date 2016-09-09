@@ -3407,4 +3407,24 @@ typedef struct DropSubscriptionStmt
 	bool		missing_ok;		/* Skip error if missing? */
 } DropSubscriptionStmt;
 
+
+typedef enum AlterTypeCmdType
+{
+	AT_AlterTypeInvalidCommand
+} AlterTypeCmdType;
+
+typedef struct AlterTypeCmd
+{
+	NodeTag				type;
+	AlterTypeCmdType	cmdtype;
+	Node			   *def;
+} AlterTypeCmd;
+
+typedef struct AlterTypeStmt
+{
+	NodeTag		type;
+	List	   *typeName;
+	List	   *cmds;
+} AlterTypeStmt;
+
 #endif   /* PARSENODES_H */

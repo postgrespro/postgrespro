@@ -3622,3 +3622,29 @@ AlterTypeNamespaceInternal(Oid typeOid, Oid nspOid,
 
 	return oldNspOid;
 }
+
+/*
+ * Execute ALTER TYPE <typeName> <command>, ...
+ */
+void
+AlterType(AlterTypeStmt *stmt)
+{
+	TypeName   *typename;
+	Oid			typeid;
+	ListCell   *lcmd;
+
+	/* Make a TypeName so we can use standard type lookup machinery */
+	typename = makeTypeNameFromNameList(stmt->typeName);
+	typeid = typenameTypeId(NULL, typename);
+
+	foreach(lcmd, stmt->cmds)
+	{
+		AlterTypeCmd *cmd = (AlterTypeCmd *) lfirst(lcmd);
+
+		switch (cmd->cmdtype)
+		{
+			default:
+				elog(ERROR, "unknown ALTER TYPE command %d", cmd->cmdtype);
+		}
+	}
+}
