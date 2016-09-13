@@ -32,6 +32,9 @@ typedef struct CompressionMethodOptionsRoutines
 typedef Datum (*CompressionRoutine)  (Datum value, CompressionOptions options);
 typedef Datum (*DecompressionRoutine)(Datum value, CompressionOptions options);
 
+/* CompressionMethodRoutine.flags */
+#define CM_EXTENDED_REPRESENTATION	0x01
+
 /*
  * API struct for an compression method.
  * Note this must be stored in a single palloc'd chunk of memory.
@@ -39,6 +42,7 @@ typedef Datum (*DecompressionRoutine)(Datum value, CompressionOptions options);
 typedef struct CompressionMethodRoutine
 {
 	NodeTag		type;
+	int			flags;
 	CompressionMethodOptionsRoutines *options;
 	void	  (*addAttr)(Form_pg_attribute attr, List *options);
 	void	  (*dropAttr)(Form_pg_attribute attr, List *options);

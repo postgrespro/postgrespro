@@ -1595,8 +1595,8 @@ GetColumnCompressionForAttribute(Form_pg_attribute att)
 {
 	ColumnCompression *compression = makeNode(ColumnCompression);
 
-	compression->methodName = OidIsValid(att->attcompression) ?
-						get_compression_method_name(att->attcompression) : NULL;
+	compression->methodName = NULL;
+	compression->methodOid = att->attcompression;
 	compression->options = untransformRelOptions(
 								get_attcmoptions(att->attrelid, att->attnum));
 
@@ -1607,8 +1607,10 @@ static void
 CheckCompressionMismatch(ColumnCompression *c1, ColumnCompression *c2,
 						 const char *attributeName)
 {
-	char *cmname1 = c1->methodName;
-	char *cmname2 = c2->methodName;
+	char *cmname1 = c1->methodName ? c1->methodName :
+						get_compression_method_name(c1->methodOid);
+	char *cmname2 = c2->methodName ? c2->methodName :
+						get_compression_method_name(c2->methodOid);
 
 	if (strcmp(cmname1, cmname2))
 		ereport(ERROR,
@@ -5223,14 +5225,17 @@ GetAttributeCompression(ColumnCompression *compression,
 						List **optionsList,
 						Datum *optionsDatum)
 {
-	if (compression)
+	if (compression &&
+		(compression->methodName || OidIsValid(compression->methodOid)))
 	{
-		*cmid = get_compression_method_oid(compression->methodName, false);
+		*cmid = compression->methodName
+				? get_compression_method_oid(compression->methodName, false)
+				: compression->methodOid;
 		*optionsList = compression->options;
 	}
 	else
 	{
-		*cmid = InvalidOid;
+		*cmid = get_base_typnullcm(att->atttypid);
 		*optionsList = NIL;
 	}
 
@@ -9512,7 +9517,7 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 	attTup->attbyval = tform->typbyval;
 	attTup->attalign = tform->typalign;
 	attTup->attstorage = tform->typstorage;
-	attTup->attcompression = InvalidOid;
+	attTup->attcompression = get_base_typnullcm(targettype);
 
 	ReleaseSysCache(typeTuple);
 

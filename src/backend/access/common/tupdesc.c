@@ -30,6 +30,7 @@
 #include "utils/acl.h"
 #include "utils/builtins.h"
 #include "utils/datum.h"
+#include "utils/lsyscache.h"
 #include "utils/resowner_private.h"
 #include "utils/syscache.h"
 
@@ -764,7 +765,8 @@ TupleDescInitAttrCompression(TupleDesc desc,
 							 List *optionsList,
 							 Datum optionsDatum)
 {
-	AttributeCompression *ac;
+	AttributeCompression   *ac;
+	Oid						nullcmoid;
 
 	if (!desc->tdcompression)
 		desc->tdcompression = (AttributeCompression *)
@@ -777,6 +779,14 @@ TupleDescInitAttrCompression(TupleDesc desc,
 	ac->options = cmr->options && cmr->options->convert ?
 				  cmr->options->convert(desc->attrs[attnum - 1], optionsList) :
 				  optionsList;
+
+	nullcmoid = (cmr->flags & CM_EXTENDED_REPRESENTATION)
+					? InvalidOid
+					: get_base_typnullcm(desc->attrs[attnum - 1]->atttypid);
+
+	ac->routineNull = OidIsValid(nullcmoid)
+						? GetCompressionMethodRoutineByCmId(nullcmoid)
+						: NULL;
 }
 
 /*

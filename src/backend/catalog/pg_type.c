@@ -22,6 +22,7 @@
 #include "catalog/indexing.h"
 #include "catalog/objectaccess.h"
 #include "catalog/pg_collation.h"
+#include "catalog/pg_compression.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_type.h"
@@ -119,6 +120,7 @@ TypeShellMake(const char *typeName, Oid typeNamespace, Oid ownerId)
 	values[Anum_pg_type_typndims - 1] = Int32GetDatum(0);
 	values[Anum_pg_type_typcollation - 1] = ObjectIdGetDatum(InvalidOid);
 	values[Anum_pg_type_typdefaultcm - 1] = ObjectIdGetDatum(InvalidOid);
+	values[Anum_pg_type_typnullcm - 1] = ObjectIdGetDatum(InvalidOid);
 	nulls[Anum_pg_type_typdefaultbin - 1] = true;
 	nulls[Anum_pg_type_typdefault - 1] = true;
 	nulls[Anum_pg_type_typacl - 1] = true;
@@ -166,6 +168,7 @@ TypeShellMake(const char *typeName, Oid typeNamespace, Oid ownerId)
 								 InvalidOid,
 								 InvalidOid,
 								 NULL,
+								 InvalidOid,
 								 false);
 
 	/* Post creation hook for new shell type */
@@ -223,7 +226,8 @@ TypeCreate(Oid newTypeOid,
 		   int32 typeMod,
 		   int32 typNDims,		/* Array dimensions for baseType */
 		   bool typeNotNull,
-		   Oid typeCollation)
+		   Oid typeCollation,
+		   Oid nullcmOid)
 {
 	Relation	pg_type_desc;
 	Oid			typeObjectId;
@@ -364,6 +368,7 @@ TypeCreate(Oid newTypeOid,
 	values[Anum_pg_type_typndims - 1] = Int32GetDatum(typNDims);
 	values[Anum_pg_type_typcollation - 1] = ObjectIdGetDatum(typeCollation);
 	values[Anum_pg_type_typdefaultcm - 1] = ObjectIdGetDatum(InvalidOid);
+	values[Anum_pg_type_typnullcm - 1] = ObjectIdGetDatum(nullcmOid);
 
 	/*
 	 * initialize the default binary value for this type.  Check for nulls of
@@ -484,6 +489,7 @@ TypeCreate(Oid newTypeOid,
 								 (defaultTypeBin ?
 								  stringToNode(defaultTypeBin) :
 								  NULL),
+								 nullcmOid,
 								 rebuildDeps);
 
 	/* Post creation hook for new type */
@@ -528,6 +534,7 @@ GenerateTypeDependencies(Oid typeNamespace,
 						 Oid baseType,
 						 Oid typeCollation,
 						 Node *defaultExpr,
+						 Oid nullcmOid,
 						 bool rebuild)
 {
 	ObjectAddress myself,
@@ -673,6 +680,12 @@ GenerateTypeDependencies(Oid typeNamespace,
 		referenced.classId = CollationRelationId;
 		referenced.objectId = typeCollation;
 		referenced.objectSubId = 0;
+		recordDependencyOn(&myself, &referenced, DEPENDENCY_NORMAL);
+	}
+
+	if (OidIsValid(nullcmOid))
+	{
+		ObjectAddressSet(referenced, CompressionMethodRelationId, nullcmOid);
 		recordDependencyOn(&myself, &referenced, DEPENDENCY_NORMAL);
 	}
 

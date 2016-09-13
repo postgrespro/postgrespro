@@ -47,6 +47,7 @@ typedef struct tupleConstr
 typedef struct
 {
 	struct CompressionMethodRoutine *routine;
+	struct CompressionMethodRoutine *routineNull;
 	Datum			optionsDatum;
 	const void	   *options;
 } AttributeCompression;

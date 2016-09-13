@@ -2342,15 +2342,14 @@ getBaseTypeTuple(Oid *typid, int32 *typmod)
  * getBaseTypeAndTypmod
  *		If the given type is a domain, return its base type and typmod;
  *		otherwise return the type's own OID, and leave *typmod unchanged.
- *
  */
 Oid
 getBaseTypeAndTypmod(Oid typid, int32 *typmod)
 {
 	HeapTuple tup = getBaseTypeTuple(&typid, typmod);
 	ReleaseSysCache(tup);
- 	return typid;
- }
+	return typid;
+}
 
 /*
  * get_typavgwidth
@@ -2842,6 +2841,23 @@ bool
 type_is_collatable(Oid typid)
 {
 	return OidIsValid(get_typcollation(typid));
+}
+
+/*
+ * get_base_tynullcm
+ *
+ *		Given the type OID, return the base type's typnulcm attribute.
+ */
+Oid
+get_base_typnullcm(Oid typid)
+{
+	int32			typmod = -1;
+	HeapTuple		typtup = getBaseTypeTuple(&typid, &typmod);
+	Oid				result = ((Form_pg_type) GETSTRUCT(typtup))->typnullcm;
+
+	ReleaseSysCache(typtup);
+
+	return result;
 }
 
 /*

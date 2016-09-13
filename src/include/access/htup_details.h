@@ -826,4 +826,9 @@ extern HeapTuple heap_tuple_from_minimal_tuple(MinimalTuple mtup);
 extern MinimalTuple minimal_tuple_from_heap_tuple(HeapTuple htup);
 extern Datum tuple_compress_attr(TupleDesc td, AttrNumber attnum, Datum value);
 
+#define tuple_attr_needs_compression(tupdesc, atti, datum) \
+		(OidIsValid((tupdesc)->attrs[atti]->attcompression) && \
+		 ((tupdesc)->tdcompression[atti].routine->decompress || \
+		  VARATT_IS_EXTERNAL(DatumGetPointer(datum))))
+
 #endif   /* HTUP_DETAILS_H */

@@ -497,7 +497,8 @@ transformColumnCompression(ColumnDef *column, RangeVar *relation,
 		if (OidIsValid(cmoid))
 		{
 			column->compression = makeNode(ColumnCompression);
-			column->compression->methodName = get_compression_method_name(cmoid);
+			column->compression->methodName = NULL;
+			column->compression->methodOid = cmoid;
 			column->compression->options = NIL;
 		}
 	}

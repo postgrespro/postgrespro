@@ -15,6 +15,7 @@
 #define TUPMACS_H
 
 #include "postgres.h"
+#include "access/compression.h"
 #include "access/tupdesc.h"
 #include "catalog/pg_attribute.h"
 
@@ -42,9 +43,10 @@ extern Datum tuple_decompress_attr(TupleDesc tupdesc, int attnum, Datum value);
  */
 #define fetchatt_raw(A,T) fetch_att(T, (A)->attbyval, (A)->attlen)
 
-#define fetchatt_decompress(tupdesc, attnum, tuple, decompress) \
+#define fetchatt_decompress(tupdesc, attnum, tuple, _decompress) \
 ( \
-	((decompress) && OidIsValid((tupdesc)->attrs[attnum]->attcompression)) \
+	((_decompress) && OidIsValid((tupdesc)->attrs[attnum]->attcompression) && \
+	 ((tupdesc)->tdcompression[attnum].routine->decompress)) \
 		? tuple_decompress_attr(tupdesc, attnum, \
 					fetchatt_raw((tupdesc)->attrs[attnum], tuple)) \
 		: 			fetchatt_raw((tupdesc)->attrs[attnum], tuple) \

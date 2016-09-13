@@ -145,6 +145,7 @@ extern void getTypeBinaryOutputInfo(Oid type, Oid *typSend, bool *typIsVarlena);
 extern Oid	get_typmodin(Oid typid);
 extern Oid	get_typcollation(Oid typid);
 extern bool type_is_collatable(Oid typid);
+extern Oid	get_base_typnullcm(Oid typid);
 extern Oid	get_base_typdefaultcm(HeapTuple	typtup);
 extern Oid	getBaseType(Oid typid);
 extern Oid	getBaseTypeAndTypmod(Oid typid, int32 *typmod);

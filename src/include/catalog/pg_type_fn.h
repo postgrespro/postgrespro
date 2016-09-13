@@ -52,7 +52,8 @@ extern ObjectAddress TypeCreate(Oid newTypeOid,
 		   int32 typeMod,
 		   int32 typNDims,
 		   bool typeNotNull,
-		   Oid typeCollation);
+		   Oid typeCollation,
+		   Oid nullcmOid);
 
 extern void GenerateTypeDependencies(Oid typeNamespace,
 						 Oid typeObjectId,
@@ -71,6 +72,7 @@ extern void GenerateTypeDependencies(Oid typeNamespace,
 						 Oid baseType,
 						 Oid typeCollation,
 						 Node *defaultExpr,
+						 Oid nullcmOid,
 						 bool rebuild);
 
 extern void RenameTypeInternal(Oid typeOid, const char *newTypeName,

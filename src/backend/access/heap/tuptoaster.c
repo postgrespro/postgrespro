@@ -1302,10 +1302,7 @@ toast_flatten_tuple_to_datum(HeapTupleHeader tup,
 				}
 			}
 
-			if (OidIsValid(att[i]->attcompression) ||
-				(att[i]->attlen == -1 &&
-				 OidIsValid(att[i]->attrelid) &&
-				 VARATT_IS_EXTERNAL_EXTENDED(DatumGetPointer(new_value))))
+			if (tuple_attr_needs_compression(tupleDesc, i, new_value))
 			{
 				void *compressed_value = DatumGetPointer(
 					tuple_compress_attr(tupleDesc, i,
