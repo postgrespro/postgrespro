@@ -385,7 +385,7 @@ SetPtrackClearLSN(bool set_invalid)
 		ereport(PANIC,
 				(errcode_for_file_access(),
 				 errmsg("could not close ptrack control file: %m")));
-	//LWLockRelease(ControlFileLock);
+	/* LWLockRelease(ControlFileLock); */
 }
 
 /* Test ptrack file */

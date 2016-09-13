@@ -115,7 +115,6 @@
 #include "executor/nodeWorktablescan.h"
 #include "miscadmin.h"
 
-
 /* ------------------------------------------------------------------------
  *		ExecInitNode
  *
@@ -356,6 +355,9 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 	return result;
 }
 
+/* Hooks for plugins to pre/post process ExecProcNode */
+PreExecProcNode_hook_type preExecProcNode_hook = NULL;
+PostExecProcNode_hook_type postExecProcNode_hook = NULL;
 
 /* ----------------------------------------------------------------
  *		ExecProcNode
@@ -374,7 +376,12 @@ ExecProcNode(PlanState *node)
 		ExecReScan(node);		/* let ReScan handle this */
 
 	if (node->instrument)
+	{
+		if (preExecProcNode_hook)
+			preExecProcNode_hook(node);
+
 		InstrStartNode(node->instrument);
+	}
 
 	switch (nodeTag(node))
 	{
@@ -527,7 +534,12 @@ ExecProcNode(PlanState *node)
 	}
 
 	if (node->instrument)
+	{
 		InstrStopNode(node->instrument, TupIsNull(result) ? 0.0 : 1.0);
+
+		if (postExecProcNode_hook)
+			postExecProcNode_hook(node, result);
+	}
 
 	return result;
 }
