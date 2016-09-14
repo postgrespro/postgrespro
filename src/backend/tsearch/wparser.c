@@ -412,7 +412,7 @@ ts_headline_jsonb_byid_opt(PG_FUNCTION_ARGS)
 	/* flatten result to jsonb before jb freeing */
 	out = DatumGetJsonb(PointerGetDatum(JsonValueToJsonb(JsonToJsonValue(out, &jv))));
 
-	PG_FREE_IF_COPY(jb, 1);
+	PG_FREE_IF_COPY_JSONB(jb, 1);
 	PG_FREE_IF_COPY(query, 2);
 	if (opt)
 		PG_FREE_IF_COPY(opt, 3);
@@ -492,6 +492,7 @@ ts_headline_json_byid_opt(PG_FUNCTION_ARGS)
 
 #ifndef JSON_GENERIC
 	out = transform_json_string_values(json, state, action);
+	PG_FREE_IF_COPY(json, 1);
 #else
 	{
 		Jsonb	   *jsonb = transform_jsonb_string_values(json, state, action);
@@ -500,10 +501,11 @@ ts_headline_json_byid_opt(PG_FUNCTION_ARGS)
 		out = cstring_to_text(str);
 
 		pfree(str);
+
+		PG_FREE_IF_COPY_JSONB(json, 1);
 	}
 #endif
 
-	PG_FREE_IF_COPY(json, 1);
 	PG_FREE_IF_COPY(query, 2);
 	if (opt)
 		PG_FREE_IF_COPY(opt, 3);

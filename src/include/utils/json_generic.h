@@ -91,8 +91,9 @@ struct JsonContainerOps
 typedef struct CompressedObject
 {
 	ExpandedObjectHeader	eoh;
-	Datum					compressed;
+	Datum					value;
 	CompressionOptions	   	options;
+	bool					freeValue;
 } CompressedObject;
 
 typedef struct Json
@@ -102,6 +103,8 @@ typedef struct Json
 	bool				is_json;	/* json or jsonb */
 } Json;
 
+#define JsonIsTemporary(json) \
+		((json)->obj.eoh.vl_len_ != EOH_HEADER_MAGIC)
 
 #ifndef JsonxContainerOps
 # define JsonxContainerOps			(&jsonbContainerOps)
@@ -110,7 +113,7 @@ typedef struct Json
 #define JsonFlattenToJsonbDatum(json) \
 		PointerGetDatum(JsonFlatten(json, JsonbEncode, &jsonbContainerOps, NULL))
 
-#define JsonGetEOHDatum(json)		EOHPGetRODatum(&(json)->obj.eoh)
+#define JsonGetEOHDatum(json)		EOHPGetRODatum(&JsonGetNonTemporary(json)->obj.eoh)
 
 /* #define JSON_FLATTEN_INTO_TARGET */
 
@@ -128,15 +131,34 @@ typedef struct Json
 #define JsonGetDatum(json)			JsonxGetDatum(json)
 
 #undef DatumGetJsonb
-#define DatumGetJsonb(datum)		DatumGetJson(datum, &jsonbContainerOps, NULL)
-#define DatumGetJsont(datum)		DatumGetJson(datum, &jsontContainerOps, NULL)
-#define DatumGetJsonx(datum)		DatumGetJson(datum, JsonxContainerOps, NULL)
+#define DatumGetJsonb(datum) \
+		DatumGetJson(datum, &jsonbContainerOps, NULL, NULL)
+		
+#define DatumGetJsont(datum) \
+		DatumGetJson(datum, &jsontContainerOps, NULL, NULL)
+
+#define DatumGetJsonx(datum) \
+		DatumGetJson(datum, JsonxContainerOps, NULL, NULL)
+
+#define DatumGetJsonxTmp(datum, tmp) \
+		DatumGetJson(datum, JsonxContainerOps, NULL, tmp)
 
 #undef PG_RETURN_JSONB
 #define PG_RETURN_JSONB(x)			PG_RETURN_DATUM(JsonGetDatum(x))
 
+#define PG_GETARG_JSONX_TMP(n, tmp)	DatumGetJsonxTmp(PG_GETARG_DATUM(n), tmp)
+
 #undef	PG_GETARG_JSONB
-#define PG_GETARG_JSONB(n)			DatumGetJsonx(PG_GETARG_DATUM(n))
+#define PG_GETARG_JSONB(n)			PG_GETARG_JSONX_TMP(n, alloca(sizeof(Json))) /* FIXME conditional alloca() */
+
+#define PG_FREE_IF_COPY_JSONB(json, n) \
+	do { \
+		if (!VARATT_IS_EXTERNAL_EXPANDED(PG_GETARG_POINTER(n))) \
+			JsonFree(json); \
+		else \
+			Assert(DatumGetEOHP(PG_GETARG_DATUM(n)) == &(json)->obj.eoh); \
+	} while (0)
+
 
 #define JsonRoot(json)				(&(json)->root)
 #define JsonGetSize(json)			(JsonRoot(json)->len)
@@ -225,7 +247,10 @@ JsonIteratorNext(JsonIterator **it, JsonValue *val, bool skipNested)
 #define equalsJsonbScalarValue			JsonValueScalarEquals
 
 extern Json *DatumGetJson(Datum val, JsonContainerOps *ops,
-						  CompressionOptions options);
+						  CompressionOptions options, Json *tmp);
+
+extern void JsonFree(Json *json);
+extern Json *JsonCopyTemporary(Json *tmp);
 
 #define JsonContainerAlloc() \
 	((JsonContainerData *) palloc(sizeof(JsonContainerData)))
@@ -259,6 +284,12 @@ JsonIteratorFree(JsonIterator *it)
 {
 	while (it)
 		it = JsonIteratorFreeAndGetParent(it);
+}
+
+static inline Json *
+JsonGetNonTemporary(Json *json)
+{
+	return JsonIsTemporary(json) ? JsonCopyTemporary(json) : json;
 }
 
 extern Json *JsonValueToJson(JsonValue *val);

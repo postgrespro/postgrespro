@@ -280,7 +280,7 @@ jsonb_to_tsvector_byid(PG_FUNCTION_ARGS)
 
 	iterate_jsonb_string_values(jb, &state, (JsonIterateStringValuesAction) add_to_tsvector);
 
-	PG_FREE_IF_COPY(jb, 1);
+	PG_FREE_IF_COPY_JSONB(jb, 1);
 
 	if (state.result == NULL)
 	{
@@ -329,11 +329,12 @@ json_to_tsvector_byid(PG_FUNCTION_ARGS)
 
 #ifndef JSON_GENERIC
 	iterate_json_string_values(json, &state, (JsonIterateStringValuesAction) add_to_tsvector);
+	PG_FREE_IF_COPY(json, 1);
 #else
 	iterate_jsonb_string_values(json, &state, (JsonIterateStringValuesAction) add_to_tsvector);
+	PG_FREE_IF_COPY_JSONB(json, 1);
 #endif
 
-	PG_FREE_IF_COPY(json, 1);
 	if (state.result == NULL)
 	{
 		/* There weren't any string elements in json,
