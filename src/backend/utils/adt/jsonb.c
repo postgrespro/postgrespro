@@ -1172,7 +1172,12 @@ jsonb_build_object(PG_FUNCTION_ARGS)
 		if (PG_ARGISNULL(i))
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+#ifdef JSON_C
+					 errmsg("argument %d cannot be null", i + 1),
+					 errhint("Object keys should be text.")));
+#else
 					 errmsg("argument %d: key must not be null", i + 1)));
+#endif
 		val_type = get_fn_expr_argtype(fcinfo->flinfo, i);
 
 		/*
@@ -1522,7 +1527,7 @@ jsonb_agg_transfn(PG_FUNCTION_ARGS)
 	if (!AggCheckCallContext(fcinfo, &aggcontext))
 	{
 		/* cannot be called directly because of internal-type argument */
-		elog(ERROR, "jsonb_agg_transfn called in non-aggregate context");
+		elog(ERROR, JSONB"_agg_transfn called in non-aggregate context");
 	}
 
 	/* set up the accumulator on the first go round */
@@ -1676,7 +1681,7 @@ jsonb_object_agg_transfn(PG_FUNCTION_ARGS)
 	if (!AggCheckCallContext(fcinfo, &aggcontext))
 	{
 		/* cannot be called directly because of internal-type argument */
-		elog(ERROR, "jsonb_object_agg_transfn called in non-aggregate context");
+		elog(ERROR, JSONB"_object_agg_transfn called in non-aggregate context");
 	}
 
 	/* set up the accumulator on the first go round */

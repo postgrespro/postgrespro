@@ -13,6 +13,7 @@
  */
 
 #define JSON_C
+#define JSONB "json"
 
 #define jsonb_in					_json_in
 #define jsonb_recv					_json_recv

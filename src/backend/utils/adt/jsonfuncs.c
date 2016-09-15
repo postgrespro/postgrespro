@@ -537,12 +537,12 @@ jsonb_object_keys(PG_FUNCTION_ARGS)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("cannot call %s on a scalar",
-							"jsonb_object_keys")));
+							JSONB"_object_keys")));
 		else if (JB_ROOT_IS_ARRAY(jb))
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("cannot call %s on an array",
-							"jsonb_object_keys")));
+							JSONB"_object_keys")));
 
 		funcctx = SRF_FIRSTCALL_INIT();
 		oldcontext = MemoryContextSwitchTo(funcctx->multi_call_memory_ctx);
@@ -1524,7 +1524,7 @@ get_jsonb_path_all(FunctionCallInfo fcinfo, bool as_text)
 				/* Container must be array, but make sure */
 
 				if (!JsonContainerIsArray(container))
-					elog(ERROR, "not a jsonb array");
+					elog(ERROR, "not a "JSONB" array");
 
 				nelements = JsonContainerSize(container) >= 0 ?
 							JsonContainerSize(container) :
@@ -1702,7 +1702,7 @@ json_each(PG_FUNCTION_ARGS)
 Datum
 jsonb_each(PG_FUNCTION_ARGS)
 {
-	return each_worker_jsonb(fcinfo, "jsonb_each", false);
+	return each_worker_jsonb(fcinfo, JSONB"_each", false);
 }
 
 #ifndef JSON_GENERIC
@@ -1716,7 +1716,7 @@ json_each_text(PG_FUNCTION_ARGS)
 Datum
 jsonb_each_text(PG_FUNCTION_ARGS)
 {
-	return each_worker_jsonb(fcinfo, "jsonb_each_text", true);
+	return each_worker_jsonb(fcinfo, JSONB"_each_text", true);
 }
 
 static Datum
@@ -1769,7 +1769,7 @@ each_worker_jsonb(FunctionCallInfo fcinfo, const char *funcname, bool as_text)
 	MemoryContextSwitchTo(old_cxt);
 
 	tmp_cxt = AllocSetContextCreate(CurrentMemoryContext,
-									"jsonb_each temporary cxt",
+									JSONB"_each temporary cxt",
 									ALLOCSET_DEFAULT_SIZES);
 
 	it = JsonbIteratorInit(&jb->root);
@@ -2026,13 +2026,13 @@ each_scalar(void *state, char *token, JsonTokenType tokentype)
 Datum
 jsonb_array_elements(PG_FUNCTION_ARGS)
 {
-	return elements_worker_jsonb(fcinfo, "jsonb_array_elements", false);
+	return elements_worker_jsonb(fcinfo, JSONB"_array_elements", false);
 }
 
 Datum
 jsonb_array_elements_text(PG_FUNCTION_ARGS)
 {
-	return elements_worker_jsonb(fcinfo, "jsonb_array_elements_text", true);
+	return elements_worker_jsonb(fcinfo, JSONB"_array_elements_text", true);
 }
 
 static Datum
@@ -2086,7 +2086,7 @@ elements_worker_jsonb(FunctionCallInfo fcinfo, const char *funcname,
 	MemoryContextSwitchTo(old_cxt);
 
 	tmp_cxt = AllocSetContextCreate(CurrentMemoryContext,
-									"jsonb_array_elements temporary cxt",
+									JSONB"_array_elements temporary cxt",
 									ALLOCSET_DEFAULT_SIZES);
 
 	it = JsonbIteratorInit(&jb->root);
@@ -2348,13 +2348,13 @@ elements_scalar(void *state, char *token, JsonTokenType tokentype)
 Datum
 jsonb_populate_record(PG_FUNCTION_ARGS)
 {
-	return populate_record_worker(fcinfo, "jsonb_populate_record", true);
+	return populate_record_worker(fcinfo, JSONB"_populate_record", true);
 }
 
 Datum
 jsonb_to_record(PG_FUNCTION_ARGS)
 {
-	return populate_record_worker(fcinfo, "jsonb_to_record", false);
+	return populate_record_worker(fcinfo, JSONB"_to_record", false);
 }
 
 #ifndef JSON_GENERIC
@@ -3491,13 +3491,13 @@ hash_scalar(void *state, char *token, JsonTokenType tokentype)
 Datum
 jsonb_populate_recordset(PG_FUNCTION_ARGS)
 {
-	return populate_recordset_worker(fcinfo, "jsonb_populate_recordset", true);
+	return populate_recordset_worker(fcinfo, JSONB"_populate_recordset", true);
 }
 
 Datum
 jsonb_to_recordset(PG_FUNCTION_ARGS)
 {
-	return populate_recordset_worker(fcinfo, "jsonb_to_recordset", false);
+	return populate_recordset_worker(fcinfo, JSONB"_to_recordset", false);
 }
 
 #ifndef JSON_GENERIC
@@ -4594,7 +4594,7 @@ IteratorConcat(JsonbIterator **it1, JsonbIterator **it2,
 		 */
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("invalid concatenation of jsonb objects")));
+				 errmsg("invalid concatenation of "JSONB" objects")));
 	}
 
 	return res;
@@ -4697,7 +4697,7 @@ setPathObject(JsonbIterator **it, Datum *path_elems, bool *path_nulls,
 					ereport(ERROR,
 							(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 							 errmsg("cannot replace existing key"),
-							 errhint("Try using the function jsonb_set "
+							 errhint("Try using the function "JSONB"_set "
 									 "to replace key value.")));
 
 				r = JsonbIteratorNext(it, &v, true);	/* skip value */
