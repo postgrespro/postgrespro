@@ -140,12 +140,13 @@ heap_tuple_fetch_attr(struct varlena * attr)
 		 * This is an expanded-object pointer --- get flat format
 		 */
 		ExpandedObjectHeader *eoh;
+		void		*context;
 		Size		resultsize;
 
 		eoh = DatumGetEOHP(PointerGetDatum(attr));
-		resultsize = EOH_get_flat_size(eoh);
+		resultsize = EOH_get_flat_size(eoh, &context);
 		result = (struct varlena *) palloc(resultsize);
-		EOH_flatten_into(eoh, (void *) result, resultsize);
+		EOH_flatten_into(eoh, (void *) result, resultsize, &context);
 	}
 	else
 	{
@@ -381,7 +382,7 @@ toast_raw_datum_size(Datum value)
 	}
 	else if (VARATT_IS_EXTERNAL_EXPANDED(attr))
 	{
-		result = EOH_get_flat_size(DatumGetEOHP(value));
+		result = EOH_get_flat_size(DatumGetEOHP(value), NULL);
 	}
 	else if (VARATT_IS_COMPRESSED(attr))
 	{
@@ -441,7 +442,7 @@ toast_datum_size(Datum value)
 	}
 	else if (VARATT_IS_EXTERNAL_EXPANDED(attr))
 	{
-		result = EOH_get_flat_size(DatumGetEOHP(value));
+		result = EOH_get_flat_size(DatumGetEOHP(value), NULL);
 	}
 	else if (VARATT_IS_EXTERNAL_EXTENDED(attr))
 	{

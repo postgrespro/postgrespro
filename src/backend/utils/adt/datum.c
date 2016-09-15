@@ -142,10 +142,11 @@ datumCopy(Datum value, bool typByVal, int typLen)
 			ExpandedObjectHeader *eoh = DatumGetEOHP(value);
 			Size		resultsize;
 			char	   *resultptr;
+			void	   *context;
 
-			resultsize = EOH_get_flat_size(eoh);
+			resultsize = EOH_get_flat_size(eoh, &context);
 			resultptr = (char *) palloc(resultsize);
-			EOH_flatten_into(eoh, (void *) resultptr, resultsize);
+			EOH_flatten_into(eoh, (void *) resultptr, resultsize, &context);
 			res = PointerGetDatum(resultptr);
 		}
 		else
@@ -272,7 +273,7 @@ datumEstimateSpace(Datum value, bool isnull, bool typByVal, int typLen)
 		{
 			ExpandedObjectHeader *eoh = DatumGetEOHP(value);
 
-			sz += EOH_get_flat_size(eoh);
+			sz += EOH_get_flat_size(eoh, NULL);
 		}
 		else
 			sz += datumGetSize(value, typByVal, typLen);
@@ -303,6 +304,7 @@ datumSerialize(Datum value, bool isnull, bool typByVal, int typLen,
 			   char **start_address)
 {
 	ExpandedObjectHeader *eoh = NULL;
+	void	   *context;
 	int			header;
 
 	/* Write header word. */
@@ -313,7 +315,7 @@ datumSerialize(Datum value, bool isnull, bool typByVal, int typLen,
 	else if (VARATT_IS_EXTERNAL_EXPANDED(value))
 	{
 		eoh = DatumGetEOHP(value);
-		header = EOH_get_flat_size(eoh);
+		header = EOH_get_flat_size(eoh, &context);
 	}
 	else
 		header = datumGetSize(value, typByVal, typLen);
@@ -330,7 +332,7 @@ datumSerialize(Datum value, bool isnull, bool typByVal, int typLen,
 		}
 		else if (eoh)
 		{
-			EOH_flatten_into(eoh, (void *) *start_address, header);
+			EOH_flatten_into(eoh, (void *) *start_address, header, &context);
 			*start_address += header;
 		}
 		else
