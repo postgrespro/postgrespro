@@ -12,11 +12,12 @@
 #include "utils/builtins.h"
 #include "utils/json_generic.h"
 #include "utils/memutils.h"
+#include "utils/builtins.h"
 
 static Json *JsonExpand(Json *tmp, Datum value, bool freeValue,
 						JsonContainerOps *ops, CompressionOptions options);
 
-static JsonContainerOps jsonvContainerOps;
+JsonContainerOps jsonvContainerOps;
 
 #if 0
 static JsonValue *
@@ -210,10 +211,7 @@ jsonvScalarIteratorNext(JsonIterator **it, JsonValue *res, bool skipNested)
 	switch (sit->next)
 	{
 		case WJB_BEGIN_ARRAY:
-			res->type = jbvArray;
-			res->val.array.rawScalar = true;
-			res->val.array.nElems = 1;
-			res->val.array.elems = NULL;
+			JsonValueInitArray(res, 1, 0, true, true);
 			sit->next = WJB_ELEM;
 			return WJB_BEGIN_ARRAY;
 
@@ -271,6 +269,7 @@ jsonvArrayIteratorNext(JsonIterator **it, JsonValue *res, bool skipNested)
 			Assert(res->type == jbvArray || res->type == jbvObject);
 			res->val.binary.data = JsonValueToContainer(val);
 			res->val.binary.len = 0;
+			res->val.binary.uniquified = JsonValueIsUniquified(val);
 			res->type = jbvBinary;
 		}
 	}
@@ -323,6 +322,8 @@ jsonvObjectIteratorNext(JsonIterator **it, JsonValue *res, bool skipNested)
 				Assert(res->type == jbvArray || res->type == jbvObject);
 				res->val.binary.data = JsonValueToContainer(&pair->value);
 				res->val.binary.len = 0;
+				res->val.binary.uniquified =
+											JsonValueIsUniquified(&pair->value);
 				res->type = jbvBinary;
 			}
 		}
@@ -416,7 +417,9 @@ static JsonValue *
 jsonvFindKeyInObject(JsonContainer *objc, const JsonValue *key)
 {
 	JsonValue  *obj = (JsonValue *) objc->data;
+	JsonValue  *res;
 	int			i;
+	bool		uniquified;
 
 	Assert(JsonContainerIsObject(objc));
 	Assert(key->type == jbvString);
@@ -430,27 +433,34 @@ jsonvFindKeyInObject(JsonContainer *objc, const JsonValue *key)
 
 	Assert(obj->type == jbvObject);
 
+	res = NULL;
+	uniquified = obj->val.object.uniquified;
+
 	for (i = 0; i < obj->val.object.nPairs; i++)
 	{
 		JsonPair *pair = &obj->val.object.pairs[i];
+
 		if (!lengthCompareJsonbStringValue(key, &pair->key))
 		{
-			if (pair->value.type == jbvObject ||
-				pair->value.type == jbvArray)
-			{	/* FIXME need to wrap containers into binary JsonValue */
-				JsonContainer *jc = JsonValueToContainer(&pair->value);
-				JsonValue  *jv = (JsonValue *) palloc(sizeof(JsonValue));
-				jv->type = jbvBinary;
-				jv->val.binary.data = jc;
-				jv->val.binary.len = jc->len;
-				return jv;
-			}
+			res = &pair->value; /* FIXME palloced copy */
 
-			return &pair->value; /* FIXME palloced copy */
+			if (uniquified)
+				break;
 		}
 	}
 
-	return NULL;
+	if (res && (res->type == jbvObject || res->type == jbvArray))
+	{	/* FIXME need to wrap containers into binary JsonValue */
+		JsonContainer *jc = JsonValueToContainer(res);
+		JsonValue  *jv = (JsonValue *) palloc(sizeof(JsonValue));
+		jv->type = jbvBinary;
+		jv->val.binary.data = jc;
+		jv->val.binary.len = jc->len;
+		jv->val.binary.uniquified = JsonValueIsUniquified(res);
+		res = jv;
+	}
+
+	return res;
 }
 
 static JsonValue *
@@ -540,7 +550,7 @@ jsonvGetArraySize(JsonContainer *arrc)
 	}
 }
 
-static JsonContainerOps
+JsonContainerOps
 jsonvContainerOps =
 {
 	JsonContainerJsonv,
@@ -566,6 +576,7 @@ JsonToJsonValue(Json *json, JsonValue *jv)
 	jv->type = jbvBinary;
 	jv->val.binary.data = &json->root;
 	jv->val.binary.len = json->root.len;
+	jv->val.binary.uniquified = json->root.ops != &jsontContainerOps;
 
 	return jv;
 }
@@ -699,6 +710,40 @@ JsonInit(Json *json)
 }
 
 static Size
+jsonGetFlatSizeJsont(Json *json, void **context)
+{
+	Size		size;
+
+	if (json->root.ops == &jsontContainerOps)
+		size = VARHDRSZ + json->root.len;
+	else
+	{
+		char	   *str = JsonToCString(&json->root);
+		size = VARHDRSZ + strlen(str);
+		if (context)
+			*context = str;
+		else
+			pfree(str);
+	}
+
+	return size;
+}
+
+static void *
+jsonFlattenJsont(Json *json, void **context)
+{
+	if (json->root.ops == &jsontContainerOps)
+		return cstring_to_text_with_len(json->root.data, json->root.len);
+	else
+	{
+		char   *str = context ? (char *) *context : JsonToCString(JsonRoot(json));
+		text   *text = cstring_to_text(str);
+		pfree(str);
+		return text;
+	}
+}
+
+static Size
 jsonGetFlatSize2(Json *json, void **context)
 {
 	Size		size;
@@ -706,20 +751,8 @@ jsonGetFlatSize2(Json *json, void **context)
 #ifdef JSON_FLATTEN_INTO_TARGET
 	if (json->is_json)
 #endif
-#if defined(JSON_FLATTEN_INTO_TARGET) || defined(JSON_FLATTEN_INTO_JSON)
-	{
-		if (json->root.ops == &jsontContainerOps)
-			size = VARHDRSZ + json->root.len;
-		else
-		{
-			char	   *str = JsonToCString(&json->root);
-			size = VARHDRSZ + strlen(str);
-			if (context)
-				*context = str;
-			else
-				pfree(str);
-		}
-	}
+#if defined(JSON_FLATTEN_INTO_TARGET) || defined(JSON_FLATTEN_INTO_JSONT)
+		size = jsonGetFlatSizeJsont(json, context);
 #endif
 #ifdef JSON_FLATTEN_INTO_TARGET
 	else
@@ -750,18 +783,8 @@ jsonFlatten(Json *json, void **context)
 #ifdef JSON_FLATTEN_INTO_TARGET
 	if (json->is_json)
 #endif
-#if defined(JSON_FLATTEN_INTO_TARGET) || defined(JSON_FLATTEN_INTO_JSON)
-	{
-		if (json->root.ops == &jsontContainerOps)
-			return cstring_to_text_with_len(json->root.data, json->root.len);
-		else
-		{
-			char   *str = context ? (char *) *context : JsonToCString(JsonRoot(json));
-			text   *text = cstring_to_text(str);
-			pfree(str);
-			return text;
-		}
-	}
+#if defined(JSON_FLATTEN_INTO_TARGET) || defined(JSON_FLATTEN_INTO_JSONT)
+		return jsonFlattenJsont(json, context);
 #endif
 #ifdef JSON_FLATTEN_INTO_TARGET
 	else
@@ -800,9 +823,21 @@ jsonGetFlatSize(ExpandedObjectHeader *eoh, void **context)
 
 		if (json->root.ops == &jsonvContainerOps)
 		{
+			JsonValue *val = (JsonValue *) flat->data;
+
+			if (JsonValueIsUniquified(val))
+			{
+				tmp.len = jsonGetFlatSize2(json, context) - VARHDRSZ;
+				tmp.ops = flatContainerOps;
+			}
+			else
+			{
+				tmp.len = jsonGetFlatSizeJsont(json, context) - VARHDRSZ;
+				tmp.ops = &jsontContainerOps;
+			}
+
 			tmp.data = NULL;
-			tmp.ops = flatContainerOps;
-			tmp.len = jsonGetFlatSize2(json, context) - VARHDRSZ;
+
 			flat = &tmp;
 		}
 
@@ -829,11 +864,21 @@ jsonFlattenInto(ExpandedObjectHeader *eoh, void *result, Size allocated_size,
 
 		if (flat->ops == &jsonvContainerOps)
 		{
-			tmpData = jsonFlatten(json, context);
+			JsonValue *val = (JsonValue *) flat->data;
 
-			tmp.ops = flatContainerOps;
+			if (JsonValueIsUniquified(val))
+			{
+				tmpData = jsonFlatten(json, context);
+				tmp.ops = flatContainerOps;
+			}
+			else
+			{
+				tmpData = jsonFlattenJsont(json, context);
+				tmp.ops = &jsontContainerOps;
+			}
+
 			tmp.data = VARDATA(tmpData);
-			tmp.len = VARSIZE_ANY_EXHDR(tmpData);
+			tmp.len = VARSIZE(tmpData) - VARHDRSZ;
 
 			flat = &tmp;
 		}

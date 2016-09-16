@@ -29,6 +29,12 @@
 #include "utils/syscache.h"
 #include "utils/typcache.h"
 
+#ifdef JSON_C
+# define JSON_UNIQUIFIED false
+#else
+# define JSON_UNIQUIFIED true
+#endif
+
 typedef struct JsonbInState
 {
 	JsonbParseState *parseState;
@@ -453,6 +459,14 @@ JsonbToCStringWorker(StringInfo out, JsonbContainer *in, int estimated_len,
 	bool		raw_scalar = false;
 	bool		last_was_key = false;
 
+	char		element_sep[5] = ", ";
+	char		field_sep[4] = ", ";
+	char		colon_sep[4] = ": ";
+	char		brace_sep = 0;
+	int			element_sep_size = ispaces;
+	int			field_sep_size = ispaces;
+	int			colon_sep_size = 2;
+
 	if (out == NULL)
 		out = makeStringInfo();
 
@@ -472,6 +486,17 @@ JsonbToCStringWorker(StringInfo out, JsonbContainer *in, int estimated_len,
 
 				if (!v.val.array.rawScalar)
 				{
+					if (skipNested && !v.val.array.uniquified)
+					{
+						element_sep[1] = v.val.array.elementSeparator[0];
+						element_sep[2] = v.val.array.elementSeparator[1];
+						element_sep[3] = v.val.array.elementSeparator[2];
+						element_sep[4] = 0;
+						element_sep_size = element_sep[1] ?
+										   element_sep[2] ?
+										   element_sep[3] ? 4 : 3 : 2 : 1;
+					}
+
 					add_indent(out, use_indent && !last_was_key, level);
 					appendStringInfoCharMacro(out, '[');
 				}
@@ -482,25 +507,45 @@ JsonbToCStringWorker(StringInfo out, JsonbContainer *in, int estimated_len,
 				level++;
 				break;
 			case WJB_BEGIN_OBJECT:
+				if (skipNested && !v.val.object.uniquified)
+				{
+					brace_sep = v.val.object.braceSeparator;
+					field_sep[1] = v.val.object.fieldSeparator;
+					field_sep_size = field_sep[1] ? 2 : 1;
+					colon_sep_size = 0;
+
+					if (v.val.object.colonSeparator.before)
+						colon_sep[colon_sep_size++] =
+								v.val.object.colonSeparator.before;
+
+					colon_sep[colon_sep_size++] = ':';
+
+					if (v.val.object.colonSeparator.after)
+						colon_sep[colon_sep_size++] =
+								v.val.object.colonSeparator.after;
+				}
+
 				if (!first)
 					appendBinaryStringInfo(out, ", ", ispaces);
 
 				add_indent(out, use_indent && !last_was_key, level);
 				appendStringInfoCharMacro(out, '{');
+				if (brace_sep)
+					appendStringInfoCharMacro(out, brace_sep);
 
 				first = true;
 				level++;
 				break;
 			case WJB_KEY:
 				if (!first)
-					appendBinaryStringInfo(out, ", ", ispaces);
+					appendBinaryStringInfo(out, field_sep, field_sep_size);
 				first = true;
 
 				add_indent(out, use_indent, level);
 
 				/* json rules guarantee this is a string */
 				jsonb_put_escaped_value(out, &v);
-				appendBinaryStringInfo(out, ": ", 2);
+				appendBinaryStringInfo(out, colon_sep, colon_sep_size);
 
 				type = JsonbIteratorNext(&it, &v, skipNested);
 				if (type == WJB_VALUE)
@@ -525,7 +570,8 @@ JsonbToCStringWorker(StringInfo out, JsonbContainer *in, int estimated_len,
 				break;
 			case WJB_ELEM:
 				if (!first)
-					appendBinaryStringInfo(out, ", ", ispaces);
+					appendBinaryStringInfo(out, element_sep, element_sep_size);
+
 				first = false;
 
 				if (!raw_scalar)
@@ -548,6 +594,8 @@ JsonbToCStringWorker(StringInfo out, JsonbContainer *in, int estimated_len,
 			case WJB_END_OBJECT:
 				level--;
 				add_indent(out, use_indent, level);
+				if (brace_sep)
+					appendStringInfoCharMacro(out, brace_sep);
 				appendStringInfoCharMacro(out, '}');
 				first = false;
 				break;
@@ -951,6 +999,12 @@ array_dim_to_jsonb(JsonbInState *result, int dim, int ndims, int *dims, Datum *v
 	Assert(dim < ndims);
 
 	result->res = pushJsonbValue(&result->parseState, WJB_BEGIN_ARRAY, NULL);
+#ifdef JSON_C
+	result->res->val.array.uniquified = false;
+	result->res->val.array.elementSeparator[0] = 0;
+	result->res->val.array.elementSeparator[1] = 0;
+	result->res->val.array.elementSeparator[2] = 0;
+#endif
 
 	for (i = 1; i <= dims[dim]; i++)
 	{
@@ -1045,6 +1099,13 @@ composite_to_jsonb(Datum composite, JsonbInState *result)
 	tuple = &tmptup;
 
 	result->res = pushJsonbValue(&result->parseState, WJB_BEGIN_OBJECT, NULL);
+#ifdef JSON_C
+	result->res->val.object.uniquified = false;
+	result->res->val.object.fieldSeparator = 0;
+	result->res->val.object.braceSeparator = 0;
+	result->res->val.object.colonSeparator.before = 0;
+	result->res->val.object.colonSeparator.after = 0;
+#endif
 
 	for (i = 0; i < tupdesc->natts; i++)
 	{
@@ -1164,6 +1225,13 @@ jsonb_build_object(PG_FUNCTION_ARGS)
 	memset(&result, 0, sizeof(JsonbInState));
 
 	result.res = pushJsonbValue(&result.parseState, WJB_BEGIN_OBJECT, NULL);
+	result.res->val.object.uniquified = JSON_UNIQUIFIED;
+#ifdef JSON_C
+	result.res->val.object.fieldSeparator = ' ';
+	result.res->val.object.braceSeparator = 0;
+	result.res->val.object.colonSeparator.before = ' ';
+	result.res->val.object.colonSeparator.after = ' ';
+#endif
 
 	for (i = 0; i < nargs; i += 2)
 	{
@@ -1323,10 +1391,18 @@ jsonb_object(PG_FUNCTION_ARGS)
 				count,
 				i;
 	JsonbInState result;
+	JsonbValue *obj;
 
 	memset(&result, 0, sizeof(JsonbInState));
 
-	(void) pushJsonbValue(&result.parseState, WJB_BEGIN_OBJECT, NULL);
+	obj = pushJsonbValue(&result.parseState, WJB_BEGIN_OBJECT, NULL);
+	obj->val.object.uniquified = JSON_UNIQUIFIED;
+#ifdef JSON_C
+	obj->val.object.fieldSeparator = ' ';
+	obj->val.object.braceSeparator = 0;
+	obj->val.object.colonSeparator.before = ' ';
+	obj->val.object.colonSeparator.after = ' ';
+#endif
 
 	switch (ndims)
 	{
@@ -1429,10 +1505,18 @@ jsonb_object_two_arg(PG_FUNCTION_ARGS)
 				val_count,
 				i;
 	JsonbInState result;
+	JsonbValue *obj;
 
 	memset(&result, 0, sizeof(JsonbInState));
 
-	(void) pushJsonbValue(&result.parseState, WJB_BEGIN_OBJECT, NULL);
+	obj = pushJsonbValue(&result.parseState, WJB_BEGIN_OBJECT, NULL);
+	obj->val.object.uniquified = JSON_UNIQUIFIED;
+#ifdef JSON_C
+	obj->val.object.fieldSeparator = ' ';
+	obj->val.object.braceSeparator = 0;
+	obj->val.object.colonSeparator.before = ' ';
+	obj->val.object.colonSeparator.after = ' ';
+#endif
 
 	if (nkdims > 1 || nkdims != nvdims)
 		ereport(ERROR,
@@ -1551,6 +1635,23 @@ jsonb_agg_transfn(PG_FUNCTION_ARGS)
 
 		jsonb_categorize_type(arg_type, &state->val_category,
 							  &state->val_output_func);
+
+#ifdef JSON_C
+		result->res->val.array.uniquified = false;
+		if (state->val_category == JSONBTYPE_ARRAY ||
+			state->val_category == JSONBTYPE_COMPOSITE)
+		{
+			result->res->val.array.elementSeparator[0] = ' ';
+			result->res->val.array.elementSeparator[1] = '\n';
+			result->res->val.array.elementSeparator[2] = ' ';
+		}
+		else
+		{
+			result->res->val.array.elementSeparator[0] = ' ';
+			result->res->val.array.elementSeparator[1] = 0;
+			result->res->val.array.elementSeparator[2] = 0;
+		}
+#endif
 	}
 	else
 	{
@@ -1696,6 +1797,13 @@ jsonb_object_agg_transfn(PG_FUNCTION_ARGS)
 		state->res = result;
 		result->res = pushJsonbValue(&result->parseState,
 									 WJB_BEGIN_OBJECT, NULL);
+#ifdef JSON_C
+		result->res->val.object.uniquified = false;
+		result->res->val.object.braceSeparator = ' ';
+		result->res->val.object.fieldSeparator = ' ';
+		result->res->val.object.colonSeparator.before = ' ';
+		result->res->val.object.colonSeparator.after = ' ';
+#endif
 		MemoryContextSwitchTo(oldcontext);
 
 		arg_type = get_fn_expr_argtype(fcinfo->flinfo, 1);
