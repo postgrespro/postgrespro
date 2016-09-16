@@ -782,6 +782,7 @@ jsonb_object_field_text(PG_FUNCTION_ARGS)
 	Jsonb	   *jb = PG_GETARG_JSONB(0);
 	text	   *key = PG_GETARG_TEXT_PP(1);
 	JsonbValue *v;
+	JsonbValue	vbuf;
 
 	if (!JB_ROOT_IS_OBJECT(jb))
 		PG_RETURN_NULL();
@@ -808,6 +809,10 @@ jsonb_object_field_text(PG_FUNCTION_ARGS)
 				result = cstring_to_text(DatumGetCString(DirectFunctionCall1(numeric_out,
 										  PointerGetDatum(v->val.numeric))));
 				break;
+			case jbvObject:
+			case jbvArray:
+				v = JsonValueWrapInBinary(v, &vbuf);
+				/* fall through */
 			case jbvBinary:
 				{
 					StringInfo	jtext = makeStringInfo();
@@ -897,6 +902,7 @@ jsonb_array_element_text(PG_FUNCTION_ARGS)
 	Jsonb	   *jb = PG_GETARG_JSONB(0);
 	int			element = PG_GETARG_INT32(1);
 	JsonbValue *v;
+	JsonbValue	vbuf;
 
 	if (!JB_ROOT_IS_ARRAY(jb))
 		PG_RETURN_NULL();
@@ -933,6 +939,10 @@ jsonb_array_element_text(PG_FUNCTION_ARGS)
 				result = cstring_to_text(DatumGetCString(DirectFunctionCall1(numeric_out,
 										  PointerGetDatum(v->val.numeric))));
 				break;
+			case jbvObject:
+			case jbvArray:
+				v = JsonValueWrapInBinary(v, &vbuf);
+				/* fall through */
 			case jbvBinary:
 				{
 					StringInfo	jtext = makeStringInfo();
@@ -1563,6 +1573,8 @@ get_jsonb_path_all(FunctionCallInfo fcinfo, bool as_text)
 		{
 			have_object = jbvp->type == jbvObject;
 			have_array = jbvp->type == jbvArray;
+			if (have_object || have_array)
+				container = JsonValueToContainer(jbvp);
 		}
 	}
 
@@ -2759,6 +2771,8 @@ JsValueToJsObject(JsValue *jsv, JsObject *jso)
 		if (jbv->type == jbvBinary &&
 			JsonContainerIsObject(jbv->val.binary.data))
 			jso->val.jsonb_cont = jbv->val.binary.data;
+		else if (jbv->type == jbvObject)
+			jso->val.jsonb_cont = JsonValueToContainer(jbv);
 		else
 		{
 			bool		is_scalar = IsAJsonbScalar(jbv) ||
@@ -2891,6 +2905,8 @@ populate_scalar(ScalarIOData *io, Oid typid, int32 typmod, JsValue *jsv)
 		else if (jbv->type == jbvNumeric)
 			str = DatumGetCString(DirectFunctionCall1(numeric_out,
 										PointerGetDatum(jbv->val.numeric)));
+		else if (jbv->type == jbvObject || jbv->type == jbvArray)
+			str = JsonbToCString(NULL, JsonValueToContainer(jbv), 0);
 		else if (jbv->type == jbvBinary)
 			str = JsonbToCString(NULL, jbv->val.binary.data,
 									   jbv->val.binary.len);
