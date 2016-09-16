@@ -58,6 +58,7 @@ typedef struct JsonCompressionOptionsOps
 	Size	(*encodeOptions)(JsonContainer *, void *buf);
 	Size	(*decodeOptions)(const void *buf, CompressionOptions *);
 	bool	(*optionsAreEqual)(JsonContainer *, CompressionOptions);
+	void   *(*copyOptions)(void *options);
 } JsonCompressionOptionsOps;
 
 typedef enum JsonContainerTypes
@@ -86,6 +87,7 @@ struct JsonContainerOps
 	uint32			(*getArraySize)(JsonContainer *array);
 	char		   *(*toString)(StringInfo out, JsonContainer *jc,
 								int estimated_len);
+	JsonContainer  *(*copy)(JsonContainer *jc);
 };
 
 typedef struct CompressedObject
@@ -230,6 +232,9 @@ typedef struct Json
 #define JsonGetArraySize(json) \
 		JsonOp0(getArraySize, json)
 
+#define JsonCopy(jscontainer) \
+		JsonOp0(copy, jscontainer)
+
 static inline JsonIteratorToken
 JsonIteratorNext(JsonIterator **it, JsonValue *val, bool skipNested)
 {
@@ -340,6 +345,8 @@ extern Json *JsonValueToJson(JsonValue *val);
 extern JsonValue *JsonToJsonValue(Json *json, JsonValue *jv);
 extern JsonValue *JsonValueUnpackBinary(const JsonValue *jbv);
 extern JsonContainer *JsonValueToContainer(const JsonValue *val);
+extern JsonValue *JsonValueCopy(JsonValue *res, const JsonValue *val);
+extern JsonContainer *JsonCopyFlat(JsonContainer *flatContainer);
 
 extern int JsonCompareContainers(JsonContainer *a, JsonContainer *b);
 

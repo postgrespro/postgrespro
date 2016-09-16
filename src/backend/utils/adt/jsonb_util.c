@@ -2108,4 +2108,5 @@ jsonbContainerOps =
 	jsonbGetArrayElement,
 	NULL,
 	JsonbToCStringRaw,
+	JsonCopyFlat,
 };
