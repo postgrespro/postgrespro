@@ -19,6 +19,7 @@
 #define gin_triconsistent_jsonb_path	gin_triconsistent_json_path
 
 #define JsonxContainerOps				(&jsontContainerOps)
+#define JsonxGetUniquified(json)		(json)
 #ifdef JSON_FLATTEN_INTO_TARGET
 # define JsonxGetDatum(json)	\
 		PointerGetDatum(cstring_to_text(JsonToCString(JsonRoot(json))))

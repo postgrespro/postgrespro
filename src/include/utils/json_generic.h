@@ -121,16 +121,18 @@ typedef struct Json
 
 #undef JsonbGetDatum
 #ifdef JSON_FLATTEN_INTO_TARGET
-# define JsonbGetDatum(json)		JsonFlattenToJsonbDatum(json)
+# define JsonbGetDatum(json)		JsonFlattenToJsonbDatum(JsonGetUniquified(json))
 #else
-# define JsonbGetDatum(json)		JsonGetEOHDatum(json)
+# define JsonbGetDatum(json)		JsonGetEOHDatum(JsonGetUniquified(json))
 #endif
 
-#ifndef JsonxGetDatum
-# define JsonxGetDatum(json)		JsonbGetDatum(json)
+#ifdef JsonxGetDatum
+# define JsonGetDatum(json)			JsonxGetDatum(json)
+#elif defined(JsonxGetUniquified)
+# define JsonGetDatum(json)			JsonGetEOHDatum(JsonxGetUniquified(json))
+#else
+# define JsonGetDatum(json)			JsonbGetDatum(json)
 #endif
-
-#define JsonGetDatum(json)			JsonxGetDatum(json)
 
 #undef DatumGetJsonb
 #define DatumGetJsonb(datum) \
@@ -180,13 +182,14 @@ typedef struct Json
 		 ((jc)->ops != &jsonvContainerOps || \
 		  JsonValueIsUniquified((JsonValue *) jc->data)))
 
+#define JsonIsUniquified(json)		JsonContainerIsUniquified(JsonRoot(json))
+
 #define JsonValueIsScalar(jsval)	IsAJsonbScalar(jsval)
 
 #define JsonContainerGetType(jc) ((jc)->ops->type)
 #define JsonContainerGetOpsByType(type) \
 		((type) == JsonContainerJsont ? &jsontContainerOps : \
 		 (type) == JsonContainerJsonb ? &jsonbContainerOps : NULL)
-
 
 #ifdef JSONB_UTIL_C
 #define JsonbValueToJsonb JsonValueToJsonb
@@ -256,11 +259,16 @@ JsonIteratorNext(JsonIterator **it, JsonValue *val, bool skipNested)
 #define compareJsonbContainers			JsonCompareContainers
 #define equalsJsonbScalarValue			JsonValueScalarEquals
 
+extern JsonContainerOps jsonbContainerOps;
+extern JsonContainerOps jsontContainerOps;
+extern JsonContainerOps jsonvContainerOps;
+
 extern Json *DatumGetJson(Datum val, JsonContainerOps *ops,
 						  CompressionOptions options, Json *tmp);
 
 extern void JsonFree(Json *json);
 extern Json *JsonCopyTemporary(Json *tmp);
+extern Json *JsonUniquify(Json *json);
 
 #define JsonContainerAlloc() \
 	((JsonContainerData *) palloc(sizeof(JsonContainerData)))
@@ -300,6 +308,12 @@ static inline Json *
 JsonGetNonTemporary(Json *json)
 {
 	return JsonIsTemporary(json) ? JsonCopyTemporary(json) : json;
+}
+
+static inline Json *
+JsonGetUniquified(Json *json)
+{
+	return JsonIsUniquified(json) ? json : JsonUniquify(json);
 }
 
 static inline JsonValue *
@@ -409,9 +423,5 @@ extern void JsonbEncode(StringInfo, const JsonValue *, CompressionOptions);
 		JsonValueFlatten(val, JsonbEncode, &jsonbContainerOps, NULL)
 
 extern int lengthCompareJsonbStringValue(const void *a, const void *b);
-
-extern JsonContainerOps jsonbContainerOps;
-extern JsonContainerOps jsontContainerOps;
-extern JsonContainerOps jsonvContainerOps;
 
 #endif /* UTILS_JSON_GENERIC_H */

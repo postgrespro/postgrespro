@@ -23,6 +23,7 @@
 #define jsonb_hash			json_hash
 
 #define JsonxContainerOps			(&jsontContainerOps)
+#define JsonxGetUniquified(json)	(json)
 #ifdef JSON_FLATTEN_INTO_TARGET
 # define JsonxGetDatum(json)	\
 		PointerGetDatum(cstring_to_text(JsonToCString(JsonRoot(json))))
