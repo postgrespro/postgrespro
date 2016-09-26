@@ -632,7 +632,6 @@ fillJsonbValue(const JsonbContainer *container, int index,
 						   (JsonbContainer *)(base_addr + INTALIGN(offset)),
 						   getJsonbLength(container, index) -
 								(INTALIGN(offset) - offset));
-		result->val.binary.len = result->val.binary.data->len;
 		result->val.binary.uniquified = true;
 	}
 }

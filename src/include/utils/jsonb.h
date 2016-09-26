@@ -295,7 +295,6 @@ struct JsonbValue
 
 		struct
 		{
-			int			len; /* FIXME remove */
 			bool		uniquified;
 			const struct JsonContainerData *data;
 		}			binary;		/* Array or object, in on-disk format */
