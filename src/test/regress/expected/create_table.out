@@ -534,10 +534,10 @@ CREATE TABLE oids_parted (
 ) PARTITION BY RANGE (a) WITH OIDS;
 CREATE TABLE part_forced_oids PARTITION OF oids_parted FOR VALUES FROM (1) TO (10) WITHOUT OIDS;
 \d+ part_forced_oids
-                             Table "public.part_forced_oids"
- Column |  Type   | Collation | Nullable | Default | Storage | Stats target | Description 
---------+---------+-----------+----------+---------+---------+--------------+-------------
- a      | integer |           | not null |         | plain   |              | 
+                                    Table "public.part_forced_oids"
+ Column |  Type   | Collation | Nullable | Default | Storage | Compression | Stats target | Description 
+--------+---------+-----------+----------+---------+---------+-------------+--------------+-------------
+ a      | integer |           | not null |         | plain   |             |              | 
 Partition of: oids_parted FOR VALUES FROM (1) TO (10)
 Has OIDs: yes
 

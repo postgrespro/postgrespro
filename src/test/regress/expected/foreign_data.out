@@ -1247,12 +1247,12 @@ CREATE TABLE pt1 (
 CREATE FOREIGN TABLE ft2 () INHERITS (pt1)
   SERVER s0 OPTIONS (delimiter ',', quote '"', "be quoted" 'value');
 \d+ pt1
-                                    Table "public.pt1"
- Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
---------+---------+-----------+----------+---------+----------+--------------+-------------
- c1     | integer |           | not null |         | plain    |              | 
- c2     | text    |           |          |         | extended |              | 
- c3     | date    |           |          |         | plain    |              | 
+                                           Table "public.pt1"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Compression | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+-------------+--------------+-------------
+ c1     | integer |           | not null |         | plain    |             |              | 
+ c2     | text    |           |          |         | extended |             |              | 
+ c3     | date    |           |          |         | plain    |             |              | 
 Child tables: ft2
 
 \d+ ft2
@@ -1268,12 +1268,12 @@ Inherits: pt1
 
 DROP FOREIGN TABLE ft2;
 \d+ pt1
-                                    Table "public.pt1"
- Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
---------+---------+-----------+----------+---------+----------+--------------+-------------
- c1     | integer |           | not null |         | plain    |              | 
- c2     | text    |           |          |         | extended |              | 
- c3     | date    |           |          |         | plain    |              | 
+                                           Table "public.pt1"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Compression | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+-------------+--------------+-------------
+ c1     | integer |           | not null |         | plain    |             |              | 
+ c2     | text    |           |          |         | extended |             |              | 
+ c3     | date    |           |          |         | plain    |             |              | 
 
 CREATE FOREIGN TABLE ft2 (
 	c1 integer NOT NULL,
@@ -1292,12 +1292,12 @@ FDW Options: (delimiter ',', quote '"', "be quoted" 'value')
 
 ALTER FOREIGN TABLE ft2 INHERIT pt1;
 \d+ pt1
-                                    Table "public.pt1"
- Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
---------+---------+-----------+----------+---------+----------+--------------+-------------
- c1     | integer |           | not null |         | plain    |              | 
- c2     | text    |           |          |         | extended |              | 
- c3     | date    |           |          |         | plain    |              | 
+                                           Table "public.pt1"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Compression | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+-------------+--------------+-------------
+ c1     | integer |           | not null |         | plain    |             |              | 
+ c2     | text    |           |          |         | extended |             |              | 
+ c3     | date    |           |          |         | plain    |             |              | 
 Child tables: ft2
 
 \d+ ft2
@@ -1335,12 +1335,12 @@ Child tables: ct3,
               ft3
 
 \d+ ct3
-                                    Table "public.ct3"
- Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
---------+---------+-----------+----------+---------+----------+--------------+-------------
- c1     | integer |           | not null |         | plain    |              | 
- c2     | text    |           |          |         | extended |              | 
- c3     | date    |           |          |         | plain    |              | 
+                                           Table "public.ct3"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Compression | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+-------------+--------------+-------------
+ c1     | integer |           | not null |         | plain    |             |              | 
+ c2     | text    |           |          |         | extended |             |              | 
+ c3     | date    |           |          |         | plain    |             |              | 
 Inherits: ft2
 
 \d+ ft3
@@ -1360,17 +1360,17 @@ ALTER TABLE pt1 ADD COLUMN c6 integer;
 ALTER TABLE pt1 ADD COLUMN c7 integer NOT NULL;
 ALTER TABLE pt1 ADD COLUMN c8 integer;
 \d+ pt1
-                                    Table "public.pt1"
- Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
---------+---------+-----------+----------+---------+----------+--------------+-------------
- c1     | integer |           | not null |         | plain    |              | 
- c2     | text    |           |          |         | extended |              | 
- c3     | date    |           |          |         | plain    |              | 
- c4     | integer |           |          |         | plain    |              | 
- c5     | integer |           |          | 0       | plain    |              | 
- c6     | integer |           |          |         | plain    |              | 
- c7     | integer |           | not null |         | plain    |              | 
- c8     | integer |           |          |         | plain    |              | 
+                                           Table "public.pt1"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Compression | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+-------------+--------------+-------------
+ c1     | integer |           | not null |         | plain    |             |              | 
+ c2     | text    |           |          |         | extended |             |              | 
+ c3     | date    |           |          |         | plain    |             |              | 
+ c4     | integer |           |          |         | plain    |             |              | 
+ c5     | integer |           |          | 0       | plain    |             |              | 
+ c6     | integer |           |          |         | plain    |             |              | 
+ c7     | integer |           | not null |         | plain    |             |              | 
+ c8     | integer |           |          |         | plain    |             |              | 
 Child tables: ft2
 
 \d+ ft2
@@ -1392,17 +1392,17 @@ Child tables: ct3,
               ft3
 
 \d+ ct3
-                                    Table "public.ct3"
- Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
---------+---------+-----------+----------+---------+----------+--------------+-------------
- c1     | integer |           | not null |         | plain    |              | 
- c2     | text    |           |          |         | extended |              | 
- c3     | date    |           |          |         | plain    |              | 
- c4     | integer |           |          |         | plain    |              | 
- c5     | integer |           |          | 0       | plain    |              | 
- c6     | integer |           |          |         | plain    |              | 
- c7     | integer |           | not null |         | plain    |              | 
- c8     | integer |           |          |         | plain    |              | 
+                                           Table "public.ct3"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Compression | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+-------------+--------------+-------------
+ c1     | integer |           | not null |         | plain    |             |              | 
+ c2     | text    |           |          |         | extended |             |              | 
+ c3     | date    |           |          |         | plain    |             |              | 
+ c4     | integer |           |          |         | plain    |             |              | 
+ c5     | integer |           |          | 0       | plain    |             |              | 
+ c6     | integer |           |          |         | plain    |             |              | 
+ c7     | integer |           | not null |         | plain    |             |              | 
+ c8     | integer |           |          |         | plain    |             |              | 
 Inherits: ft2
 
 \d+ ft3
@@ -1434,17 +1434,17 @@ ALTER TABLE pt1 ALTER COLUMN c1 SET (n_distinct = 100);
 ALTER TABLE pt1 ALTER COLUMN c8 SET STATISTICS -1;
 ALTER TABLE pt1 ALTER COLUMN c8 SET STORAGE EXTERNAL;
 \d+ pt1
-                                    Table "public.pt1"
- Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
---------+---------+-----------+----------+---------+----------+--------------+-------------
- c1     | integer |           | not null |         | plain    | 10000        | 
- c2     | text    |           |          |         | extended |              | 
- c3     | date    |           |          |         | plain    |              | 
- c4     | integer |           |          | 0       | plain    |              | 
- c5     | integer |           |          |         | plain    |              | 
- c6     | integer |           | not null |         | plain    |              | 
- c7     | integer |           |          |         | plain    |              | 
- c8     | text    |           |          |         | external |              | 
+                                           Table "public.pt1"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Compression | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+-------------+--------------+-------------
+ c1     | integer |           | not null |         | plain    |             | 10000        | 
+ c2     | text    |           |          |         | extended |             |              | 
+ c3     | date    |           |          |         | plain    |             |              | 
+ c4     | integer |           |          | 0       | plain    |             |              | 
+ c5     | integer |           |          |         | plain    |             |              | 
+ c6     | integer |           | not null |         | plain    |             |              | 
+ c7     | integer |           |          |         | plain    |             |              | 
+ c8     | text    |           |          |         | external |             |              | 
 Child tables: ft2
 
 \d+ ft2
@@ -1472,12 +1472,12 @@ ALTER TABLE pt1 DROP COLUMN c6;
 ALTER TABLE pt1 DROP COLUMN c7;
 ALTER TABLE pt1 DROP COLUMN c8;
 \d+ pt1
-                                    Table "public.pt1"
- Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
---------+---------+-----------+----------+---------+----------+--------------+-------------
- c1     | integer |           | not null |         | plain    | 10000        | 
- c2     | text    |           |          |         | extended |              | 
- c3     | date    |           |          |         | plain    |              | 
+                                           Table "public.pt1"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Compression | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+-------------+--------------+-------------
+ c1     | integer |           | not null |         | plain    |             | 10000        | 
+ c2     | text    |           |          |         | extended |             |              | 
+ c3     | date    |           |          |         | plain    |             |              | 
 Child tables: ft2
 
 \d+ ft2
@@ -1509,12 +1509,12 @@ SELECT relname, conname, contype, conislocal, coninhcount, connoinherit
 
 -- child does not inherit NO INHERIT constraints
 \d+ pt1
-                                    Table "public.pt1"
- Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
---------+---------+-----------+----------+---------+----------+--------------+-------------
- c1     | integer |           | not null |         | plain    | 10000        | 
- c2     | text    |           |          |         | extended |              | 
- c3     | date    |           |          |         | plain    |              | 
+                                           Table "public.pt1"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Compression | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+-------------+--------------+-------------
+ c1     | integer |           | not null |         | plain    |             | 10000        | 
+ c2     | text    |           |          |         | extended |             |              | 
+ c3     | date    |           |          |         | plain    |             |              | 
 Check constraints:
     "pt1chk1" CHECK (c1 > 0) NO INHERIT
     "pt1chk2" CHECK (c2 <> ''::text)
@@ -1556,12 +1556,12 @@ ALTER FOREIGN TABLE ft2 ADD CONSTRAINT pt1chk2 CHECK (c2 <> '');
 ALTER FOREIGN TABLE ft2 INHERIT pt1;
 -- child does not inherit NO INHERIT constraints
 \d+ pt1
-                                    Table "public.pt1"
- Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
---------+---------+-----------+----------+---------+----------+--------------+-------------
- c1     | integer |           | not null |         | plain    | 10000        | 
- c2     | text    |           |          |         | extended |              | 
- c3     | date    |           |          |         | plain    |              | 
+                                           Table "public.pt1"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Compression | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+-------------+--------------+-------------
+ c1     | integer |           | not null |         | plain    |             | 10000        | 
+ c2     | text    |           |          |         | extended |             |              | 
+ c3     | date    |           |          |         | plain    |             |              | 
 Check constraints:
     "pt1chk1" CHECK (c1 > 0) NO INHERIT
     "pt1chk2" CHECK (c2 <> ''::text)
@@ -1587,12 +1587,12 @@ ALTER TABLE pt1 DROP CONSTRAINT pt1chk2 CASCADE;
 INSERT INTO pt1 VALUES (1, 'pt1'::text, '1994-01-01'::date);
 ALTER TABLE pt1 ADD CONSTRAINT pt1chk3 CHECK (c2 <> '') NOT VALID;
 \d+ pt1
-                                    Table "public.pt1"
- Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
---------+---------+-----------+----------+---------+----------+--------------+-------------
- c1     | integer |           | not null |         | plain    | 10000        | 
- c2     | text    |           |          |         | extended |              | 
- c3     | date    |           |          |         | plain    |              | 
+                                           Table "public.pt1"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Compression | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+-------------+--------------+-------------
+ c1     | integer |           | not null |         | plain    |             | 10000        | 
+ c2     | text    |           |          |         | extended |             |              | 
+ c3     | date    |           |          |         | plain    |             |              | 
 Check constraints:
     "pt1chk3" CHECK (c2 <> ''::text) NOT VALID
 Child tables: ft2
@@ -1614,12 +1614,12 @@ Inherits: pt1
 -- VALIDATE CONSTRAINT need do nothing on foreign tables
 ALTER TABLE pt1 VALIDATE CONSTRAINT pt1chk3;
 \d+ pt1
-                                    Table "public.pt1"
- Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
---------+---------+-----------+----------+---------+----------+--------------+-------------
- c1     | integer |           | not null |         | plain    | 10000        | 
- c2     | text    |           |          |         | extended |              | 
- c3     | date    |           |          |         | plain    |              | 
+                                           Table "public.pt1"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Compression | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+-------------+--------------+-------------
+ c1     | integer |           | not null |         | plain    |             | 10000        | 
+ c2     | text    |           |          |         | extended |             |              | 
+ c3     | date    |           |          |         | plain    |             |              | 
 Check constraints:
     "pt1chk3" CHECK (c2 <> ''::text)
 Child tables: ft2
@@ -1641,12 +1641,12 @@ Inherits: pt1
 -- OID system column
 ALTER TABLE pt1 SET WITH OIDS;
 \d+ pt1
-                                    Table "public.pt1"
- Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
---------+---------+-----------+----------+---------+----------+--------------+-------------
- c1     | integer |           | not null |         | plain    | 10000        | 
- c2     | text    |           |          |         | extended |              | 
- c3     | date    |           |          |         | plain    |              | 
+                                           Table "public.pt1"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Compression | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+-------------+--------------+-------------
+ c1     | integer |           | not null |         | plain    |             | 10000        | 
+ c2     | text    |           |          |         | extended |             |              | 
+ c3     | date    |           |          |         | plain    |             |              | 
 Check constraints:
     "pt1chk3" CHECK (c2 <> ''::text)
 Child tables: ft2
@@ -1671,12 +1671,12 @@ ALTER TABLE ft2 SET WITHOUT OIDS;  -- ERROR
 ERROR:  cannot drop inherited column "oid"
 ALTER TABLE pt1 SET WITHOUT OIDS;
 \d+ pt1
-                                    Table "public.pt1"
- Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
---------+---------+-----------+----------+---------+----------+--------------+-------------
- c1     | integer |           | not null |         | plain    | 10000        | 
- c2     | text    |           |          |         | extended |              | 
- c3     | date    |           |          |         | plain    |              | 
+                                           Table "public.pt1"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Compression | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+-------------+--------------+-------------
+ c1     | integer |           | not null |         | plain    |             | 10000        | 
+ c2     | text    |           |          |         | extended |             |              | 
+ c3     | date    |           |          |         | plain    |             |              | 
 Check constraints:
     "pt1chk3" CHECK (c2 <> ''::text)
 Child tables: ft2
@@ -1702,12 +1702,12 @@ ALTER TABLE pt1 RENAME COLUMN c3 TO f3;
 -- changes name of a constraint recursively
 ALTER TABLE pt1 RENAME CONSTRAINT pt1chk3 TO f2_check;
 \d+ pt1
-                                    Table "public.pt1"
- Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
---------+---------+-----------+----------+---------+----------+--------------+-------------
- f1     | integer |           | not null |         | plain    | 10000        | 
- f2     | text    |           |          |         | extended |              | 
- f3     | date    |           |          |         | plain    |              | 
+                                           Table "public.pt1"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Compression | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+-------------+--------------+-------------
+ f1     | integer |           | not null |         | plain    |             | 10000        | 
+ f2     | text    |           |          |         | extended |             |              | 
+ f3     | date    |           |          |         | plain    |             |              | 
 Check constraints:
     "f2_check" CHECK (f2 <> ''::text)
 Child tables: ft2

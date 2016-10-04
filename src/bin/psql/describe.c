@@ -1610,6 +1610,21 @@ describeOneTableDetails(const char *schemaname,
 	if (verbose)
 	{
 		appendPQExpBufferStr(&buf, ",\n  a.attstorage");
+
+		if (pset.sversion >= 100000)
+			appendPQExpBufferStr(&buf, ",\n  CASE WHEN attcompression = 0 THEN NULL ELSE "
+								 " (SELECT c.cmname || "
+								 "		(CASE WHEN attcmoptions IS NULL "
+								 "		 THEN '' "
+								 "		 ELSE '(' || array_to_string(ARRAY(SELECT quote_ident(option_name) || ' ' || quote_literal(option_value)"
+								 "											  FROM pg_options_to_table(attcmoptions)), ', ') || ')'"
+								 " 		 END) "
+								 "  FROM pg_catalog.pg_compression c "
+								 "  WHERE c.oid = a.attcompression) "
+								 " END AS attcmname");
+		else
+			appendPQExpBufferStr(&buf, "\n  NULL AS attcmname");
+
 		appendPQExpBufferStr(&buf, ",\n  CASE WHEN a.attstattarget=-1 THEN NULL ELSE a.attstattarget END AS attstattarget");
 
 		/*
@@ -1731,6 +1746,10 @@ describeOneTableDetails(const char *schemaname,
 	if (verbose)
 	{
 		headers[cols++] = gettext_noop("Storage");
+
+		if (tableinfo.relkind == RELKIND_RELATION)
+			headers[cols++] = gettext_noop("Compression");
+
 		if (tableinfo.relkind == RELKIND_RELATION ||
 			tableinfo.relkind == RELKIND_MATVIEW ||
 			tableinfo.relkind == RELKIND_FOREIGN_TABLE ||
@@ -1829,13 +1848,18 @@ describeOneTableDetails(const char *schemaname,
 										 "???")))),
 							  false, false);
 
+			/* Column compression. */
+			if (tableinfo.relkind == RELKIND_RELATION)
+				printTableAddCell(&cont, PQgetvalue(res, i, firstvcol + 1),
+								  false, false);
+
 			/* Statistics target, if the relkind supports this feature */
 			if (tableinfo.relkind == RELKIND_RELATION ||
 				tableinfo.relkind == RELKIND_MATVIEW ||
 				tableinfo.relkind == RELKIND_FOREIGN_TABLE ||
 				tableinfo.relkind == RELKIND_PARTITIONED_TABLE)
 			{
-				printTableAddCell(&cont, PQgetvalue(res, i, firstvcol + 1),
+				printTableAddCell(&cont, PQgetvalue(res, i, firstvcol + 2),
 								  false, false);
 			}
 
@@ -1846,7 +1870,7 @@ describeOneTableDetails(const char *schemaname,
 				tableinfo.relkind == RELKIND_COMPOSITE_TYPE ||
 				tableinfo.relkind == RELKIND_FOREIGN_TABLE ||
 				tableinfo.relkind == RELKIND_PARTITIONED_TABLE)
-				printTableAddCell(&cont, PQgetvalue(res, i, firstvcol + 2),
+				printTableAddCell(&cont, PQgetvalue(res, i, firstvcol + 3),
 								  false, false);
 		}
 	}
