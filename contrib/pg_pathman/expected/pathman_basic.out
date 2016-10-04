@@ -9,12 +9,87 @@ INSERT INTO test.hash_rel VALUES (1, 1);
 INSERT INTO test.hash_rel VALUES (2, 2);
 INSERT INTO test.hash_rel VALUES (3, 3);
 SELECT pathman.create_hash_partitions('test.hash_rel', 'value', 3);
-ERROR:  Partitioning key 'value' must be NOT NULL
+ERROR:  partitioning key 'value' must be NOT NULL
 ALTER TABLE test.hash_rel ALTER COLUMN value SET NOT NULL;
+SELECT pathman.create_hash_partitions('test.hash_rel', 'value', 3, partition_data:=false);
+ create_hash_partitions 
+------------------------
+                      3
+(1 row)
+
+EXPLAIN (COSTS OFF) SELECT * FROM test.hash_rel;
+          QUERY PLAN          
+------------------------------
+ Append
+   ->  Seq Scan on hash_rel
+   ->  Seq Scan on hash_rel_0
+   ->  Seq Scan on hash_rel_1
+   ->  Seq Scan on hash_rel_2
+(5 rows)
+
+SELECT * FROM test.hash_rel;
+ id | value 
+----+-------
+  1 |     1
+  2 |     2
+  3 |     3
+(3 rows)
+
+SELECT pathman.set_enable_parent('test.hash_rel', false);
+ set_enable_parent 
+-------------------
+ 
+(1 row)
+
+EXPLAIN (COSTS OFF) SELECT * FROM test.hash_rel;
+          QUERY PLAN          
+------------------------------
+ Append
+   ->  Seq Scan on hash_rel_0
+   ->  Seq Scan on hash_rel_1
+   ->  Seq Scan on hash_rel_2
+(4 rows)
+
+SELECT * FROM test.hash_rel;
+ id | value 
+----+-------
+(0 rows)
+
+SELECT pathman.set_enable_parent('test.hash_rel', true);
+ set_enable_parent 
+-------------------
+ 
+(1 row)
+
+EXPLAIN (COSTS OFF) SELECT * FROM test.hash_rel;
+          QUERY PLAN          
+------------------------------
+ Append
+   ->  Seq Scan on hash_rel
+   ->  Seq Scan on hash_rel_0
+   ->  Seq Scan on hash_rel_1
+   ->  Seq Scan on hash_rel_2
+(5 rows)
+
+SELECT * FROM test.hash_rel;
+ id | value 
+----+-------
+  1 |     1
+  2 |     2
+  3 |     3
+(3 rows)
+
+SELECT pathman.drop_partitions('test.hash_rel');
+NOTICE:  function test.hash_rel_upd_trig_func() does not exist, skipping
+NOTICE:  0 rows copied from test.hash_rel_0
+NOTICE:  0 rows copied from test.hash_rel_1
+NOTICE:  0 rows copied from test.hash_rel_2
+ drop_partitions 
+-----------------
+               3
+(1 row)
+
 SELECT pathman.create_hash_partitions('test.hash_rel', 'Value', 3);
-NOTICE:  function test.hash_rel_insert_trigger_func() does not exist, skipping
-NOTICE:  function test.hash_rel_update_trigger_func() does not exist, skipping
-NOTICE:  Copying data to partitions...
  create_hash_partitions 
 ------------------------
                       3
@@ -55,13 +130,12 @@ CREATE INDEX ON test.range_rel (dt);
 INSERT INTO test.range_rel (dt, txt)
 SELECT g, md5(g::TEXT) FROM generate_series('2015-01-01', '2015-04-30', '1 day'::interval) as g;
 SELECT pathman.create_range_partitions('test.range_rel', 'dt', '2015-01-01'::DATE, '1 month'::INTERVAL, 2);
-ERROR:  Partitioning key 'dt' must be NOT NULL
+ERROR:  partitioning key 'dt' must be NOT NULL
 ALTER TABLE test.range_rel ALTER COLUMN dt SET NOT NULL;
 SELECT pathman.create_range_partitions('test.range_rel', 'dt', '2015-01-01'::DATE, '1 month'::INTERVAL, 2);
-ERROR:  Not enough partitions to fit all the values of 'dt'
+ERROR:  not enough partitions to fit all values of 'dt'
 SELECT pathman.create_range_partitions('test.range_rel', 'DT', '2015-01-01'::DATE, '1 month'::INTERVAL);
 NOTICE:  sequence "range_rel_seq" does not exist, skipping
-NOTICE:  Copying data to partitions...
  create_range_partitions 
 -------------------------
                        4
@@ -84,7 +158,6 @@ CREATE TABLE test.num_range_rel (
 	txt	TEXT);
 SELECT pathman.create_range_partitions('test.num_range_rel', 'id', 0, 1000, 4);
 NOTICE:  sequence "num_range_rel_seq" does not exist, skipping
-NOTICE:  Copying data to partitions...
  create_range_partitions 
 -------------------------
                        4
@@ -123,9 +196,9 @@ SET pg_pathman.enable_runtimemergeappend = OFF;
 VACUUM;
 /* update triggers test */
 SELECT pathman.create_hash_update_trigger('test.hash_rel');
- create_hash_update_trigger 
-----------------------------
- 
+ create_hash_update_trigger  
+-----------------------------
+ test.hash_rel_upd_trig_func
 (1 row)
 
 UPDATE test.hash_rel SET value = 7 WHERE value = 6;
@@ -144,9 +217,9 @@ SELECT * FROM test.hash_rel WHERE value = 7;
 (1 row)
 
 SELECT pathman.create_range_update_trigger('test.num_range_rel');
-       create_range_update_trigger        
-------------------------------------------
- test.num_range_rel_update_trigger_func()
+   create_range_update_trigger    
+----------------------------------
+ test.num_range_rel_upd_trig_func
 (1 row)
 
 UPDATE test.num_range_rel SET id = 3001 WHERE id = 1;
@@ -551,7 +624,7 @@ WHERE j1.dt < '2015-03-01' AND j2.dt >= '2015-02-01' ORDER BY j2.dt;
  * Test CTE query
  */
 EXPLAIN (COSTS OFF)
-    WITH ttt AS (SELECT * FROM test.range_rel WHERE dt >= '2015-02-01' AND dt < '2015-03-15')
+	WITH ttt AS (SELECT * FROM test.range_rel WHERE dt >= '2015-02-01' AND dt < '2015-03-15')
 SELECT * FROM ttt;
                                          QUERY PLAN                                         
 --------------------------------------------------------------------------------------------
@@ -564,7 +637,7 @@ SELECT * FROM ttt;
 (6 rows)
 
 EXPLAIN (COSTS OFF)
-    WITH ttt AS (SELECT * FROM test.hash_rel WHERE value = 2)
+	WITH ttt AS (SELECT * FROM test.hash_rel WHERE value = 2)
 SELECT * FROM ttt;
               QUERY PLAN              
 --------------------------------------
@@ -576,230 +649,10 @@ SELECT * FROM ttt;
 (5 rows)
 
 /*
- * Test RuntimeAppend
- */
-create or replace function test.pathman_assert(smt bool, error_msg text) returns text as $$
-begin
-	if not smt then
-		raise exception '%', error_msg;
-	end if;
-
-	return 'ok';
-end;
-$$ language plpgsql;
-create or replace function test.pathman_equal(a text, b text, error_msg text) returns text as $$
-begin
-	if a != b then
-		raise exception '''%'' is not equal to ''%'', %', a, b, error_msg;
-	end if;
-
-	return 'equal';
-end;
-$$ language plpgsql;
-create or replace function test.pathman_test(query text) returns jsonb as $$
-declare
-	plan jsonb;
-begin
-	execute 'explain (analyze, format json)' || query into plan;
-
-	return plan;
-end;
-$$ language plpgsql;
-create or replace function test.pathman_test_1() returns text as $$
-declare
-	plan jsonb;
-	num int;
-begin
-	plan = test.pathman_test('select * from test.runtime_test_1 where id = (select * from test.run_values limit 1)');
-
-	perform test.pathman_equal((plan->0->'Plan'->'Node Type')::text,
-							   '"Custom Scan"',
-							   'wrong plan type');
-
-	perform test.pathman_equal((plan->0->'Plan'->'Custom Plan Provider')::text,
-							   '"RuntimeAppend"',
-							   'wrong plan provider');
-
-	perform test.pathman_equal((plan->0->'Plan'->'Plans'->1->'Relation Name')::text,
-							   format('"runtime_test_1_%s"', pathman.get_hash(hashint4(1), 6)),
-							   'wrong partition');
-
-	select count(*) from jsonb_array_elements_text(plan->0->'Plan'->'Plans') into num;
-	perform test.pathman_equal(num::text, '2', 'expected 2 child plans for custom scan');
-
-	return 'ok';
-end;
-$$ language plpgsql;
-create or replace function test.pathman_test_2() returns text as $$
-declare
-	plan jsonb;
-	num int;
-begin
-	plan = test.pathman_test('select * from test.runtime_test_1 where id = any (select * from test.run_values limit 4)');
-
-	perform test.pathman_equal((plan->0->'Plan'->'Node Type')::text,
-							   '"Nested Loop"',
-							   'wrong plan type');
-
-	perform test.pathman_equal((plan->0->'Plan'->'Plans'->1->'Node Type')::text,
-							   '"Custom Scan"',
-							   'wrong plan type');
-
-	perform test.pathman_equal((plan->0->'Plan'->'Plans'->1->'Custom Plan Provider')::text,
-							   '"RuntimeAppend"',
-							   'wrong plan provider');
-
-	select count(*) from jsonb_array_elements_text(plan->0->'Plan'->'Plans'->1->'Plans') into num;
-	perform test.pathman_equal(num::text, '4', 'expected 4 child plans for custom scan');
-
-	for i in 0..3 loop
-		perform test.pathman_equal((plan->0->'Plan'->'Plans'->1->'Plans'->i->'Relation Name')::text,
-								   format('"runtime_test_1_%s"', pathman.get_hash(hashint4(i + 1), 6)),
-								   'wrong partition');
-
-		num = plan->0->'Plan'->'Plans'->1->'Plans'->i->'Actual Loops';
-		perform test.pathman_equal(num::text, '1', 'expected 1 loop');
-	end loop;
-
-	return 'ok';
-end;
-$$ language plpgsql;
-create or replace function test.pathman_test_3() returns text as $$
-declare
-	plan jsonb;
-	num int;
-begin
-	plan = test.pathman_test('select * from test.runtime_test_1 a join test.run_values b on a.id = b.val');
-
-	perform test.pathman_equal((plan->0->'Plan'->'Node Type')::text,
-							   '"Nested Loop"',
-							   'wrong plan type');
-
-	perform test.pathman_equal((plan->0->'Plan'->'Plans'->1->'Node Type')::text,
-							   '"Custom Scan"',
-							   'wrong plan type');
-
-	perform test.pathman_equal((plan->0->'Plan'->'Plans'->1->'Custom Plan Provider')::text,
-							   '"RuntimeAppend"',
-							   'wrong plan provider');
-
-	select count(*) from jsonb_array_elements_text(plan->0->'Plan'->'Plans'->1->'Plans') into num;
-	perform test.pathman_equal(num::text, '6', 'expected 6 child plans for custom scan');
-
-	for i in 0..5 loop
-		num = plan->0->'Plan'->'Plans'->1->'Plans'->i->'Actual Loops';
-		perform test.pathman_assert(num > 0 and num <= 1718, 'expected no more than 1718 loops');
-	end loop;
-
-	return 'ok';
-end;
-$$ language plpgsql;
-create or replace function test.pathman_test_4() returns text as $$
-declare
-	plan jsonb;
-	num int;
-begin
-	plan = test.pathman_test('select * from test.category c, lateral' ||
-							 '(select * from test.runtime_test_2 g where g.category_id = c.id order by rating limit 4) as tg');
-
-	perform test.pathman_equal((plan->0->'Plan'->'Node Type')::text,
-							   '"Nested Loop"',
-							   'wrong plan type');
-
-														/* Limit -> Custom Scan */
-	perform test.pathman_equal((plan->0->'Plan'->'Plans'->1->0->'Node Type')::text,
-							   '"Custom Scan"',
-							   'wrong plan type');
-
-	perform test.pathman_equal((plan->0->'Plan'->'Plans'->1->0->'Custom Plan Provider')::text,
-							   '"RuntimeMergeAppend"',
-							   'wrong plan provider');
-
-	select count(*) from jsonb_array_elements_text(plan->0->'Plan'->'Plans'->1->'Plans'->0->'Plans') into num;
-	perform test.pathman_equal(num::text, '4', 'expected 4 child plans for custom scan');
-
-	for i in 0..3 loop
-		perform test.pathman_equal((plan->0->'Plan'->'Plans'->1->'Plans'->0->'Plans'->i->'Relation Name')::text,
-								   format('"runtime_test_2_%s"', pathman.get_hash(hashint4(i + 1), 6)),
-								   'wrong partition');
-
-		num = plan->0->'Plan'->'Plans'->1->'Plans'->0->'Plans'->i->'Actual Loops';
-		perform test.pathman_assert(num = 1, 'expected no more than 1 loops');
-	end loop;
-
-	return 'ok';
-end;
-$$ language plpgsql;
-create table test.run_values as select generate_series(1, 10000) val;
-create table test.runtime_test_1(id serial primary key, val real);
-insert into test.runtime_test_1 select generate_series(1, 10000), random();
-select pathman.create_hash_partitions('test.runtime_test_1', 'id', 6);
-NOTICE:  function test.runtime_test_1_insert_trigger_func() does not exist, skipping
-NOTICE:  function test.runtime_test_1_update_trigger_func() does not exist, skipping
-NOTICE:  Copying data to partitions...
- create_hash_partitions 
-------------------------
-                      6
-(1 row)
-
-create table test.category as (select id, 'cat' || id::text as name from generate_series(1, 4) id);
-create table test.runtime_test_2 (id serial, category_id int not null, name text, rating real);
-insert into test.runtime_test_2 (select id, (id % 6) + 1 as category_id, 'good' || id::text as name, random() as rating from generate_series(1, 100000) id);
-create index on test.runtime_test_2 (category_id, rating);
-select pathman.create_hash_partitions('test.runtime_test_2', 'category_id', 6);
-NOTICE:  function test.runtime_test_2_insert_trigger_func() does not exist, skipping
-NOTICE:  function test.runtime_test_2_update_trigger_func() does not exist, skipping
-NOTICE:  Copying data to partitions...
- create_hash_partitions 
-------------------------
-                      6
-(1 row)
-
-analyze test.run_values;
-analyze test.runtime_test_1;
-set enable_mergejoin = off;
-set enable_hashjoin = off;
-set pg_pathman.enable_runtimeappend = on;
-set pg_pathman.enable_runtimemergeappend = on;
-select test.pathman_test_1(); /* RuntimeAppend (select ... where id = (subquery)) */
- pathman_test_1 
-----------------
- ok
-(1 row)
-
-select test.pathman_test_2(); /* RuntimeAppend (select ... where id = any(subquery)) */
- pathman_test_2 
-----------------
- ok
-(1 row)
-
-select test.pathman_test_3(); /* RuntimeAppend (a join b on a.id = b.val) */
- pathman_test_3 
-----------------
- ok
-(1 row)
-
-select test.pathman_test_4(); /* RuntimeMergeAppend (lateral) */
- pathman_test_4 
-----------------
- ok
-(1 row)
-
-set pg_pathman.enable_runtimeappend = off;
-set pg_pathman.enable_runtimemergeappend = off;
-set enable_mergejoin = on;
-set enable_hashjoin = on;
-drop table test.run_values, test.runtime_test_1, test.runtime_test_2 cascade;
-NOTICE:  drop cascades to 12 other objects
-/*
  * Test split and merge
  */
 /* Split first partition in half */
 SELECT pathman.split_range_partition('test.num_range_rel_1', 500);
-NOTICE:  Creating new partition...
-NOTICE:  Copying data to new partition...
-NOTICE:  Altering original partition...
-NOTICE:  Done!
  split_range_partition 
 -----------------------
  {0,1000}
@@ -816,10 +669,6 @@ EXPLAIN (COSTS OFF) SELECT * FROM test.num_range_rel WHERE id BETWEEN 100 AND 70
 (5 rows)
 
 SELECT pathman.split_range_partition('test.range_rel_1', '2015-01-15'::DATE);
-NOTICE:  Creating new partition...
-NOTICE:  Copying data to new partition...
-NOTICE:  Altering original partition...
-NOTICE:  Done!
   split_range_partition  
 -------------------------
  {01-01-2015,02-01-2015}
@@ -827,10 +676,6 @@ NOTICE:  Done!
 
 /* Merge two partitions into one */
 SELECT pathman.merge_range_partitions('test.num_range_rel_1', 'test.num_range_rel_' || currval('test.num_range_rel_seq'));
-NOTICE:  Altering first partition...
-NOTICE:  Copying data...
-NOTICE:  Dropping second partition...
-NOTICE:  Done!
  merge_range_partitions 
 ------------------------
  
@@ -845,10 +690,6 @@ EXPLAIN (COSTS OFF) SELECT * FROM test.num_range_rel WHERE id BETWEEN 100 AND 70
 (3 rows)
 
 SELECT pathman.merge_range_partitions('test.range_rel_1', 'test.range_rel_' || currval('test.range_rel_seq'));
-NOTICE:  Altering first partition...
-NOTICE:  Copying data...
-NOTICE:  Dropping second partition...
-NOTICE:  Done!
  merge_range_partitions 
 ------------------------
  
@@ -856,8 +697,6 @@ NOTICE:  Done!
 
 /* Append and prepend partitions */
 SELECT pathman.append_range_partition('test.num_range_rel');
-NOTICE:  Appending new partition...
-NOTICE:  Done!
  append_range_partition 
 ------------------------
  test.num_range_rel_6
@@ -871,8 +710,6 @@ EXPLAIN (COSTS OFF) SELECT * FROM test.num_range_rel WHERE id >= 4000;
 (2 rows)
 
 SELECT pathman.prepend_range_partition('test.num_range_rel');
-NOTICE:  Prepending new partition...
-NOTICE:  Done!
  prepend_range_partition 
 -------------------------
  test.num_range_rel_7
@@ -892,16 +729,12 @@ SELECT pathman.drop_range_partition('test.num_range_rel_7');
 (1 row)
 
 SELECT pathman.append_range_partition('test.range_rel');
-NOTICE:  Appending new partition...
-NOTICE:  Done!
  append_range_partition 
 ------------------------
  test.range_rel_6
 (1 row)
 
 SELECT pathman.prepend_range_partition('test.range_rel');
-NOTICE:  Prepending new partition...
-NOTICE:  Done!
  prepend_range_partition 
 -------------------------
  test.range_rel_7
@@ -932,9 +765,8 @@ EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt BETWEEN '2014-12-15' A
 (3 rows)
 
 SELECT pathman.add_range_partition('test.range_rel', '2014-12-01'::DATE, '2015-01-02'::DATE);
-ERROR:  Specified range overlaps with existing partitions
+ERROR:  specified range overlaps with existing partitions
 SELECT pathman.add_range_partition('test.range_rel', '2014-12-01'::DATE, '2015-01-01'::DATE);
-NOTICE:  Done!
  add_range_partition 
 ---------------------
  test.range_rel_8
@@ -952,7 +784,7 @@ EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt BETWEEN '2014-12-15' A
 
 CREATE TABLE test.range_rel_archive (LIKE test.range_rel INCLUDING ALL);
 SELECT pathman.attach_range_partition('test.range_rel', 'test.range_rel_archive', '2014-01-01'::DATE, '2015-01-01'::DATE);
-ERROR:  Specified range overlaps with existing partitions
+ERROR:  specified range overlaps with existing partitions
 SELECT pathman.attach_range_partition('test.range_rel', 'test.range_rel_archive', '2014-01-01'::DATE, '2014-12-01'::DATE);
  attach_range_partition 
 ------------------------
@@ -986,17 +818,61 @@ EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt BETWEEN '2014-11-15' A
 (4 rows)
 
 CREATE TABLE test.range_rel_test1 (
-    id  SERIAL PRIMARY KEY,
-    dt  TIMESTAMP,
-    txt TEXT,
-    abc INTEGER);
+	id  SERIAL PRIMARY KEY,
+	dt  TIMESTAMP,
+	txt TEXT,
+	abc INTEGER);
 SELECT pathman.attach_range_partition('test.range_rel', 'test.range_rel_test1', '2013-01-01'::DATE, '2014-01-01'::DATE);
-ERROR:  Partition must have the exact same structure as parent
+ERROR:  partition must have the exact same structure as parent
 CREATE TABLE test.range_rel_test2 (
-    id  SERIAL PRIMARY KEY,
-    dt  TIMESTAMP);
+	id  SERIAL PRIMARY KEY,
+	dt  TIMESTAMP);
 SELECT pathman.attach_range_partition('test.range_rel', 'test.range_rel_test2', '2013-01-01'::DATE, '2014-01-01'::DATE);
-ERROR:  Partition must have the exact same structure as parent
+ERROR:  partition must have the exact same structure as parent
+/*
+ * Zero partitions count and adding partitions with specified name
+ */
+CREATE TABLE test.zero(
+	id		SERIAL PRIMARY KEY,
+	value	INT NOT NULL);
+INSERT INTO test.zero SELECT g, g FROM generate_series(1, 100) as g;
+SELECT pathman.create_range_partitions('test.zero', 'value', 50, 10, 0);
+NOTICE:  sequence "zero_seq" does not exist, skipping
+ create_range_partitions 
+-------------------------
+                       0
+(1 row)
+
+SELECT pathman.append_range_partition('test.zero', 'test.zero_0');
+ERROR:  cannot append to empty partitions set
+SELECT pathman.prepend_range_partition('test.zero', 'test.zero_1');
+ERROR:  cannot prepend to empty partitions set
+SELECT pathman.add_range_partition('test.zero', 50, 70, 'test.zero_50');
+ add_range_partition 
+---------------------
+ test.zero_50
+(1 row)
+
+SELECT pathman.append_range_partition('test.zero', 'test.zero_appended');
+ append_range_partition 
+------------------------
+ test.zero_appended
+(1 row)
+
+SELECT pathman.prepend_range_partition('test.zero', 'test.zero_prepended');
+ prepend_range_partition 
+-------------------------
+ test.zero_prepended
+(1 row)
+
+SELECT pathman.split_range_partition('test.zero_50', 60, 'test.zero_60');
+ split_range_partition 
+-----------------------
+ {50,70}
+(1 row)
+
+DROP TABLE test.zero CASCADE;
+NOTICE:  drop cascades to 4 other objects
 /*
  * Check that altering table columns doesn't break trigger
  */
@@ -1011,15 +887,14 @@ SELECT * FROM test.hash_rel WHERE id = 123;
 /*
  * Clean up
  */
-SELECT pathman.drop_hash_partitions('test.hash_rel');
-NOTICE:  drop cascades to trigger test_hash_rel_insert_trigger on table test.hash_rel
+SELECT pathman.drop_partitions('test.hash_rel');
 NOTICE:  drop cascades to 3 other objects
 NOTICE:  2 rows copied from test.hash_rel_2
 NOTICE:  3 rows copied from test.hash_rel_1
 NOTICE:  2 rows copied from test.hash_rel_0
- drop_hash_partitions 
-----------------------
-                    3
+ drop_partitions 
+-----------------
+               3
 (1 row)
 
 SELECT COUNT(*) FROM ONLY test.hash_rel;
@@ -1029,20 +904,16 @@ SELECT COUNT(*) FROM ONLY test.hash_rel;
 (1 row)
 
 SELECT pathman.create_hash_partitions('test.hash_rel', 'value', 3);
-NOTICE:  function test.hash_rel_insert_trigger_func() does not exist, skipping
-NOTICE:  function test.hash_rel_update_trigger_func() does not exist, skipping
-NOTICE:  Copying data to partitions...
  create_hash_partitions 
 ------------------------
                       3
 (1 row)
 
-SELECT pathman.drop_hash_partitions('test.hash_rel', TRUE);
-NOTICE:  drop cascades to trigger test_hash_rel_insert_trigger on table test.hash_rel
-NOTICE:  function test.hash_rel_update_trigger_func() does not exist, skipping
- drop_hash_partitions 
-----------------------
-                    3
+SELECT pathman.drop_partitions('test.hash_rel', TRUE);
+NOTICE:  function test.hash_rel_upd_trig_func() does not exist, skipping
+ drop_partitions 
+-----------------
+               3
 (1 row)
 
 SELECT COUNT(*) FROM ONLY test.hash_rel;
@@ -1052,15 +923,16 @@ SELECT COUNT(*) FROM ONLY test.hash_rel;
 (1 row)
 
 DROP TABLE test.hash_rel CASCADE;
-SELECT pathman.drop_range_partitions('test.num_range_rel');
+SELECT pathman.drop_partitions('test.num_range_rel');
+NOTICE:  drop cascades to 4 other objects
 NOTICE:  0 rows copied from test.num_range_rel_6
 NOTICE:  2 rows copied from test.num_range_rel_4
 NOTICE:  1000 rows copied from test.num_range_rel_3
 NOTICE:  1000 rows copied from test.num_range_rel_2
 NOTICE:  998 rows copied from test.num_range_rel_1
- drop_range_partitions 
------------------------
-                     5
+ drop_partitions 
+-----------------
+               5
 (1 row)
 
 DROP TABLE test.num_range_rel CASCADE;
@@ -1071,7 +943,6 @@ CREATE TABLE test.range_rel (
 	id	SERIAL PRIMARY KEY,
 	dt	TIMESTAMP NOT NULL);
 SELECT pathman.create_range_partitions('test.range_rel', 'dt', '2015-01-01'::DATE, '10 days'::INTERVAL, 1);
-NOTICE:  Copying data to partitions...
  create_range_partitions 
 -------------------------
                        1
@@ -1109,11 +980,26 @@ SELECT * FROM test.range_rel WHERE dt = '2015-03-15';
  74 | Sun Mar 15 00:00:00 2015
 (1 row)
 
+SELECT pathman.set_auto('test.range_rel', false);
+ set_auto 
+----------
+ 
+(1 row)
+
+INSERT INTO test.range_rel (dt) VALUES ('2015-06-01');
+ERROR:  no suitable partition for key 'Mon Jun 01 00:00:00 2015'
+SELECT pathman.set_auto('test.range_rel', true);
+ set_auto 
+----------
+ 
+(1 row)
+
+INSERT INTO test.range_rel (dt) VALUES ('2015-06-01');
 DROP TABLE test.range_rel CASCADE;
-NOTICE:  drop cascades to 16 other objects
+NOTICE:  drop cascades to 20 other objects
 SELECT * FROM pathman.pathman_config;
- id | relname | attname | parttype | range_interval 
-----+---------+---------+----------+----------------
+ partrel | attname | parttype | range_interval 
+---------+---------+----------+----------------
 (0 rows)
 
 /* Check overlaps */
@@ -1121,7 +1007,6 @@ CREATE TABLE test.num_range_rel (
 	id	SERIAL PRIMARY KEY,
 	txt	TEXT);
 SELECT pathman.create_range_partitions('test.num_range_rel', 'id', 1000, 1000, 4);
-NOTICE:  Copying data to partitions...
  create_range_partitions 
 -------------------------
                        4
@@ -1174,9 +1059,6 @@ CREATE TABLE test."TeSt" (a INT NOT NULL, b INT);
 SELECT pathman.create_hash_partitions('test.TeSt', 'a', 3);
 ERROR:  relation "test.test" does not exist at character 39
 SELECT pathman.create_hash_partitions('test."TeSt"', 'a', 3);
-NOTICE:  function test.TeSt_insert_trigger_func() does not exist, skipping
-NOTICE:  function test.TeSt_update_trigger_func() does not exist, skipping
-NOTICE:  Copying data to partitions...
  create_hash_partitions 
 ------------------------
                       3
@@ -1196,7 +1078,7 @@ SELECT * FROM test."TeSt";
 SELECT pathman.create_hash_update_trigger('test."TeSt"');
  create_hash_update_trigger 
 ----------------------------
- 
+ test."TeSt_upd_trig_func"
 (1 row)
 
 UPDATE test."TeSt" SET a = 1;
@@ -1224,15 +1106,14 @@ EXPLAIN (COSTS OFF) SELECT * FROM test."TeSt" WHERE a = 1;
          Filter: (a = 1)
 (3 rows)
 
-SELECT pathman.drop_hash_partitions('test."TeSt"');
-NOTICE:  drop cascades to trigger test_TeSt_insert_trigger on table test."TeSt"
+SELECT pathman.drop_partitions('test."TeSt"');
 NOTICE:  drop cascades to 3 other objects
 NOTICE:  3 rows copied from test."TeSt_2"
 NOTICE:  0 rows copied from test."TeSt_1"
 NOTICE:  0 rows copied from test."TeSt_0"
- drop_hash_partitions 
-----------------------
-                    3
+ drop_partitions 
+-----------------
+               3
 (1 row)
 
 SELECT * FROM test."TeSt";
@@ -1251,61 +1132,48 @@ INSERT INTO test."RangeRel" (dt, txt)
 SELECT g, md5(g::TEXT) FROM generate_series('2015-01-01', '2015-01-03', '1 day'::interval) as g;
 SELECT pathman.create_range_partitions('test."RangeRel"', 'dt', '2015-01-01'::DATE, '1 day'::INTERVAL);
 NOTICE:  sequence "RangeRel_seq" does not exist, skipping
-NOTICE:  Copying data to partitions...
  create_range_partitions 
 -------------------------
                        3
 (1 row)
 
 SELECT pathman.append_range_partition('test."RangeRel"');
-NOTICE:  Appending new partition...
-NOTICE:  Done!
  append_range_partition 
 ------------------------
  test."RangeRel_4"
 (1 row)
 
 SELECT pathman.prepend_range_partition('test."RangeRel"');
-NOTICE:  Prepending new partition...
-NOTICE:  Done!
  prepend_range_partition 
 -------------------------
  test."RangeRel_5"
 (1 row)
 
 SELECT pathman.merge_range_partitions('test."RangeRel_1"', 'test."RangeRel_' || currval('test."RangeRel_seq"') || '"');
-NOTICE:  Altering first partition...
-NOTICE:  Copying data...
-NOTICE:  Dropping second partition...
-NOTICE:  Done!
  merge_range_partitions 
 ------------------------
  
 (1 row)
 
 SELECT pathman.split_range_partition('test."RangeRel_1"', '2015-01-01'::DATE);
-NOTICE:  Creating new partition...
-NOTICE:  Copying data to new partition...
-NOTICE:  Altering original partition...
-NOTICE:  Done!
   split_range_partition  
 -------------------------
  {12-31-2014,01-02-2015}
 (1 row)
 
-SELECT pathman.drop_range_partitions('test."RangeRel"');
+SELECT pathman.drop_partitions('test."RangeRel"');
+NOTICE:  function test.RangeRel_upd_trig_func() does not exist, skipping
 NOTICE:  1 rows copied from test."RangeRel_6"
 NOTICE:  0 rows copied from test."RangeRel_4"
 NOTICE:  1 rows copied from test."RangeRel_3"
 NOTICE:  1 rows copied from test."RangeRel_2"
 NOTICE:  0 rows copied from test."RangeRel_1"
- drop_range_partitions 
------------------------
-                     5
+ drop_partitions 
+-----------------
+               5
 (1 row)
 
 SELECT pathman.create_partitions_from_range('test."RangeRel"', 'dt', '2015-01-01'::DATE, '2015-01-05'::DATE, '1 day'::INTERVAL);
-NOTICE:  Copying data to partitions...
  create_partitions_from_range 
 ------------------------------
                             5
@@ -1314,9 +1182,9 @@ NOTICE:  Copying data to partitions...
 DROP TABLE test."RangeRel" CASCADE;
 NOTICE:  drop cascades to 5 other objects
 SELECT * FROM pathman.pathman_config;
- id |      relname       | attname | parttype | range_interval 
-----+--------------------+---------+----------+----------------
-  8 | test.num_range_rel | id      |        2 | 1000
+      partrel       | attname | parttype | range_interval 
+--------------------+---------+----------+----------------
+ test.num_range_rel | id      |        2 | 1000
 (1 row)
 
 CREATE TABLE test."RangeRel" (
@@ -1324,23 +1192,22 @@ CREATE TABLE test."RangeRel" (
 	dt	TIMESTAMP NOT NULL,
 	txt	TEXT);
 SELECT pathman.create_range_partitions('test."RangeRel"', 'id', 1, 100, 3);
-NOTICE:  Copying data to partitions...
  create_range_partitions 
 -------------------------
                        3
 (1 row)
 
-SELECT pathman.drop_range_partitions('test."RangeRel"');
+SELECT pathman.drop_partitions('test."RangeRel"');
+NOTICE:  function test.RangeRel_upd_trig_func() does not exist, skipping
 NOTICE:  0 rows copied from test."RangeRel_3"
 NOTICE:  0 rows copied from test."RangeRel_2"
 NOTICE:  0 rows copied from test."RangeRel_1"
- drop_range_partitions 
------------------------
-                     3
+ drop_partitions 
+-----------------
+               3
 (1 row)
 
 SELECT pathman.create_partitions_from_range('test."RangeRel"', 'id', 1, 300, 100);
-NOTICE:  Copying data to partitions...
  create_partitions_from_range 
 ------------------------------
                             3
@@ -1357,9 +1224,6 @@ CREATE TABLE hash_rel (
 	value	INTEGER NOT NULL);
 INSERT INTO hash_rel (value) SELECT g FROM generate_series(1, 10000) as g;
 SELECT create_hash_partitions('hash_rel', 'value', 3);
-NOTICE:  function public.hash_rel_insert_trigger_func() does not exist, skipping
-NOTICE:  function public.hash_rel_update_trigger_func() does not exist, skipping
-NOTICE:  Copying data to partitions...
  create_hash_partitions 
 ------------------------
                       3
@@ -1385,43 +1249,30 @@ CREATE TABLE range_rel (
 INSERT INTO range_rel (dt, value) SELECT g, extract(day from g) FROM generate_series('2010-01-01'::date, '2010-12-31'::date, '1 day') as g;
 SELECT create_range_partitions('range_rel', 'dt', '2010-01-01'::date, '1 month'::interval, 12);
 NOTICE:  sequence "range_rel_seq" does not exist, skipping
-NOTICE:  Copying data to partitions...
  create_range_partitions 
 -------------------------
                       12
 (1 row)
 
 SELECT merge_range_partitions('range_rel_1', 'range_rel_2');
-NOTICE:  Altering first partition...
-NOTICE:  Copying data...
-NOTICE:  Dropping second partition...
-NOTICE:  Done!
  merge_range_partitions 
 ------------------------
  
 (1 row)
 
 SELECT split_range_partition('range_rel_1', '2010-02-15'::date);
-NOTICE:  Creating new partition...
-NOTICE:  Copying data to new partition...
-NOTICE:  Altering original partition...
-NOTICE:  Done!
   split_range_partition  
 -------------------------
  {01-01-2010,03-01-2010}
 (1 row)
 
 SELECT append_range_partition('range_rel');
-NOTICE:  Appending new partition...
-NOTICE:  Done!
  append_range_partition 
 ------------------------
  public.range_rel_14
 (1 row)
 
 SELECT prepend_range_partition('range_rel');
-NOTICE:  Prepending new partition...
-NOTICE:  Done!
  prepend_range_partition 
 -------------------------
  public.range_rel_15
@@ -1505,7 +1356,8 @@ EXPLAIN (COSTS OFF) DELETE FROM range_rel r USING tmp t WHERE r.dt = '2010-01-02
 
 DELETE FROM range_rel r USING tmp t WHERE r.dt = '2010-01-02' AND r.id = t.id;
 /* Create range partitions from whole range */
-SELECT drop_range_partitions('range_rel');
+SELECT drop_partitions('range_rel');
+NOTICE:  function public.range_rel_upd_trig_func() does not exist, skipping
 NOTICE:  0 rows copied from range_rel_15
 NOTICE:  0 rows copied from range_rel_14
 NOTICE:  14 rows copied from range_rel_13
@@ -1520,26 +1372,25 @@ NOTICE:  31 rows copied from range_rel_5
 NOTICE:  30 rows copied from range_rel_4
 NOTICE:  31 rows copied from range_rel_3
 NOTICE:  44 rows copied from range_rel_1
- drop_range_partitions 
------------------------
-                    14
+ drop_partitions 
+-----------------
+              14
 (1 row)
 
 SELECT create_partitions_from_range('range_rel', 'id', 1, 1000, 100);
-NOTICE:  Copying data to partitions...
  create_partitions_from_range 
 ------------------------------
                            10
 (1 row)
 
-SELECT drop_range_partitions('range_rel', TRUE);
- drop_range_partitions 
------------------------
-                    10
+SELECT drop_partitions('range_rel', TRUE);
+NOTICE:  function public.range_rel_upd_trig_func() does not exist, skipping
+ drop_partitions 
+-----------------
+              10
 (1 row)
 
 SELECT create_partitions_from_range('range_rel', 'dt', '2015-01-01'::date, '2015-12-01'::date, '1 month'::interval);
-NOTICE:  Copying data to partitions...
  create_partitions_from_range 
 ------------------------------
                            12
@@ -1558,12 +1409,11 @@ CREATE TABLE replies(id SERIAL PRIMARY KEY, message_id INTEGER REFERENCES messag
 INSERT INTO messages SELECT g, md5(g::text) FROM generate_series(1, 10) as g;
 INSERT INTO replies SELECT g, g, md5(g::text) FROM generate_series(1, 10) as g;
 SELECT create_range_partitions('messages', 'id', 1, 100, 2);
-WARNING:  Foreign key 'replies_message_id_fkey' references to the relation 'messages'
-ERROR:  Relation 'messages' is referenced from other relations
+WARNING:  foreign key 'replies_message_id_fkey' references relation 'messages'
+ERROR:  relation "messages" is referenced from other relations
 ALTER TABLE replies DROP CONSTRAINT replies_message_id_fkey;
 SELECT create_range_partitions('messages', 'id', 1, 100, 2);
 NOTICE:  sequence "messages_seq" does not exist, skipping
-NOTICE:  Copying data to partitions...
  create_range_partitions 
 -------------------------
                        2
@@ -1577,3 +1427,8 @@ EXPLAIN (COSTS OFF) SELECT * FROM messages;
    ->  Seq Scan on messages_2
 (3 rows)
 
+DROP SCHEMA test CASCADE;
+NOTICE:  drop cascades to 13 other objects
+DROP EXTENSION pg_pathman CASCADE;
+NOTICE:  drop cascades to 3 other objects
+DROP SCHEMA pathman CASCADE;

@@ -8,252 +8,91 @@
  * ------------------------------------------------------------------------
  */
 
-#include "pathman.h"
-#include "utils/lsyscache.h"
-#include "utils/typcache.h"
-#include "utils/array.h"
-#include "utils/snapmgr.h"
-#include "utils/memutils.h"
-#include "access/nbtree.h"
-#include "access/xact.h"
-#include "catalog/pg_type.h"
-#include "executor/spi.h"
-#include "storage/lmgr.h"
+#include "init.h"
 #include "utils.h"
+#include "pathman.h"
+#include "relation_info.h"
+#include "xact_handling.h"
+
+#include "access/htup_details.h"
+#include "access/nbtree.h"
+#include "catalog/indexing.h"
+#include "catalog/pg_type.h"
+#include "commands/tablespace.h"
+#include "funcapi.h"
+#include "miscadmin.h"
+#include "utils/builtins.h"
+#include "utils/inval.h"
+#include "utils/jsonb.h"
+#include "utils/snapmgr.h"
+#include "utils/lsyscache.h"
+#include "utils/syscache.h"
 
 
-/* declarations */
+/* Function declarations */
+
 PG_FUNCTION_INFO_V1( on_partitions_created );
 PG_FUNCTION_INFO_V1( on_partitions_updated );
 PG_FUNCTION_INFO_V1( on_partitions_removed );
-PG_FUNCTION_INFO_V1( find_or_create_range_partition);
-PG_FUNCTION_INFO_V1( get_range_by_idx );
-PG_FUNCTION_INFO_V1( get_partition_range );
-PG_FUNCTION_INFO_V1( acquire_partitions_lock );
-PG_FUNCTION_INFO_V1( release_partitions_lock );
-PG_FUNCTION_INFO_V1( check_overlap );
-PG_FUNCTION_INFO_V1( get_min_range_value );
-PG_FUNCTION_INFO_V1( get_max_range_value );
-PG_FUNCTION_INFO_V1( get_type_hash_func );
-PG_FUNCTION_INFO_V1( get_hash );
+
+PG_FUNCTION_INFO_V1( get_parent_of_partition_pl );
+PG_FUNCTION_INFO_V1( get_base_type_pl );
+PG_FUNCTION_INFO_V1( get_attribute_type_pl );
+PG_FUNCTION_INFO_V1( get_rel_tablespace_name );
+
+PG_FUNCTION_INFO_V1( show_partition_list_internal );
+
+PG_FUNCTION_INFO_V1( build_update_trigger_func_name );
+PG_FUNCTION_INFO_V1( build_update_trigger_name );
+PG_FUNCTION_INFO_V1( build_check_constraint_name_attnum );
+PG_FUNCTION_INFO_V1( build_check_constraint_name_attname );
+
+PG_FUNCTION_INFO_V1( is_date_type );
+PG_FUNCTION_INFO_V1( is_attribute_nullable );
+
+PG_FUNCTION_INFO_V1( add_to_pathman_config );
+PG_FUNCTION_INFO_V1( invalidate_relcache );
+
+PG_FUNCTION_INFO_V1( lock_partitioned_relation );
+PG_FUNCTION_INFO_V1( prevent_relation_modification );
+
+PG_FUNCTION_INFO_V1( validate_on_part_init_callback_pl );
+PG_FUNCTION_INFO_V1( invoke_on_partition_created_callback );
+
+PG_FUNCTION_INFO_V1( debug_capture );
 
 
-/*
- * Partition-related operation type.
- */
-typedef enum
+typedef struct
 {
-	EV_ON_PART_CREATED = 1,
-	EV_ON_PART_UPDATED,
-	EV_ON_PART_REMOVED
-} part_event_type;
+	Relation				pathman_config;
+	HeapScanDesc			pathman_config_scan;
+	Snapshot				snapshot;
 
-/*
- * We have to reset shared memory cache each time a transaction
- * containing a partitioning-related operation has been rollbacked,
- * hence we need to pass a partitioned table's Oid & some other stuff.
- *
- * Note: 'relname' cannot be fetched within
- * Xact callbacks, so we have to store it here.
- */
-typedef struct part_abort_arg part_abort_arg;
+	const PartRelationInfo *current_prel;
 
-struct part_abort_arg
-{
-	Oid					partitioned_table_relid;
-	char			   *relname;
+	uint32					child_number;
+} show_partition_list_cxt;
 
-	bool				is_subxact;		/* needed for correct callback removal */
-	SubTransactionId	subxact_id;		/* necessary for detecting specific subxact */
-	part_abort_arg	   *xact_cb_arg;	/* points to the parent Xact's arg */
-
-	part_event_type		event;			/* created | updated | removed partitions */
-
-	bool				expired;		/* set by (Sub)Xact when a job is done */
-};
-
-
-static part_abort_arg * make_part_abort_arg(Oid partitioned_table,
-											part_event_type event,
-											bool is_subxact,
-											part_abort_arg *xact_cb_arg);
-
-static void handle_part_event_cancellation(const part_abort_arg *arg);
-static void on_xact_abort_callback(XactEvent event, void *arg);
-static void on_subxact_abort_callback(SubXactEvent event, SubTransactionId mySubid,
-									  SubTransactionId parentSubid, void *arg);
-
-static void remove_on_xact_abort_callbacks(void *arg);
-static void add_on_xact_abort_callbacks(Oid partitioned_table, part_event_type event);
 
 static void on_partitions_created_internal(Oid partitioned_table, bool add_callbacks);
 static void on_partitions_updated_internal(Oid partitioned_table, bool add_callbacks);
 static void on_partitions_removed_internal(Oid partitioned_table, bool add_callbacks);
 
 
-/* Construct part_abort_arg for callbacks in TopTransactionContext. */
-static part_abort_arg *
-make_part_abort_arg(Oid partitioned_table, part_event_type event,
-					bool is_subxact, part_abort_arg *xact_cb_arg)
-{
-	part_abort_arg *arg = MemoryContextAlloc(TopTransactionContext,
-											 sizeof(part_abort_arg));
-
-	const char	   *relname = get_rel_name(partitioned_table);
-
-	/* Fill in Oid & relation name */
-	arg->partitioned_table_relid = partitioned_table;
-	arg->relname = MemoryContextStrdup(TopTransactionContext, relname);
-	arg->is_subxact = is_subxact;
-	arg->subxact_id = GetCurrentSubTransactionId(); /* for SubXact callback */
-	arg->xact_cb_arg = xact_cb_arg;
-	arg->event = event;
-	arg->expired = false;
-
-	return arg;
-}
-
-/* Revert shared memory cache changes iff xact has been aborted. */
-static void
-handle_part_event_cancellation(const part_abort_arg *arg)
-{
-#define DO_NOT_USE_CALLBACKS false /* just to clarify intentions */
-
-	switch (arg->event)
-	{
-		case EV_ON_PART_CREATED:
-			{
-				elog(WARNING, "Partitioning of table '%s' has been aborted, "
-							  "removing partitions from pg_pathman's cache",
-					 arg->relname);
-
-				on_partitions_removed_internal(arg->partitioned_table_relid,
-											   DO_NOT_USE_CALLBACKS);
-			}
-			break;
-
-		case EV_ON_PART_UPDATED:
-			{
-				elog(WARNING, "All changes in partitioned table "
-							  "'%s' will be discarded",
-					 arg->relname);
-
-				on_partitions_updated_internal(arg->partitioned_table_relid,
-											   DO_NOT_USE_CALLBACKS);
-			}
-			break;
-
-		case EV_ON_PART_REMOVED:
-			{
-				elog(WARNING, "All changes in partitioned table "
-							  "'%s' will be discarded",
-					 arg->relname);
-
-				on_partitions_created_internal(arg->partitioned_table_relid,
-											   DO_NOT_USE_CALLBACKS);
-			}
-			break;
-
-		default:
-			elog(ERROR, "Unknown event spotted in xact callback");
-	}
-}
-
 /*
- * Add & remove xact callbacks
+ * Extracted common check.
  */
-
-static void
-remove_on_xact_abort_callbacks(void *arg)
+static bool
+check_relation_exists(Oid relid)
 {
-	part_abort_arg *parg = (part_abort_arg *) arg;
-
-	elog(DEBUG2, "remove_on_xact_abort_callbacks() "
-				 "[is_subxact = %s, relname = '%s', event = %u] "
-				 "triggered for relation %u",
-		 (parg->is_subxact ? "true" : "false"), parg->relname,
-		 parg->event, parg->partitioned_table_relid);
-
-	/* Is this a SubXact callback or not? */
-	if (!parg->is_subxact)
-		UnregisterXactCallback(on_xact_abort_callback, arg);
-	else
-		UnregisterSubXactCallback(on_subxact_abort_callback, arg);
-
-	pfree(arg);
+	return get_rel_type_id(relid) != InvalidOid;
 }
 
-static void
-add_on_xact_abort_callbacks(Oid partitioned_table, part_event_type event)
-{
-	part_abort_arg *xact_cb_arg = make_part_abort_arg(partitioned_table,
-													  event, false, NULL);
-
-	RegisterXactCallback(on_xact_abort_callback, (void *) xact_cb_arg);
-	execute_on_xact_mcxt_reset(TopTransactionContext,
-							   remove_on_xact_abort_callbacks,
-							   xact_cb_arg);
-
-	/* Register SubXact callback if necessary */
-	if (IsSubTransaction())
-	{
-		/*
-		 * SubXact callback's arg contains a pointer to the parent
-		 * Xact callback's arg. This will allow it to 'expire' both
-		 * args and to prevent Xact's callback from doing anything
-		 */
-		void *subxact_cb_arg = make_part_abort_arg(partitioned_table, event,
-												   true, xact_cb_arg);
-
-		RegisterSubXactCallback(on_subxact_abort_callback, subxact_cb_arg);
-		execute_on_xact_mcxt_reset(CurTransactionContext,
-								   remove_on_xact_abort_callbacks,
-								   subxact_cb_arg);
-	}
-}
 
 /*
- * Xact & SubXact callbacks
- */
-
-static void
-on_xact_abort_callback(XactEvent event, void *arg)
-{
-	part_abort_arg *parg = (part_abort_arg *) arg;
-
-	/* Check that this is an aborted Xact & action has not expired yet */
-	if ((event == XACT_EVENT_ABORT || event == XACT_EVENT_PARALLEL_ABORT) &&
-		!parg->expired)
-	{
-		handle_part_event_cancellation(parg);
-
-		/* Set expiration flag */
-		parg->expired = true;
-	}
-}
-
-static void
-on_subxact_abort_callback(SubXactEvent event, SubTransactionId mySubid,
-						  SubTransactionId parentSubid, void *arg)
-{
-	part_abort_arg *parg = (part_abort_arg *) arg;
-
-	Assert(parg->subxact_id != InvalidSubTransactionId);
-
-	/* Check if this is an aborted SubXact we've been waiting for */
-	if (event == SUBXACT_EVENT_ABORT_SUB &&
-		mySubid <= parg->subxact_id && !parg->expired)
-	{
-		handle_part_event_cancellation(parg);
-
-		/* Now set expiration flags to disable Xact callback */
-		parg->xact_cb_arg->expired = true;
-		parg->expired = true;
-	}
-}
-
-/*
- * Callbacks
+ * ----------------------------
+ *  Partition events callbacks
+ * ----------------------------
  */
 
 static void
@@ -262,34 +101,18 @@ on_partitions_created_internal(Oid partitioned_table, bool add_callbacks)
 	elog(DEBUG2, "on_partitions_created() [add_callbacks = %s] "
 				 "triggered for relation %u",
 		 (add_callbacks ? "true" : "false"), partitioned_table);
-
-	LWLockAcquire(pmstate->load_config_lock, LW_EXCLUSIVE);
-		load_relations(false);
-	LWLockRelease(pmstate->load_config_lock);
-
-	/* Register hooks that will clear shmem cache if needed */
-	if (add_callbacks)
-		add_on_xact_abort_callbacks(partitioned_table, EV_ON_PART_CREATED);
 }
 
 static void
 on_partitions_updated_internal(Oid partitioned_table, bool add_callbacks)
 {
+	bool found;
+
 	elog(DEBUG2, "on_partitions_updated() [add_callbacks = %s] "
 				 "triggered for relation %u",
 		 (add_callbacks ? "true" : "false"), partitioned_table);
 
-	if (get_pathman_relation_info(partitioned_table, NULL))
-	{
-		LWLockAcquire(pmstate->load_config_lock, LW_EXCLUSIVE);
-			remove_relation_info(partitioned_table);
-			load_relations(false);
-		LWLockRelease(pmstate->load_config_lock);
-	}
-
-	/* Register hooks that will clear shmem cache if needed */
-	if (add_callbacks)
-		add_on_xact_abort_callbacks(partitioned_table, EV_ON_PART_UPDATED);
+	invalidate_pathman_relation_info(partitioned_table, &found);
 }
 
 static void
@@ -298,19 +121,8 @@ on_partitions_removed_internal(Oid partitioned_table, bool add_callbacks)
 	elog(DEBUG2, "on_partitions_removed() [add_callbacks = %s] "
 				 "triggered for relation %u",
 		 (add_callbacks ? "true" : "false"), partitioned_table);
-
-	LWLockAcquire(pmstate->load_config_lock, LW_EXCLUSIVE);
-		remove_relation_info(partitioned_table);
-	LWLockRelease(pmstate->load_config_lock);
-
-	/* Register hooks that will clear shmem cache if needed */
-	if (add_callbacks)
-		add_on_xact_abort_callbacks(partitioned_table, EV_ON_PART_REMOVED);
 }
 
-/*
- * Thin layer between pure c and pl/PgSQL
- */
 
 Datum
 on_partitions_created(PG_FUNCTION_ARGS)
@@ -333,322 +145,724 @@ on_partitions_removed(PG_FUNCTION_ARGS)
 	PG_RETURN_NULL();
 }
 
+
 /*
- * Returns partition oid for specified parent relid and value.
- * In case when partition isn't exist try to create one.
+ * ------------------------
+ *  Various useful getters
+ * ------------------------
+ */
+
+/*
+ * Get parent of a specified partition.
  */
 Datum
-find_or_create_range_partition(PG_FUNCTION_ARGS)
+get_parent_of_partition_pl(PG_FUNCTION_ARGS)
+{
+	Oid					partition = PG_GETARG_OID(0);
+	PartParentSearch	parent_search;
+	Oid					parent;
+
+	/* Fetch parent & write down search status */
+	parent = get_parent_of_partition(partition, &parent_search);
+
+	/* We MUST be sure :) */
+	Assert(parent_search != PPS_NOT_SURE);
+
+	/* It must be parent known by pg_pathman */
+	if (parent_search == PPS_ENTRY_PART_PARENT)
+		PG_RETURN_OID(parent);
+	else
+	{
+		elog(ERROR, "\%s\" is not pg_pathman's partition",
+			 get_rel_name_or_relid(partition));
+
+		PG_RETURN_NULL();
+	}
+}
+
+/*
+ * Extract basic type of a domain.
+ */
+Datum
+get_base_type_pl(PG_FUNCTION_ARGS)
+{
+	PG_RETURN_OID(getBaseType(PG_GETARG_OID(0)));
+}
+
+/*
+ * Get type (as REGTYPE) of a given attribute.
+ */
+Datum
+get_attribute_type_pl(PG_FUNCTION_ARGS)
+{
+	Oid			relid = PG_GETARG_OID(0);
+	text	   *attname = PG_GETARG_TEXT_P(1);
+	Oid			result;
+	HeapTuple	tp;
+
+	/* NOTE: for now it's the most efficient way */
+	tp = SearchSysCacheAttName(relid, text_to_cstring(attname));
+	if (HeapTupleIsValid(tp))
+	{
+		Form_pg_attribute att_tup = (Form_pg_attribute) GETSTRUCT(tp);
+		result = att_tup->atttypid;
+		ReleaseSysCache(tp);
+
+		PG_RETURN_OID(result);
+	}
+	else
+		elog(ERROR, "Cannot find type name for attribute \"%s\" "
+					"of relation \"%s\"",
+			 text_to_cstring(attname), get_rel_name_or_relid(relid));
+
+	PG_RETURN_NULL(); /* keep compiler happy */
+}
+
+/*
+ * Return tablespace name for specified relation
+ */
+Datum
+get_rel_tablespace_name(PG_FUNCTION_ARGS)
+{
+	Oid			relid = PG_GETARG_OID(0);
+	Oid			tablespace_id;
+	char	   *result;
+
+	tablespace_id = get_rel_tablespace(relid);
+
+	/* If tablespace id is InvalidOid then use the default tablespace */
+	if (!OidIsValid(tablespace_id))
+	{
+		tablespace_id = GetDefaultTablespace(get_rel_persistence(relid));
+
+		/* If tablespace is still invalid then use database's default */
+		if (!OidIsValid(tablespace_id))
+			tablespace_id = MyDatabaseTableSpace;
+	}
+
+	result = get_tablespace_name(tablespace_id);
+	PG_RETURN_TEXT_P(cstring_to_text(result));
+}
+
+
+/*
+ * ----------------------
+ *  Common purpose VIEWs
+ * ----------------------
+ */
+
+/*
+ * List all existing partitions and their parents.
+ */
+Datum
+show_partition_list_internal(PG_FUNCTION_ARGS)
+{
+	show_partition_list_cxt	   *usercxt;
+	FuncCallContext			   *funccxt;
+
+	/*
+	 * Initialize tuple descriptor & function call context.
+	 */
+	if (SRF_IS_FIRSTCALL())
+	{
+		TupleDesc		tupdesc;
+		MemoryContext	old_mcxt;
+
+		funccxt = SRF_FIRSTCALL_INIT();
+
+		old_mcxt = MemoryContextSwitchTo(funccxt->multi_call_memory_ctx);
+
+		usercxt = (show_partition_list_cxt *) palloc(sizeof(show_partition_list_cxt));
+
+		/* Open PATHMAN_CONFIG with latest snapshot available */
+		usercxt->pathman_config = heap_open(get_pathman_config_relid(),
+											AccessShareLock);
+		usercxt->snapshot = RegisterSnapshot(GetLatestSnapshot());
+		usercxt->pathman_config_scan = heap_beginscan(usercxt->pathman_config,
+													  usercxt->snapshot, 0, NULL);
+
+		usercxt->current_prel = NULL;
+
+		/* Create tuple descriptor */
+		tupdesc = CreateTemplateTupleDesc(Natts_pathman_partition_list, false);
+
+		TupleDescInitEntry(tupdesc, Anum_pathman_pl_parent,
+						   "parent", REGCLASSOID, -1, 0);
+		TupleDescInitEntry(tupdesc, Anum_pathman_pl_partition,
+						   "partition", REGCLASSOID, -1, 0);
+		TupleDescInitEntry(tupdesc, Anum_pathman_pl_parttype,
+						   "parttype", INT4OID, -1, 0);
+		TupleDescInitEntry(tupdesc, Anum_pathman_pl_partattr,
+						   "partattr", TEXTOID, -1, 0);
+		TupleDescInitEntry(tupdesc, Anum_pathman_pl_range_min,
+						   "range_min", TEXTOID, -1, 0);
+		TupleDescInitEntry(tupdesc, Anum_pathman_pl_range_max,
+						   "range_max", TEXTOID, -1, 0);
+
+		funccxt->tuple_desc = BlessTupleDesc(tupdesc);
+		funccxt->user_fctx = (void *) usercxt;
+
+		MemoryContextSwitchTo(old_mcxt);
+	}
+
+	funccxt = SRF_PERCALL_SETUP();
+	usercxt = (show_partition_list_cxt *) funccxt->user_fctx;
+
+	/* Iterate through pathman cache */
+	for(;;)
+	{
+		const PartRelationInfo *prel;
+		HeapTuple				htup;
+		Datum					values[Natts_pathman_partition_list];
+		bool					isnull[Natts_pathman_partition_list] = { 0 };
+		char				   *partattr_cstr;
+
+		/* Fetch next PartRelationInfo if needed */
+		if (usercxt->current_prel == NULL)
+		{
+			HeapTuple	pathman_config_htup;
+			Datum		parent_table;
+			bool		parent_table_isnull;
+			Oid			parent_table_oid;
+
+			pathman_config_htup = heap_getnext(usercxt->pathman_config_scan,
+											   ForwardScanDirection);
+			if (!HeapTupleIsValid(pathman_config_htup))
+				break;
+
+			parent_table = heap_getattr(pathman_config_htup,
+										Anum_pathman_config_partrel,
+										RelationGetDescr(usercxt->pathman_config),
+										&parent_table_isnull);
+
+			Assert(parent_table_isnull == false);
+			parent_table_oid = DatumGetObjectId(parent_table);
+
+			usercxt->current_prel = get_pathman_relation_info(parent_table_oid);
+			if (usercxt->current_prel == NULL)
+				continue;
+
+			usercxt->child_number = 0;
+		}
+
+		/* Alias to 'usercxt->current_prel' */
+		prel = usercxt->current_prel;
+
+		if (usercxt->child_number >= PrelChildrenCount(prel))
+		{
+			usercxt->current_prel = NULL;
+			usercxt->child_number = 0;
+
+			continue;
+		}
+
+		partattr_cstr = get_attname(PrelParentRelid(prel), prel->attnum);
+		if (!partattr_cstr)
+		{
+			usercxt->current_prel = NULL;
+			continue;
+		}
+
+		values[Anum_pathman_pl_parent - 1]		= PrelParentRelid(prel);
+		values[Anum_pathman_pl_parttype - 1]	= prel->parttype;
+		values[Anum_pathman_pl_partattr - 1]	= CStringGetTextDatum(partattr_cstr);
+
+		switch (prel->parttype)
+		{
+			case PT_HASH:
+				{
+					Oid	 *children = PrelGetChildrenArray(prel),
+						  child_oid = children[usercxt->child_number];
+
+					values[Anum_pathman_pl_partition - 1] = child_oid;
+					isnull[Anum_pathman_pl_range_min - 1] = true;
+					isnull[Anum_pathman_pl_range_max - 1] = true;
+				}
+				break;
+
+			case PT_RANGE:
+				{
+					RangeEntry *re;
+					Datum		rmin,
+								rmax;
+
+					re = &PrelGetRangesArray(prel)[usercxt->child_number];
+
+					rmin = CStringGetTextDatum(datum_to_cstring(re->min,
+																prel->atttype));
+					rmax = CStringGetTextDatum(datum_to_cstring(re->max,
+																prel->atttype));
+
+					values[Anum_pathman_pl_partition - 1] = re->child_oid;
+					values[Anum_pathman_pl_range_min - 1] = rmin;
+					values[Anum_pathman_pl_range_max - 1] = rmax;
+				}
+				break;
+
+			default:
+				elog(ERROR, "Unknown partitioning type %u", prel->parttype);
+		}
+
+		/* Switch to the next child */
+		usercxt->child_number++;
+
+		/* Form output tuple */
+		htup = heap_form_tuple(funccxt->tuple_desc, values, isnull);
+
+		SRF_RETURN_NEXT(funccxt, HeapTupleGetDatum(htup));
+	}
+
+	/* Clean resources */
+	heap_endscan(usercxt->pathman_config_scan);
+	UnregisterSnapshot(usercxt->snapshot);
+	heap_close(usercxt->pathman_config, AccessShareLock);
+
+	SRF_RETURN_DONE(funccxt);
+}
+
+
+/*
+ * --------
+ *  Traits
+ * --------
+ */
+
+Datum
+is_date_type(PG_FUNCTION_ARGS)
+{
+	PG_RETURN_BOOL(is_date_type_internal(PG_GETARG_OID(0)));
+}
+
+Datum
+is_attribute_nullable(PG_FUNCTION_ARGS)
+{
+	Oid			relid = PG_GETARG_OID(0);
+	text	   *attname = PG_GETARG_TEXT_P(1);
+	bool		result = true;
+	HeapTuple	tp;
+
+	tp = SearchSysCacheAttName(relid, text_to_cstring(attname));
+	if (HeapTupleIsValid(tp))
+	{
+		Form_pg_attribute att_tup = (Form_pg_attribute) GETSTRUCT(tp);
+		result = !att_tup->attnotnull;
+		ReleaseSysCache(tp);
+	}
+	else
+		elog(ERROR, "Cannot find type name for attribute \"%s\" "
+					"of relation \"%s\"",
+			 text_to_cstring(attname), get_rel_name_or_relid(relid));
+
+	PG_RETURN_BOOL(result); /* keep compiler happy */
+}
+
+
+/*
+ * ------------------------
+ *  Useful string builders
+ * ------------------------
+ */
+
+Datum
+build_update_trigger_func_name(PG_FUNCTION_ARGS)
+{
+	Oid			relid = PG_GETARG_OID(0),
+				nspid;
+	const char *result;
+
+	/* Check that relation exists */
+	if (!check_relation_exists(relid))
+		elog(ERROR, "Invalid relation %u", relid);
+
+	nspid = get_rel_namespace(relid);
+	result = psprintf("%s.%s",
+					  quote_identifier(get_namespace_name(nspid)),
+					  quote_identifier(psprintf("%s_upd_trig_func",
+												get_rel_name(relid))));
+
+	PG_RETURN_TEXT_P(cstring_to_text(result));
+}
+
+Datum
+build_update_trigger_name(PG_FUNCTION_ARGS)
+{
+	Oid			relid = PG_GETARG_OID(0);
+	const char *result; /* trigger's name can't be qualified */
+
+	/* Check that relation exists */
+	if (!check_relation_exists(relid))
+		elog(ERROR, "Invalid relation %u", relid);
+
+	result = quote_identifier(psprintf("%s_upd_trig", get_rel_name(relid)));
+
+	PG_RETURN_TEXT_P(cstring_to_text(result));
+}
+
+Datum
+build_check_constraint_name_attnum(PG_FUNCTION_ARGS)
+{
+	Oid			relid = PG_GETARG_OID(0);
+	AttrNumber	attnum = PG_GETARG_INT16(1);
+	const char *result;
+
+	if (!check_relation_exists(relid))
+		elog(ERROR, "Invalid relation %u", relid);
+
+	/* We explicitly do not support system attributes */
+	if (attnum == InvalidAttrNumber || attnum < 0)
+		elog(ERROR, "Cannot build check constraint name: "
+					"invalid attribute number %i", attnum);
+
+	result = build_check_constraint_name_internal(relid, attnum);
+
+	PG_RETURN_TEXT_P(cstring_to_text(quote_identifier(result)));
+}
+
+Datum
+build_check_constraint_name_attname(PG_FUNCTION_ARGS)
+{
+	Oid			relid = PG_GETARG_OID(0);
+	text	   *attname = PG_GETARG_TEXT_P(1);
+	AttrNumber	attnum = get_attnum(relid, text_to_cstring(attname));
+	const char *result;
+
+	if (!check_relation_exists(relid))
+		elog(ERROR, "Invalid relation %u", relid);
+
+	if (attnum == InvalidAttrNumber)
+		elog(ERROR, "Relation \"%s\" has no column '%s'",
+			 get_rel_name_or_relid(relid), text_to_cstring(attname));
+
+	result = build_check_constraint_name_internal(relid, attnum);
+
+	PG_RETURN_TEXT_P(cstring_to_text(quote_identifier(result)));
+}
+
+
+/*
+ * ------------------------
+ *  Cache & config updates
+ * ------------------------
+ */
+
+/*
+ * Try to add previously partitioned table to PATHMAN_CONFIG.
+ */
+Datum
+add_to_pathman_config(PG_FUNCTION_ARGS)
+{
+	Oid					relid;
+	text			   *attname;
+	PartType			parttype;
+
+	Relation			pathman_config;
+	Datum				values[Natts_pathman_config];
+	bool				isnull[Natts_pathman_config];
+	HeapTuple			htup;
+	CatalogIndexState	indstate;
+
+	PathmanInitState	init_state;
+	MemoryContext		old_mcxt = CurrentMemoryContext;
+
+	if (PG_ARGISNULL(0))
+		elog(ERROR, "parent_relid should not be null");
+
+	if (PG_ARGISNULL(1))
+		elog(ERROR, "attname should not be null");
+
+	/* Read parameters */
+	relid = PG_GETARG_OID(0);
+	attname = PG_GETARG_TEXT_P(1);
+
+	/* Check that relation exists */
+	if (!check_relation_exists(relid))
+		elog(ERROR, "Invalid relation %u", relid);
+
+	if (get_attnum(relid, text_to_cstring(attname)) == InvalidAttrNumber)
+		elog(ERROR, "Relation \"%s\" has no column '%s'",
+			 get_rel_name_or_relid(relid), text_to_cstring(attname));
+
+	/* Select partitioning type using 'range_interval' */
+	parttype = PG_ARGISNULL(2) ? PT_HASH : PT_RANGE;
+
+	/*
+	 * Initialize columns (partrel, attname, parttype, range_interval).
+	 */
+	values[Anum_pathman_config_partrel - 1]			= ObjectIdGetDatum(relid);
+	isnull[Anum_pathman_config_partrel - 1]			= false;
+
+	values[Anum_pathman_config_attname - 1]			= PointerGetDatum(attname);
+	isnull[Anum_pathman_config_attname - 1]			= false;
+
+	values[Anum_pathman_config_parttype - 1]		= Int32GetDatum(parttype);
+	isnull[Anum_pathman_config_parttype - 1]		= false;
+
+	values[Anum_pathman_config_range_interval - 1]	= PG_GETARG_DATUM(2);
+	isnull[Anum_pathman_config_range_interval - 1]	= PG_ARGISNULL(2);
+
+	/* Insert new row into PATHMAN_CONFIG */
+	pathman_config = heap_open(get_pathman_config_relid(), RowExclusiveLock);
+	htup = heap_form_tuple(RelationGetDescr(pathman_config), values, isnull);
+	simple_heap_insert(pathman_config, htup);
+	indstate = CatalogOpenIndexes(pathman_config);
+	CatalogIndexInsert(indstate, htup);
+	CatalogCloseIndexes(indstate);
+	heap_close(pathman_config, RowExclusiveLock);
+
+	/* Now try to create a PartRelationInfo */
+	PG_TRY();
+	{
+		/* Some flags might change during refresh attempt */
+		save_pathman_init_state(&init_state);
+
+		refresh_pathman_relation_info(relid, parttype, text_to_cstring(attname));
+	}
+	PG_CATCH();
+	{
+		ErrorData *edata;
+
+		/* Switch to the original context & copy edata */
+		MemoryContextSwitchTo(old_mcxt);
+		edata = CopyErrorData();
+		FlushErrorState();
+
+		/* We have to restore all changed flags */
+		restore_pathman_init_state(&init_state);
+
+		/* Show error message */
+		elog(ERROR, "%s", edata->message);
+
+		FreeErrorData(edata);
+	}
+	PG_END_TRY();
+
+	PG_RETURN_BOOL(true);
+}
+
+
+/*
+ * Invalidate relcache for a specified relation.
+ */
+Datum
+invalidate_relcache(PG_FUNCTION_ARGS)
 {
 	Oid		relid = PG_GETARG_OID(0);
-	Datum	value = PG_GETARG_DATUM(1);
-	Oid		value_type = get_fn_expr_argtype(fcinfo->flinfo, 1);
-	int		pos;
-	bool	found;
-	RangeRelation	*rangerel;
-	RangeEntry		*ranges;
-	TypeCacheEntry	*tce;
-	PartRelationInfo *prel;
-	Oid				 cmp_proc_oid;
-	FmgrInfo		 cmp_func;
 
-	tce = lookup_type_cache(value_type,
-		TYPECACHE_EQ_OPR | TYPECACHE_LT_OPR | TYPECACHE_GT_OPR |
-		TYPECACHE_CMP_PROC | TYPECACHE_CMP_PROC_FINFO);
+	if (check_relation_exists(relid))
+		CacheInvalidateRelcacheByRelid(relid);
 
-	prel = get_pathman_relation_info(relid, NULL);
-	rangerel = get_pathman_range_relation(relid, NULL);
+	PG_RETURN_VOID();
+}
 
-	if (!prel || !rangerel)
-		PG_RETURN_NULL();
 
-	cmp_proc_oid = get_opfamily_proc(tce->btree_opf,
-									 value_type,
-									 prel->atttype,
-									 BTORDER_PROC);
-	fmgr_info(cmp_proc_oid, &cmp_func);
+/*
+ * --------------------------
+ *  Special locking routines
+ * --------------------------
+ */
 
-	ranges = dsm_array_get_pointer(&rangerel->ranges);
-	pos = range_binary_search(rangerel, &cmp_func, value, &found);
+/*
+ * Acquire appropriate lock on a partitioned relation.
+ */
+Datum
+lock_partitioned_relation(PG_FUNCTION_ARGS)
+{
+	Oid			relid = PG_GETARG_OID(0);
+
+	/* Lock partitioned relation till transaction's end */
+	xact_lock_partitioned_rel(relid, false);
+
+	PG_RETURN_VOID();
+}
+
+/*
+ * Lock relation exclusively & check for current isolation level.
+ */
+Datum
+prevent_relation_modification(PG_FUNCTION_ARGS)
+{
+	Oid			relid = PG_GETARG_OID(0);
 
 	/*
-	 * If found then just return oid. Else create new partitions
+	 * Check that isolation level is READ COMMITTED.
+	 * Else we won't be able to see new rows
+	 * which could slip through locks.
 	 */
-	if (found)
-		PG_RETURN_OID(ranges[pos].child_oid);
+	if (!xact_is_level_read_committed())
+		ereport(ERROR,
+				(errmsg("Cannot perform blocking partitioning operation"),
+				 errdetail("Expected READ COMMITTED isolation level")));
+
 	/*
-	 * If not found and value is between first and last partitions
-	*/
-	if (!found && pos >= 0)
-		PG_RETURN_NULL();
-	else
-	{
-		Oid		child_oid;
-		bool	crashed = false;
+	 * Check if table is being modified
+	 * concurrently in a separate transaction.
+	 */
+	if (!xact_lock_rel_exclusive(relid, true))
+		ereport(ERROR,
+				(errmsg("Cannot perform blocking partitioning operation"),
+				 errdetail("Table \"%s\" is being modified concurrently",
+						   get_rel_name_or_relid(relid))));
 
-		/* Lock config before appending new partitions */
-		LWLockAcquire(pmstate->load_config_lock, LW_EXCLUSIVE);
+	PG_RETURN_VOID();
+}
 
-		/* Restrict concurrent partition creation */
-		LWLockAcquire(pmstate->edit_partitions_lock, LW_EXCLUSIVE);
 
-		/*
-		 * Check if someone else has already created partition.
-		 */
-		ranges = dsm_array_get_pointer(&rangerel->ranges);
-		pos = range_binary_search(rangerel, &cmp_func, value, &found);
-		if (found)
-		{
-			LWLockRelease(pmstate->edit_partitions_lock);
-			LWLockRelease(pmstate->load_config_lock);
-			PG_RETURN_OID(ranges[pos].child_oid);
-		}
+/*
+ * -------------------------------------------
+ *  User-defined partition creation callbacks
+ * -------------------------------------------
+ */
 
-		/* Start background worker to create new partitions */
-		child_oid = create_partitions_bg_worker(relid, value, value_type, &crashed);
+/*
+ * Checks that callback function meets specific requirements.
+ * It must have the only JSONB argument and BOOL return type.
+ */
+Datum
+validate_on_part_init_callback_pl(PG_FUNCTION_ARGS)
+{
+	validate_on_part_init_cb(PG_GETARG_OID(0), true);
 
-		/* Release locks */
-		if (!crashed)
-		{
-			LWLockRelease(pmstate->edit_partitions_lock);
-			LWLockRelease(pmstate->load_config_lock);
-		}
-
-		/* Repeat binary search */
-		(void) range_binary_search(rangerel, &cmp_func, value, &found);
-		if (found)
-			PG_RETURN_OID(child_oid);
-	}
-
-	PG_RETURN_NULL();
+	PG_RETURN_VOID();
 }
 
 /*
- * Returns range (min, max) as output parameters
- *
- * first argument is the parent relid
- * second is the partition relid
- * third and forth are MIN and MAX output parameters
+ * Builds JSONB object containing new partition parameters
+ * and invokes the callback.
  */
 Datum
-get_partition_range(PG_FUNCTION_ARGS)
+invoke_on_partition_created_callback(PG_FUNCTION_ARGS)
 {
-	Oid		parent_oid = PG_GETARG_OID(0);
-	Oid		child_oid = PG_GETARG_OID(1);
-	int		nelems = 2;
-	int 	i;
-	bool	found = false;
-	Datum			   *elems;
-	PartRelationInfo   *prel;
-	RangeRelation	   *rangerel;
-	RangeEntry		   *ranges;
-	TypeCacheEntry	   *tce;
-	ArrayType		   *arr;
+#define JSB_INIT_VAL(value, val_type, val_cstring) \
+	do { \
+		(value)->type = jbvString; \
+		(value)->val.string.len = strlen(val_cstring); \
+		(value)->val.string.val = val_cstring; \
+		pushJsonbValue(&jsonb_state, val_type, (value)); \
+	} while (0)
 
-	prel = get_pathman_relation_info(parent_oid, NULL);
+#define ARG_PARENT			0	/* parent table */
+#define ARG_CHILD			1	/* partition */
+#define ARG_CALLBACK		2	/* callback to be invoked */
+#define ARG_RANGE_START		3	/* start_value */
+#define ARG_RANGE_END		4	/* end_value */
 
-	rangerel = get_pathman_range_relation(parent_oid, NULL);
+	Oid						parent_oid		= PG_GETARG_OID(ARG_PARENT),
+							partition_oid	= PG_GETARG_OID(ARG_CHILD);
+	PartType				part_type;
 
-	if (!prel || !rangerel)
-		PG_RETURN_NULL();
+	Oid						cb_oid			= PG_GETARG_OID(ARG_CALLBACK);
+	FmgrInfo				cb_flinfo;
+	FunctionCallInfoData	cb_fcinfo;
 
-	ranges = dsm_array_get_pointer(&rangerel->ranges);
-	tce = lookup_type_cache(prel->atttype, 0);
+	JsonbParseState		   *jsonb_state = NULL;
+	JsonbValue			   *result,
+							key,
+							val;
 
-	/* Looking for specified partition */
-	for(i=0; i<rangerel->ranges.length; i++)
-		if (ranges[i].child_oid == child_oid)
-		{
-			found = true;
+	/* If there's no callback function specified, we're done */
+	if (cb_oid == InvalidOid)
+		PG_RETURN_VOID();
+
+	if (PG_ARGISNULL(ARG_PARENT))
+		elog(ERROR, "parent_relid should not be null");
+
+	if (PG_ARGISNULL(ARG_CHILD))
+		elog(ERROR, "partition should not be null");
+
+	/* Both RANGE_START & RANGE_END are not available (HASH) */
+	if (PG_ARGISNULL(ARG_RANGE_START) && PG_ARGISNULL(ARG_RANGE_START))
+		part_type = PT_HASH;
+
+	/* Either RANGE_START or RANGE_END is missing */
+	else if (PG_ARGISNULL(ARG_RANGE_START) || PG_ARGISNULL(ARG_RANGE_START))
+		elog(ERROR, "both boundaries must be provided for RANGE partition");
+
+	/* Both RANGE_START & RANGE_END are provided */
+	else part_type = PT_RANGE;
+
+	/* Build JSONB according to partitioning type */
+	switch (part_type)
+	{
+		case PT_HASH:
+			{
+				pushJsonbValue(&jsonb_state, WJB_BEGIN_OBJECT, NULL);
+
+				JSB_INIT_VAL(&key, WJB_KEY, "parent");
+				JSB_INIT_VAL(&val, WJB_VALUE, get_rel_name_or_relid(parent_oid));
+				JSB_INIT_VAL(&key, WJB_KEY, "partition");
+				JSB_INIT_VAL(&val, WJB_VALUE, get_rel_name_or_relid(partition_oid));
+				JSB_INIT_VAL(&key, WJB_KEY, "part_type");
+				JSB_INIT_VAL(&val, WJB_VALUE, "HASH");
+
+				result = pushJsonbValue(&jsonb_state, WJB_END_OBJECT, NULL);
+			}
 			break;
-		}
 
-	if (found)
-	{
-		bool byVal = rangerel->by_val;
+		case PT_RANGE:
+			{
+				char   *start_value,
+					   *end_value;
+				Oid		type = get_fn_expr_argtype(fcinfo->flinfo, ARG_RANGE_START);
 
-		elems = palloc(nelems * sizeof(Datum));
-		elems[0] = PATHMAN_GET_DATUM(ranges[i].min, byVal);
-		elems[1] = PATHMAN_GET_DATUM(ranges[i].max, byVal);
+				/* Convert min & max to CSTRING */
+				start_value = datum_to_cstring(PG_GETARG_DATUM(ARG_RANGE_START), type);
+				end_value = datum_to_cstring(PG_GETARG_DATUM(ARG_RANGE_END), type);
 
-		arr = construct_array(elems, nelems, prel->atttype,
-							  tce->typlen, tce->typbyval, tce->typalign);
-		PG_RETURN_ARRAYTYPE_P(arr);
+				pushJsonbValue(&jsonb_state, WJB_BEGIN_OBJECT, NULL);
+
+				JSB_INIT_VAL(&key, WJB_KEY, "parent");
+				JSB_INIT_VAL(&val, WJB_VALUE, get_rel_name_or_relid(parent_oid));
+				JSB_INIT_VAL(&key, WJB_KEY, "partition");
+				JSB_INIT_VAL(&val, WJB_VALUE, get_rel_name_or_relid(partition_oid));
+				JSB_INIT_VAL(&key, WJB_KEY, "part_type");
+				JSB_INIT_VAL(&val, WJB_VALUE, "RANGE");
+				JSB_INIT_VAL(&key, WJB_KEY, "start");
+				JSB_INIT_VAL(&val, WJB_VALUE, start_value);
+				JSB_INIT_VAL(&key, WJB_KEY, "end");
+				JSB_INIT_VAL(&val, WJB_VALUE, end_value);
+
+				result = pushJsonbValue(&jsonb_state, WJB_END_OBJECT, NULL);
+			}
+			break;
+
+		default:
+			elog(ERROR, "Unknown partitioning type %u", part_type);
+			break;
 	}
 
-	PG_RETURN_NULL();
+	/* Validate the callback's signature */
+	validate_on_part_init_cb(cb_oid, true);
+
+	fmgr_info(cb_oid, &cb_flinfo);
+
+	InitFunctionCallInfoData(cb_fcinfo, &cb_flinfo, 1, InvalidOid, NULL, NULL);
+	cb_fcinfo.arg[0] = PointerGetDatum(JsonbValueToJsonb(result));
+	cb_fcinfo.argnull[0] = false;
+
+	/* Invoke the callback */
+	FunctionCallInvoke(&cb_fcinfo);
+
+	PG_RETURN_VOID();
 }
 
 
 /*
- * Returns N-th range (in form of array)
- *
- * First argument is the parent relid.
- * Second argument is the index of the range (if it is negative then the last
- * range will be returned).
+ * -------
+ *  DEBUG
+ * -------
  */
-Datum
-get_range_by_idx(PG_FUNCTION_ARGS)
-{
-	Oid parent_oid = PG_GETARG_OID(0);
-	int idx = PG_GETARG_INT32(1);
-	PartRelationInfo *prel;
-	RangeRelation	*rangerel;
-	RangeEntry		*ranges;
-	RangeEntry		*re;
-	Datum			*elems;
-	TypeCacheEntry	*tce;
-
-	prel = get_pathman_relation_info(parent_oid, NULL);
-
-	rangerel = get_pathman_range_relation(parent_oid, NULL);
-
-	if (!prel || !rangerel || idx >= (int)rangerel->ranges.length)
-		PG_RETURN_NULL();
-
-	tce = lookup_type_cache(prel->atttype, 0);
-	ranges = dsm_array_get_pointer(&rangerel->ranges);
-	if (idx >= 0)
-		re = &ranges[idx];
-	else
-		re = &ranges[rangerel->ranges.length - 1];
-
-	elems = palloc(2 * sizeof(Datum));
-	elems[0] = PATHMAN_GET_DATUM(re->min, rangerel->by_val);
-	elems[1] = PATHMAN_GET_DATUM(re->max, rangerel->by_val);
-
-	PG_RETURN_ARRAYTYPE_P(
-		construct_array(elems, 2, prel->atttype,
-						tce->typlen, tce->typbyval, tce->typalign));
-}
 
 /*
- * Returns min value of the first range for relation
+ * NOTE: used for DEBUG, set breakpoint here.
  */
 Datum
-get_min_range_value(PG_FUNCTION_ARGS)
+debug_capture(PG_FUNCTION_ARGS)
 {
-	Oid parent_oid = PG_GETARG_OID(0);
-	PartRelationInfo *prel;
-	RangeRelation	*rangerel;
-	RangeEntry		*ranges;
+	static float8 sleep_time = 0;
+	DirectFunctionCall1(pg_sleep, Float8GetDatum(sleep_time));
 
-	prel = get_pathman_relation_info(parent_oid, NULL);
-	rangerel = get_pathman_range_relation(parent_oid, NULL);
+	/* Write something (doesn't really matter) */
+	elog(WARNING, "debug_capture [%u]", MyProcPid);
 
-	if (!prel || !rangerel || prel->parttype != PT_RANGE || rangerel->ranges.length == 0)
-		PG_RETURN_NULL();
-
-	ranges = dsm_array_get_pointer(&rangerel->ranges);
-	PG_RETURN_DATUM(PATHMAN_GET_DATUM(ranges[0].min, rangerel->by_val));
-}
-
-/*
- * Returns max value of the last range for relation
- */
-Datum
-get_max_range_value(PG_FUNCTION_ARGS)
-{
-	Oid parent_oid = PG_GETARG_OID(0);
-	PartRelationInfo *prel;
-	RangeRelation	 *rangerel;
-	RangeEntry		 *ranges;
-
-	prel = get_pathman_relation_info(parent_oid, NULL);
-	rangerel = get_pathman_range_relation(parent_oid, NULL);
-
-	if (!prel || !rangerel || prel->parttype != PT_RANGE || rangerel->ranges.length == 0)
-		PG_RETURN_NULL();
-
-	ranges = dsm_array_get_pointer(&rangerel->ranges);
-	PG_RETURN_DATUM(PATHMAN_GET_DATUM(ranges[rangerel->ranges.length-1].max, rangerel->by_val));
-}
-
-/*
- * Checks if range overlaps with existing partitions.
- * Returns TRUE if overlaps and FALSE otherwise.
- */
-Datum
-check_overlap(PG_FUNCTION_ARGS)
-{
-	Oid					partitioned_table = PG_GETARG_OID(0);
-
-	Datum				p1 = PG_GETARG_DATUM(1),
-						p2 = PG_GETARG_DATUM(2);
-
-	Oid					p1_type = get_fn_expr_argtype(fcinfo->flinfo, 1),
-						p2_type = get_fn_expr_argtype(fcinfo->flinfo, 2);
-
-	FmgrInfo		   *cmp_func_1,
-					   *cmp_func_2;
-
-	PartRelationInfo   *prel;
-	RangeRelation	   *rangerel;
-	RangeEntry		   *ranges;
-	int					i;
-	bool				byVal;
-
-	prel = get_pathman_relation_info(partitioned_table, NULL);
-	rangerel = get_pathman_range_relation(partitioned_table, NULL);
-
-	if (!prel || !rangerel || prel->parttype != PT_RANGE)
-		PG_RETURN_NULL();
-
-	/* Get comparison functions */
-	cmp_func_1 = get_cmp_func(p1_type, prel->atttype);
-	cmp_func_2 = get_cmp_func(p2_type, prel->atttype);
-
-	byVal = rangerel->by_val;
-	ranges = (RangeEntry *) dsm_array_get_pointer(&rangerel->ranges);
-	for (i = 0; i < rangerel->ranges.length; i++)
-	{
-		int c1 = FunctionCall2(cmp_func_1, p1,
-								PATHMAN_GET_DATUM(ranges[i].max, byVal));
-		int c2 = FunctionCall2(cmp_func_2, p2,
-								PATHMAN_GET_DATUM(ranges[i].min, byVal));
-
-		if (c1 < 0 && c2 > 0)
-			PG_RETURN_BOOL(true);
-	}
-
-	PG_RETURN_BOOL(false);
-}
-
-/*
- * Acquire partitions lock
- */
-Datum
-acquire_partitions_lock(PG_FUNCTION_ARGS)
-{
-	LWLockAcquire(pmstate->edit_partitions_lock, LW_EXCLUSIVE);
-	PG_RETURN_NULL();
-}
-
-Datum
-release_partitions_lock(PG_FUNCTION_ARGS)
-{
-	LWLockRelease(pmstate->edit_partitions_lock);
-	PG_RETURN_NULL();
-}
-
-/*
- * Returns hash function OID for specified type
- */
-Datum
-get_type_hash_func(PG_FUNCTION_ARGS)
-{
-	TypeCacheEntry *tce;
-	Oid 			type_oid = PG_GETARG_OID(0);
-
-	tce = lookup_type_cache(type_oid, TYPECACHE_HASH_PROC);
-	PG_RETURN_OID(tce->hash_proc);
-}
-
-Datum
-get_hash(PG_FUNCTION_ARGS)
-{
-	uint32	value = PG_GETARG_UINT32(0),
-			part_count = PG_GETARG_UINT32(1);
-
-	PG_RETURN_UINT32(make_hash(value, part_count));
+	PG_RETURN_VOID();
 }

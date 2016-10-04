@@ -4,25 +4,31 @@
  *		RuntimeMergeAppend node's function definitions and global variables
  *
  * Copyright (c) 2016, Postgres Professional
+ * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1994, Regents of the University of California
  *
  * ------------------------------------------------------------------------
  */
-#include "postgres.h"
-#include "runtime_merge_append.h"
 
+#include "pg_compat.h"
+
+#include "runtime_merge_append.h"
 #include "pathman.h"
 
+#include "postgres.h"
 #include "catalog/pg_collation.h"
 #include "miscadmin.h"
 #include "nodes/nodeFuncs.h"
+#include "nodes/plannodes.h"
 #include "optimizer/clauses.h"
 #include "optimizer/cost.h"
-#include "optimizer/restrictinfo.h"
 #include "optimizer/planmain.h"
 #include "optimizer/tlist.h"
 #include "optimizer/var.h"
 #include "utils/builtins.h"
+#include "utils/guc.h"
 #include "utils/lsyscache.h"
+#include "utils/typcache.h"
 #include "utils/memutils.h"
 #include "utils/ruleutils.h"
 
@@ -112,18 +118,18 @@ static void
 pack_runtimemergeappend_private(CustomScan *cscan, MergeAppendGuts *mag)
 {
 	List   *runtimemergeappend_private = NIL;
-	List   *sortColIdx    = NIL,
-		   *sortOperators = NIL,
-		   *collations    = NIL,
-		   *nullsFirst    = NIL;
+	List   *sortColIdx		= NIL,
+		   *sortOperators	= NIL,
+		   *collations		= NIL,
+		   *nullsFirst		= NIL;
 	int		i;
 
 	for (i = 0; i < mag->numCols; i++)
 	{
-		sortColIdx    = lappend_int(sortColIdx, mag->sortColIdx[i]);
-		sortOperators = lappend_oid(sortOperators, mag->sortOperators[i]);
-		collations    = lappend_oid(collations, mag->collations[i]);
-		nullsFirst    = lappend_int(nullsFirst, mag->nullsFirst[i]);
+		sortColIdx		= lappend_int(sortColIdx, mag->sortColIdx[i]);
+		sortOperators	= lappend_oid(sortOperators, mag->sortOperators[i]);
+		collations		= lappend_oid(collations, mag->collations[i]);
+		nullsFirst		= lappend_int(nullsFirst, mag->nullsFirst[i]);
 	}
 
 	runtimemergeappend_private = list_make2(makeInteger(mag->numCols),
@@ -132,7 +138,14 @@ pack_runtimemergeappend_private(CustomScan *cscan, MergeAppendGuts *mag)
 													   collations,
 													   nullsFirst));
 
-	/* Append RuntimeMergeAppend's data to the 'custom_private' */
+	/*
+	 * Append RuntimeMergeAppend's data to the 'custom_private' (2nd).
+	 *
+	 * This way some sort of hierarchy is maintained in 'custom_private':
+	 * inherited structure (in this case RuntimeAppend) is stored first,
+	 * so we can think of pack\unpack functions as 'constructors' to some
+	 * extent.
+	 */
 	cscan->custom_private = lappend(cscan->custom_private,
 									runtimemergeappend_private);
 }
@@ -167,15 +180,45 @@ unpack_runtimemergeappend_private(RuntimeMergeAppendState *scan_state,
 	runtimemergeappend_private = lsecond(cscan->custom_private);
 	scan_state->numCols = intVal(linitial(runtimemergeappend_private));
 
-	sortColIdx    = linitial(lsecond(runtimemergeappend_private));
-	sortOperators = lsecond(lsecond(runtimemergeappend_private));
-	collations    = lthird(lsecond(runtimemergeappend_private));
-	nullsFirst    = lfourth(lsecond(runtimemergeappend_private));
+	sortColIdx		= linitial(lsecond(runtimemergeappend_private));
+	sortOperators	= lsecond(lsecond(runtimemergeappend_private));
+	collations		= lthird(lsecond(runtimemergeappend_private));
+	nullsFirst		= lfourth(lsecond(runtimemergeappend_private));
 
-	FillStateField(sortColIdx,    AttrNumber, lfirst_int);
-	FillStateField(sortOperators, Oid,        lfirst_oid);
-	FillStateField(collations,    Oid,        lfirst_oid);
-	FillStateField(nullsFirst,    bool,       lfirst_int);
+	FillStateField(sortColIdx,		AttrNumber,	lfirst_int);
+	FillStateField(sortOperators,	Oid,		lfirst_oid);
+	FillStateField(collations,		Oid,		lfirst_oid);
+	FillStateField(nullsFirst,		bool,		lfirst_int);
+}
+
+void
+init_runtime_merge_append_static_data(void)
+{
+	runtime_merge_append_path_methods.CustomName			= "RuntimeMergeAppend";
+	runtime_merge_append_path_methods.PlanCustomPath		= create_runtimemergeappend_plan;
+
+	runtime_merge_append_plan_methods.CustomName 			= "RuntimeMergeAppend";
+	runtime_merge_append_plan_methods.CreateCustomScanState	= runtimemergeappend_create_scan_state;
+
+	runtime_merge_append_exec_methods.CustomName			= "RuntimeMergeAppend";
+	runtime_merge_append_exec_methods.BeginCustomScan		= runtimemergeappend_begin;
+	runtime_merge_append_exec_methods.ExecCustomScan		= runtimemergeappend_exec;
+	runtime_merge_append_exec_methods.EndCustomScan			= runtimemergeappend_end;
+	runtime_merge_append_exec_methods.ReScanCustomScan		= runtimemergeappend_rescan;
+	runtime_merge_append_exec_methods.MarkPosCustomScan		= NULL;
+	runtime_merge_append_exec_methods.RestrPosCustomScan	= NULL;
+	runtime_merge_append_exec_methods.ExplainCustomScan		= runtimemergeappend_explain;
+
+	DefineCustomBoolVariable("pg_pathman.enable_runtimemergeappend",
+							 "Enables the planner's use of RuntimeMergeAppend custom node.",
+							 NULL,
+							 &pg_pathman_enable_runtime_merge_append,
+							 true,
+							 PGC_USERSET,
+							 0,
+							 NULL,
+							 NULL,
+							 NULL);
 }
 
 Path *
@@ -419,7 +462,8 @@ runtimemergeappend_rescan(CustomScanState *node)
 	 * initialize sort-key information
 	 */
 	scan_state->ms_nkeys = scan_state->numCols;
-	scan_state->ms_sortkeys = palloc0(sizeof(SortSupportData) * scan_state->numCols);
+	scan_state->ms_sortkeys = (SortSupport)
+			palloc0(sizeof(SortSupportData) * scan_state->numCols);
 
 	for (i = 0; i < scan_state->numCols; i++)
 	{
@@ -706,9 +750,9 @@ prepare_sort_from_pathkeys(PlannerInfo *root, Plan *lefttree, List *pathkeys,
 					continue;
 
 				sortexpr = em->em_expr;
-				exprvars = pull_var_clause((Node *) sortexpr,
-										   PVC_INCLUDE_AGGREGATES,
-										   PVC_INCLUDE_PLACEHOLDERS);
+				exprvars = pull_var_clause_compat((Node *) sortexpr,
+												  PVC_INCLUDE_AGGREGATES,
+												  PVC_INCLUDE_PLACEHOLDERS);
 				foreach(k, exprvars)
 				{
 					if (!tlist_member_ignore_relabel(lfirst(k), tlist))
@@ -732,8 +776,8 @@ prepare_sort_from_pathkeys(PlannerInfo *root, Plan *lefttree, List *pathkeys,
 			{
 				/* copy needed so we don't modify input's tlist below */
 				tlist = copyObject(tlist);
-				lefttree = (Plan *) make_result(root, tlist, NULL,
-												lefttree);
+				lefttree = (Plan *) make_result_compat(root, tlist, NULL,
+													   lefttree);
 			}
 
 			/* Don't bother testing is_projection_capable_plan again */

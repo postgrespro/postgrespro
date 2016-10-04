@@ -12,6 +12,16 @@ INSERT INTO test.hash_rel VALUES (2, 2);
 INSERT INTO test.hash_rel VALUES (3, 3);
 SELECT pathman.create_hash_partitions('test.hash_rel', 'value', 3);
 ALTER TABLE test.hash_rel ALTER COLUMN value SET NOT NULL;
+SELECT pathman.create_hash_partitions('test.hash_rel', 'value', 3, partition_data:=false);
+EXPLAIN (COSTS OFF) SELECT * FROM test.hash_rel;
+SELECT * FROM test.hash_rel;
+SELECT pathman.set_enable_parent('test.hash_rel', false);
+EXPLAIN (COSTS OFF) SELECT * FROM test.hash_rel;
+SELECT * FROM test.hash_rel;
+SELECT pathman.set_enable_parent('test.hash_rel', true);
+EXPLAIN (COSTS OFF) SELECT * FROM test.hash_rel;
+SELECT * FROM test.hash_rel;
+SELECT pathman.drop_partitions('test.hash_rel');
 SELECT pathman.create_hash_partitions('test.hash_rel', 'Value', 3);
 SELECT COUNT(*) FROM test.hash_rel;
 SELECT COUNT(*) FROM ONLY test.hash_rel;
@@ -147,207 +157,12 @@ WHERE j1.dt < '2015-03-01' AND j2.dt >= '2015-02-01' ORDER BY j2.dt;
  * Test CTE query
  */
 EXPLAIN (COSTS OFF)
-    WITH ttt AS (SELECT * FROM test.range_rel WHERE dt >= '2015-02-01' AND dt < '2015-03-15')
+	WITH ttt AS (SELECT * FROM test.range_rel WHERE dt >= '2015-02-01' AND dt < '2015-03-15')
 SELECT * FROM ttt;
 
 EXPLAIN (COSTS OFF)
-    WITH ttt AS (SELECT * FROM test.hash_rel WHERE value = 2)
+	WITH ttt AS (SELECT * FROM test.hash_rel WHERE value = 2)
 SELECT * FROM ttt;
-
-
-/*
- * Test RuntimeAppend
- */
-
-create or replace function test.pathman_assert(smt bool, error_msg text) returns text as $$
-begin
-	if not smt then
-		raise exception '%', error_msg;
-	end if;
-
-	return 'ok';
-end;
-$$ language plpgsql;
-
-create or replace function test.pathman_equal(a text, b text, error_msg text) returns text as $$
-begin
-	if a != b then
-		raise exception '''%'' is not equal to ''%'', %', a, b, error_msg;
-	end if;
-
-	return 'equal';
-end;
-$$ language plpgsql;
-
-create or replace function test.pathman_test(query text) returns jsonb as $$
-declare
-	plan jsonb;
-begin
-	execute 'explain (analyze, format json)' || query into plan;
-
-	return plan;
-end;
-$$ language plpgsql;
-
-create or replace function test.pathman_test_1() returns text as $$
-declare
-	plan jsonb;
-	num int;
-begin
-	plan = test.pathman_test('select * from test.runtime_test_1 where id = (select * from test.run_values limit 1)');
-
-	perform test.pathman_equal((plan->0->'Plan'->'Node Type')::text,
-							   '"Custom Scan"',
-							   'wrong plan type');
-
-	perform test.pathman_equal((plan->0->'Plan'->'Custom Plan Provider')::text,
-							   '"RuntimeAppend"',
-							   'wrong plan provider');
-
-	perform test.pathman_equal((plan->0->'Plan'->'Plans'->1->'Relation Name')::text,
-							   format('"runtime_test_1_%s"', pathman.get_hash(hashint4(1), 6)),
-							   'wrong partition');
-
-	select count(*) from jsonb_array_elements_text(plan->0->'Plan'->'Plans') into num;
-	perform test.pathman_equal(num::text, '2', 'expected 2 child plans for custom scan');
-
-	return 'ok';
-end;
-$$ language plpgsql;
-
-create or replace function test.pathman_test_2() returns text as $$
-declare
-	plan jsonb;
-	num int;
-begin
-	plan = test.pathman_test('select * from test.runtime_test_1 where id = any (select * from test.run_values limit 4)');
-
-	perform test.pathman_equal((plan->0->'Plan'->'Node Type')::text,
-							   '"Nested Loop"',
-							   'wrong plan type');
-
-	perform test.pathman_equal((plan->0->'Plan'->'Plans'->1->'Node Type')::text,
-							   '"Custom Scan"',
-							   'wrong plan type');
-
-	perform test.pathman_equal((plan->0->'Plan'->'Plans'->1->'Custom Plan Provider')::text,
-							   '"RuntimeAppend"',
-							   'wrong plan provider');
-
-	select count(*) from jsonb_array_elements_text(plan->0->'Plan'->'Plans'->1->'Plans') into num;
-	perform test.pathman_equal(num::text, '4', 'expected 4 child plans for custom scan');
-
-	for i in 0..3 loop
-		perform test.pathman_equal((plan->0->'Plan'->'Plans'->1->'Plans'->i->'Relation Name')::text,
-								   format('"runtime_test_1_%s"', pathman.get_hash(hashint4(i + 1), 6)),
-								   'wrong partition');
-
-		num = plan->0->'Plan'->'Plans'->1->'Plans'->i->'Actual Loops';
-		perform test.pathman_equal(num::text, '1', 'expected 1 loop');
-	end loop;
-
-	return 'ok';
-end;
-$$ language plpgsql;
-
-create or replace function test.pathman_test_3() returns text as $$
-declare
-	plan jsonb;
-	num int;
-begin
-	plan = test.pathman_test('select * from test.runtime_test_1 a join test.run_values b on a.id = b.val');
-
-	perform test.pathman_equal((plan->0->'Plan'->'Node Type')::text,
-							   '"Nested Loop"',
-							   'wrong plan type');
-
-	perform test.pathman_equal((plan->0->'Plan'->'Plans'->1->'Node Type')::text,
-							   '"Custom Scan"',
-							   'wrong plan type');
-
-	perform test.pathman_equal((plan->0->'Plan'->'Plans'->1->'Custom Plan Provider')::text,
-							   '"RuntimeAppend"',
-							   'wrong plan provider');
-
-	select count(*) from jsonb_array_elements_text(plan->0->'Plan'->'Plans'->1->'Plans') into num;
-	perform test.pathman_equal(num::text, '6', 'expected 6 child plans for custom scan');
-
-	for i in 0..5 loop
-		num = plan->0->'Plan'->'Plans'->1->'Plans'->i->'Actual Loops';
-		perform test.pathman_assert(num > 0 and num <= 1718, 'expected no more than 1718 loops');
-	end loop;
-
-	return 'ok';
-end;
-$$ language plpgsql;
-
-create or replace function test.pathman_test_4() returns text as $$
-declare
-	plan jsonb;
-	num int;
-begin
-	plan = test.pathman_test('select * from test.category c, lateral' ||
-							 '(select * from test.runtime_test_2 g where g.category_id = c.id order by rating limit 4) as tg');
-
-	perform test.pathman_equal((plan->0->'Plan'->'Node Type')::text,
-							   '"Nested Loop"',
-							   'wrong plan type');
-
-														/* Limit -> Custom Scan */
-	perform test.pathman_equal((plan->0->'Plan'->'Plans'->1->0->'Node Type')::text,
-							   '"Custom Scan"',
-							   'wrong plan type');
-
-	perform test.pathman_equal((plan->0->'Plan'->'Plans'->1->0->'Custom Plan Provider')::text,
-							   '"RuntimeMergeAppend"',
-							   'wrong plan provider');
-
-	select count(*) from jsonb_array_elements_text(plan->0->'Plan'->'Plans'->1->'Plans'->0->'Plans') into num;
-	perform test.pathman_equal(num::text, '4', 'expected 4 child plans for custom scan');
-
-	for i in 0..3 loop
-		perform test.pathman_equal((plan->0->'Plan'->'Plans'->1->'Plans'->0->'Plans'->i->'Relation Name')::text,
-								   format('"runtime_test_2_%s"', pathman.get_hash(hashint4(i + 1), 6)),
-								   'wrong partition');
-
-		num = plan->0->'Plan'->'Plans'->1->'Plans'->0->'Plans'->i->'Actual Loops';
-		perform test.pathman_assert(num = 1, 'expected no more than 1 loops');
-	end loop;
-
-	return 'ok';
-end;
-$$ language plpgsql;
-
-
-create table test.run_values as select generate_series(1, 10000) val;
-create table test.runtime_test_1(id serial primary key, val real);
-insert into test.runtime_test_1 select generate_series(1, 10000), random();
-select pathman.create_hash_partitions('test.runtime_test_1', 'id', 6);
-
-create table test.category as (select id, 'cat' || id::text as name from generate_series(1, 4) id);
-create table test.runtime_test_2 (id serial, category_id int not null, name text, rating real);
-insert into test.runtime_test_2 (select id, (id % 6) + 1 as category_id, 'good' || id::text as name, random() as rating from generate_series(1, 100000) id);
-create index on test.runtime_test_2 (category_id, rating);
-select pathman.create_hash_partitions('test.runtime_test_2', 'category_id', 6);
-
-analyze test.run_values;
-analyze test.runtime_test_1;
-
-set enable_mergejoin = off;
-set enable_hashjoin = off;
-set pg_pathman.enable_runtimeappend = on;
-set pg_pathman.enable_runtimemergeappend = on;
-select test.pathman_test_1(); /* RuntimeAppend (select ... where id = (subquery)) */
-select test.pathman_test_2(); /* RuntimeAppend (select ... where id = any(subquery)) */
-select test.pathman_test_3(); /* RuntimeAppend (a join b on a.id = b.val) */
-select test.pathman_test_4(); /* RuntimeMergeAppend (lateral) */
-
-set pg_pathman.enable_runtimeappend = off;
-set pg_pathman.enable_runtimemergeappend = off;
-set enable_mergejoin = on;
-set enable_hashjoin = on;
-
-drop table test.run_values, test.runtime_test_1, test.runtime_test_2 cascade;
 
 /*
  * Test split and merge
@@ -387,15 +202,31 @@ EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt BETWEEN '2014-11-15' A
 SELECT pathman.detach_range_partition('test.range_rel_archive');
 EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt BETWEEN '2014-11-15' AND '2015-01-15';
 CREATE TABLE test.range_rel_test1 (
-    id  SERIAL PRIMARY KEY,
-    dt  TIMESTAMP,
-    txt TEXT,
-    abc INTEGER);
+	id  SERIAL PRIMARY KEY,
+	dt  TIMESTAMP,
+	txt TEXT,
+	abc INTEGER);
 SELECT pathman.attach_range_partition('test.range_rel', 'test.range_rel_test1', '2013-01-01'::DATE, '2014-01-01'::DATE);
 CREATE TABLE test.range_rel_test2 (
-    id  SERIAL PRIMARY KEY,
-    dt  TIMESTAMP);
+	id  SERIAL PRIMARY KEY,
+	dt  TIMESTAMP);
 SELECT pathman.attach_range_partition('test.range_rel', 'test.range_rel_test2', '2013-01-01'::DATE, '2014-01-01'::DATE);
+
+/*
+ * Zero partitions count and adding partitions with specified name
+ */
+CREATE TABLE test.zero(
+	id		SERIAL PRIMARY KEY,
+	value	INT NOT NULL);
+INSERT INTO test.zero SELECT g, g FROM generate_series(1, 100) as g;
+SELECT pathman.create_range_partitions('test.zero', 'value', 50, 10, 0);
+SELECT pathman.append_range_partition('test.zero', 'test.zero_0');
+SELECT pathman.prepend_range_partition('test.zero', 'test.zero_1');
+SELECT pathman.add_range_partition('test.zero', 50, 70, 'test.zero_50');
+SELECT pathman.append_range_partition('test.zero', 'test.zero_appended');
+SELECT pathman.prepend_range_partition('test.zero', 'test.zero_prepended');
+SELECT pathman.split_range_partition('test.zero_50', 60, 'test.zero_60');
+DROP TABLE test.zero CASCADE;
 
 /*
  * Check that altering table columns doesn't break trigger
@@ -407,14 +238,14 @@ SELECT * FROM test.hash_rel WHERE id = 123;
 /*
  * Clean up
  */
-SELECT pathman.drop_hash_partitions('test.hash_rel');
+SELECT pathman.drop_partitions('test.hash_rel');
 SELECT COUNT(*) FROM ONLY test.hash_rel;
 SELECT pathman.create_hash_partitions('test.hash_rel', 'value', 3);
-SELECT pathman.drop_hash_partitions('test.hash_rel', TRUE);
+SELECT pathman.drop_partitions('test.hash_rel', TRUE);
 SELECT COUNT(*) FROM ONLY test.hash_rel;
 DROP TABLE test.hash_rel CASCADE;
 
-SELECT pathman.drop_range_partitions('test.num_range_rel');
+SELECT pathman.drop_partitions('test.num_range_rel');
 DROP TABLE test.num_range_rel CASCADE;
 
 DROP TABLE test.range_rel CASCADE;
@@ -434,6 +265,11 @@ EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt = '2014-12-15';
 SELECT * FROM test.range_rel WHERE dt = '2014-12-15';
 EXPLAIN (COSTS OFF) SELECT * FROM test.range_rel WHERE dt = '2015-03-15';
 SELECT * FROM test.range_rel WHERE dt = '2015-03-15';
+
+SELECT pathman.set_auto('test.range_rel', false);
+INSERT INTO test.range_rel (dt) VALUES ('2015-06-01');
+SELECT pathman.set_auto('test.range_rel', true);
+INSERT INTO test.range_rel (dt) VALUES ('2015-06-01');
 
 DROP TABLE test.range_rel CASCADE;
 SELECT * FROM pathman.pathman_config;
@@ -464,7 +300,7 @@ UPDATE test."TeSt" SET a = 1;
 SELECT * FROM test."TeSt";
 SELECT * FROM test."TeSt" WHERE a = 1;
 EXPLAIN (COSTS OFF) SELECT * FROM test."TeSt" WHERE a = 1;
-SELECT pathman.drop_hash_partitions('test."TeSt"');
+SELECT pathman.drop_partitions('test."TeSt"');
 SELECT * FROM test."TeSt";
 
 CREATE TABLE test."RangeRel" (
@@ -478,7 +314,7 @@ SELECT pathman.append_range_partition('test."RangeRel"');
 SELECT pathman.prepend_range_partition('test."RangeRel"');
 SELECT pathman.merge_range_partitions('test."RangeRel_1"', 'test."RangeRel_' || currval('test."RangeRel_seq"') || '"');
 SELECT pathman.split_range_partition('test."RangeRel_1"', '2015-01-01'::DATE);
-SELECT pathman.drop_range_partitions('test."RangeRel"');
+SELECT pathman.drop_partitions('test."RangeRel"');
 SELECT pathman.create_partitions_from_range('test."RangeRel"', 'dt', '2015-01-01'::DATE, '2015-01-05'::DATE, '1 day'::INTERVAL);
 DROP TABLE test."RangeRel" CASCADE;
 SELECT * FROM pathman.pathman_config;
@@ -487,7 +323,7 @@ CREATE TABLE test."RangeRel" (
 	dt	TIMESTAMP NOT NULL,
 	txt	TEXT);
 SELECT pathman.create_range_partitions('test."RangeRel"', 'id', 1, 100, 3);
-SELECT pathman.drop_range_partitions('test."RangeRel"');
+SELECT pathman.drop_partitions('test."RangeRel"');
 SELECT pathman.create_partitions_from_range('test."RangeRel"', 'id', 1, 300, 100);
 DROP TABLE test."RangeRel" CASCADE;
 
@@ -535,9 +371,9 @@ EXPLAIN (COSTS OFF) DELETE FROM range_rel r USING tmp t WHERE r.dt = '2010-01-02
 DELETE FROM range_rel r USING tmp t WHERE r.dt = '2010-01-02' AND r.id = t.id;
 
 /* Create range partitions from whole range */
-SELECT drop_range_partitions('range_rel');
+SELECT drop_partitions('range_rel');
 SELECT create_partitions_from_range('range_rel', 'id', 1, 1000, 100);
-SELECT drop_range_partitions('range_rel', TRUE);
+SELECT drop_partitions('range_rel', TRUE);
 SELECT create_partitions_from_range('range_rel', 'dt', '2015-01-01'::date, '2015-12-01'::date, '1 month'::interval);
 EXPLAIN (COSTS OFF) SELECT * FROM range_rel WHERE dt = '2015-12-15';
 
@@ -549,3 +385,8 @@ SELECT create_range_partitions('messages', 'id', 1, 100, 2);
 ALTER TABLE replies DROP CONSTRAINT replies_message_id_fkey;
 SELECT create_range_partitions('messages', 'id', 1, 100, 2);
 EXPLAIN (COSTS OFF) SELECT * FROM messages;
+
+
+DROP SCHEMA test CASCADE;
+DROP EXTENSION pg_pathman CASCADE;
+DROP SCHEMA pathman CASCADE;

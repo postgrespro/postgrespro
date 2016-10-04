@@ -7,24 +7,25 @@
  *
  * ------------------------------------------------------------------------
  */
+
 #ifndef RUNTIME_APPEND_H
 #define RUNTIME_APPEND_H
+
+#include "pathman.h"
+#include "nodes_common.h"
 
 #include "postgres.h"
 #include "optimizer/paths.h"
 #include "optimizer/pathnode.h"
 #include "commands/explain.h"
 
-#include "pathman.h"
-#include "nodes_common.h"
-
 
 typedef struct
 {
 	CustomPath			cpath;
-	Oid					relid;		/* relid of the partitioned table */
+	Oid					relid;			/* relid of the partitioned table */
 
-	ChildScanCommon	   *children;	/* all available plans */
+	ChildScanCommon	   *children;		/* all available plans */
 	int					nchildren;
 } RuntimeAppendPath;
 
@@ -32,7 +33,6 @@ typedef struct
 {
 	CustomScanState		css;
 	Oid					relid;		/* relid of the partitioned table */
-	PartRelationInfo   *prel;
 
 	/* Restrictions to be checked during ReScan and Exec */
 	List			   *custom_exprs;
@@ -46,6 +46,9 @@ typedef struct
 	ChildScanCommon	   *cur_plans;
 	int					ncur_plans;
 
+	/* Should we include parent table? Cached for prepared statements */
+	bool				enable_parent;
+
 	/* Index of the selected plan state */
 	int					running_idx;
 
@@ -53,13 +56,18 @@ typedef struct
 	TupleTableSlot	   *slot;
 } RuntimeAppendState;
 
+
 extern bool					pg_pathman_enable_runtimeappend;
 
 extern CustomPathMethods	runtimeappend_path_methods;
 extern CustomScanMethods	runtimeappend_plan_methods;
 extern CustomExecMethods	runtimeappend_exec_methods;
 
-Path * create_runtimeappend_path(PlannerInfo *root, AppendPath *inner_append,
+
+void init_runtimeappend_static_data(void);
+
+Path * create_runtimeappend_path(PlannerInfo *root,
+								 AppendPath *inner_append,
 								 ParamPathInfo *param_info,
 								 double sel);
 
@@ -69,7 +77,9 @@ Plan * create_runtimeappend_plan(PlannerInfo *root, RelOptInfo *rel,
 
 Node * runtimeappend_create_scan_state(CustomScan *node);
 
-void runtimeappend_begin(CustomScanState *node, EState *estate, int eflags);
+void runtimeappend_begin(CustomScanState *node,
+						 EState *estate,
+						 int eflags);
 
 TupleTableSlot * runtimeappend_exec(CustomScanState *node);
 
@@ -77,6 +87,8 @@ void runtimeappend_end(CustomScanState *node);
 
 void runtimeappend_rescan(CustomScanState *node);
 
-void runtimeappend_explain(CustomScanState *node, List *ancestors, ExplainState *es);
+void runtimeappend_explain(CustomScanState *node,
+						   List *ancestors,
+						   ExplainState *es);
 
 #endif

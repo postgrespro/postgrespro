@@ -7,13 +7,26 @@
  *
  * ------------------------------------------------------------------------
  */
+
 #ifndef NODES_COMMON_H
 #define NODES_COMMON_H
 
+#include "relation_info.h"
+
+#include "postgres.h"
 #include "commands/explain.h"
-#include "pathman.h"
+#include "optimizer/planner.h"
+
+#if PG_VERSION_NUM >= 90600
+#include "nodes/extensible.h"
+#endif
 
 
+/*
+ * Common structure for storing selected
+ * Paths/Plans/PlanStates in a hash table
+ * or its slice.
+ */
 typedef struct
 {
 	Oid			relid;				/* partition relid */
@@ -23,7 +36,7 @@ typedef struct
 		CHILD_PATH = 0,
 		CHILD_PLAN,
 		CHILD_PLAN_STATE
-	}		content_type;
+	}			content_type;
 
 	union
 	{
@@ -32,7 +45,7 @@ typedef struct
 		PlanState  *plan_state;
 	}			content;
 
-	int		original_order;			/* for sorting in EXPLAIN */
+	int			original_order;		/* for sorting in EXPLAIN */
 } ChildScanCommonData;
 
 typedef ChildScanCommonData *ChildScanCommon;
@@ -50,6 +63,13 @@ clear_plan_states(CustomScanState *scan_state)
 		ExecEndNode((PlanState *) lfirst(state_cell));
 	}
 }
+
+List * get_partitioned_attr_clauses(List *restrictinfo_list,
+									const PartRelationInfo *prel,
+									Index partitioned_rel);
+
+Oid * get_partition_oids(List *ranges, int *n, const PartRelationInfo *prel,
+						 bool include_parent);
 
 Path * create_append_path_common(PlannerInfo *root,
 								 AppendPath *inner_append,
