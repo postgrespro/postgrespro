@@ -575,7 +575,8 @@ RelationBuildTupleDesc(Relation relation)
 			List		   *optionsList;
 			CompressionMethodRoutine *cmr;
 
-			cmr = GetCompressionMethodRoutineByCmId(attp->attcompression);
+			cmr = GetCompressionMethodRoutineByCmId(attp->attcompression,
+													attp->atttypid);
 			optionsDatum = get_attcmoptions(RelationGetRelid(relation),
 											attp->attnum);
 			optionsList = untransformRelOptions(optionsDatum);

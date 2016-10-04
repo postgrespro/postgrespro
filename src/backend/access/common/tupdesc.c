@@ -785,7 +785,8 @@ TupleDescInitAttrCompression(TupleDesc desc,
 					: get_base_typnullcm(desc->attrs[attnum - 1]->atttypid);
 
 	ac->routineNull = OidIsValid(nullcmoid)
-						? GetCompressionMethodRoutineByCmId(nullcmoid)
+						? GetCompressionMethodRoutineByCmId(nullcmoid,
+											desc->attrs[attnum - 1]->atttypid)
 						: NULL;
 }
 

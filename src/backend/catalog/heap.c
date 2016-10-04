@@ -1482,7 +1482,8 @@ DropAttributeCompression(HeapTuple tuple)
 {
 	Form_pg_attribute			att = (Form_pg_attribute) GETSTRUCT(tuple);
 	CompressionMethodRoutine   *cmr =
-						GetCompressionMethodRoutineByCmId(att->attcompression);
+						GetCompressionMethodRoutineByCmId(att->attcompression,
+														  att->atttypid);
 
 	if (cmr->dropAttr)
 	{

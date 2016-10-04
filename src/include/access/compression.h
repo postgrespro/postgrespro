@@ -50,7 +50,23 @@ typedef struct CompressionMethodRoutine
 	DecompressionRoutine	decompress;
 } CompressionMethodRoutine;
 
-extern CompressionMethodRoutine *GetCompressionMethodRoutine(Oid cmhandler);
-extern CompressionMethodRoutine *GetCompressionMethodRoutineByCmId(Oid cmoid);
+typedef enum { CMOP_GET_ROUTINE } CompressionMethodOp;
+
+typedef struct CompressionMethodOpArgs
+{
+	CompressionMethodOp op;
+	union
+	{
+		struct
+		{
+			Oid	typeid;
+		} getRoutine;
+	} args;
+} CompressionMethodOpArgs;
+
+extern CompressionMethodRoutine *GetCompressionMethodRoutine(Oid cmhandler,
+															 Oid typeid);
+extern CompressionMethodRoutine *GetCompressionMethodRoutineByCmId(Oid cmoid,
+																   Oid typeid);
 
 #endif /* COMPRESSION_H */
