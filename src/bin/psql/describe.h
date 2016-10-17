@@ -18,6 +18,9 @@ extern bool describeAccessMethods(const char *pattern, bool verbose);
 /* \db */
 extern bool describeTablespaces(const char *pattern, bool verbose);
 
+/* \dCM */
+extern bool describeCompressionMethods(const char *pattern, bool verbose);
+
 /* \df, \dfa, \dfn, \dft, \dfw, etc. */
 extern bool describeFunctions(const char *functypes, const char *pattern, bool verbose, bool showSystem);
 

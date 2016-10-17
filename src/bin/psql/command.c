@@ -736,7 +736,10 @@ exec_command_d(PsqlScanState scan_state, bool active_branch, const char *cmd)
 				success = listConversions(pattern, show_verbose, show_system);
 				break;
 			case 'C':
-				success = listCasts(pattern, show_verbose);
+				if (cmd[2] == 'M')
+					success = describeCompressionMethods(pattern, show_verbose);
+				else
+					success = listCasts(pattern, show_verbose);
 				break;
 			case 'd':
 				if (strncmp(cmd, "ddp", 3) == 0)
