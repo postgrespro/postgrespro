@@ -548,4 +548,67 @@ extern void JsonbEncode(StringInfo, const JsonValue *, CompressionOptions);
 
 extern int lengthCompareJsonbStringValue(const void *a, const void *b);
 
+typedef struct JsonCacheData
+{
+	int		id;
+	char	data[FLEXIBLE_ARRAY_MEMBER];
+} JsonCacheData;
+
+typedef struct JsonCacheContext
+{
+	JsonCacheData	  **data;
+	MemoryContext		mcxt;
+} JsonCacheContext;
+
+extern PGDLLIMPORT JsonCacheContext JsonCache;
+
+static inline JsonCacheContext
+JsonCacheSwitchTo(JsonCacheContext newcxt)
+{
+	JsonCacheContext oldcxt = JsonCache;
+	JsonCache = newcxt;
+	return oldcxt;
+}
+
+static inline JsonCacheContext
+JsonCacheSwitchTo2(void **data, MemoryContext mcxt)
+{
+	JsonCacheContext oldcxt = JsonCache;
+
+	JsonCache.data = (JsonCacheData **) data;
+	JsonCache.mcxt = mcxt;
+
+	return oldcxt;
+}
+
+static inline JsonCacheContext
+JsonCacheSwitchToFunc(FunctionCallInfo fcinfo)
+{
+	JsonCacheContext newcxt = {
+		fcinfo->flinfo ? (JsonCacheData **) &fcinfo->flinfo->fn_extra : NULL,
+		fcinfo->flinfo ? fcinfo->flinfo->fn_mcxt : NULL
+	};
+	return JsonCacheSwitchTo(newcxt);
+}
+
+static inline void *
+JsonCacheGet(int id, size_t size)
+{
+	JsonCacheContext *cache = &JsonCache;
+
+	if (!cache->mcxt || !cache->data)
+		return NULL;
+
+	if (!*cache->data || (*cache->data)->id != id)
+	{
+		if (*cache->data)
+			pfree(*cache->data);
+		*cache->data = MemoryContextAllocZero(cache->mcxt,
+										offsetof(JsonCacheData, data) + size);
+		(*cache->data)->id = id;
+	}
+
+	return (void *)(*cache->data)->data;
+}
+
 #endif /* UTILS_JSON_GENERIC_H */

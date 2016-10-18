@@ -120,17 +120,97 @@ typedef struct JsonbcPair
 static JEntry jsonbcEncodeValue(StringInfo buffer, const JsonbValue *val,
 								int level, JsonbcDictId dict);
 
+typedef struct JsonbcKeyCacheEntry
+{
+	char		   *key;
+	int				len;
+	JsonbcDictId	dict;
+	JsonbcKeyId		id;
+} JsonbcKeyCacheEntry;
+
+#define JSONBC_KEY_CACHE_ENTRIES 4
+
+typedef struct JsonbcKeyCache
+{
+	JsonbcKeyCacheEntry entries[JSONBC_KEY_CACHE_ENTRIES];
+	int					lastEntry;
+} JsonbcKeyCache;
+
+static inline JsonbcKeyCache *
+jsonbcKeyCacheGet()
+{
+	return JsonCacheGet(1 /* FIXME */, sizeof(JsonbcKeyCache));
+}
+
+static inline JsonbcKeyCacheEntry *
+jsonbcKeyCacheGetIdByName(JsonbcDictId dict, JsonbcKeyName keyName)
+{
+	JsonbcKeyCache *cache = jsonbcKeyCacheGet();
+	int				i;
+
+	if (!cache)
+		return NULL;
+
+	for (i = 0; i < JSONBC_KEY_CACHE_ENTRIES; i++)
+	{
+		JsonbcKeyCacheEntry *entry = &cache->entries[i];
+
+		if (!entry->dict)
+			break;
+
+		if (entry->dict == dict &&
+			entry->key[0] == keyName.s[0] &&
+			entry->len == keyName.len &&
+			!memcmp(entry->key, keyName.s, entry->len))
+			return entry;
+	}
+
+	return NULL;
+}
+
+static inline void
+jsonbcKeyCacheAdd(JsonbcDictId dict, JsonbcKeyName key, JsonbcKeyId id)
+{
+	JsonbcKeyCache		   *cache = jsonbcKeyCacheGet();
+	JsonbcKeyCacheEntry	   *entry;
+
+	if (!cache)
+		return;
+
+	entry = &cache->entries[cache->lastEntry];
+
+	if (entry->key)
+		pfree(entry->key);
+
+	entry->key = MemoryContextAlloc(JsonCache.mcxt, key.len);
+	memcpy(entry->key, key.s, key.len);
+	entry->len = key.len;
+	entry->dict = dict;
+	entry->id = id;
+
+	cache->lastEntry = (cache->lastEntry + 1) & (JSONBC_KEY_CACHE_ENTRIES - 1);
+}
+
 static JsonbcKeyId
 jsonbcConvertKeyNameToId(JsonbcDictId dict, const JsonValue *string,
 						 bool insert)
 {
 	JsonbcKeyName	keyName;
 	JsonbcKeyId		keyId;
+	JsonbcKeyCacheEntry *entry;
 
 	keyName.s = string->val.string.val;
 	keyName.len = string->val.string.len;
 
-	keyId = jsonbcDictGetIdByName(dict, keyName, insert);
+	entry = jsonbcKeyCacheGetIdByName(dict, keyName);
+
+	if (entry)
+		keyId = entry->id;
+	else
+	{
+		keyId = jsonbcDictGetIdByName(dict, keyName, insert);
+		jsonbcKeyCacheAdd(dict, keyName, keyId);
+	}
 
 	if (insert && keyId == JsonbcInvalidKeyId)
 		elog(ERROR, "could not insert key \"%.*s\" into jsonbc dictionary",

@@ -16,10 +16,12 @@
 #include "utils/memutils.h"
 #include "utils/builtins.h"
 
+
+JsonCacheContext JsonCache;
+JsonContainerOps jsonvContainerOps;
+
 static Json *JsonExpand(Json *tmp, Datum value, bool freeValue,
 						JsonContainerOps *ops, CompressionOptions options);
-
-JsonContainerOps jsonvContainerOps;
 
 JsonValue *
 JsonValueCopy(JsonValue *res, const JsonValue *val)
