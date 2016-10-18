@@ -115,11 +115,19 @@ jsonb_contains(PG_FUNCTION_ARGS)
 {
 	Jsonb	   *val = PG_GETARG_JSONB(0);
 	Jsonb	   *tmpl = PG_GETARG_JSONB(1);
+	JsonCacheContext oldcxt;
+	bool		res;
 
 	if (JB_ROOT_IS_OBJECT(val) != JB_ROOT_IS_OBJECT(tmpl))
 		PG_RETURN_BOOL(false);
 
-	PG_RETURN_BOOL(JsonbDeepContains(JsonRoot(val), JsonRoot(tmpl)));
+	oldcxt = JsonCacheSwitchToFunc(fcinfo);
+
+	res = JsonbDeepContains(JsonRoot(val), JsonRoot(tmpl));
+
+	JsonCacheSwitchTo(oldcxt);
+
+	PG_RETURN_BOOL(res);
 }
 
 Datum

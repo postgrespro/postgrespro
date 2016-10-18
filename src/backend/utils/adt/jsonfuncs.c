@@ -764,13 +764,18 @@ jsonb_object_field(PG_FUNCTION_ARGS)
 	Jsonb	   *jb = PG_GETARG_JSONB(0);
 	text	   *key = PG_GETARG_TEXT_PP(1);
 	JsonbValue *v;
+	JsonCacheContext oldcxt;
 
 	if (!JB_ROOT_IS_OBJECT(jb))
 		PG_RETURN_NULL();
 
+	oldcxt = JsonCacheSwitchToFunc(fcinfo);
+
 	v = findJsonbValueFromContainerLen(&jb->root, JB_FOBJECT,
 									   VARDATA_ANY(key),
 									   VARSIZE_ANY_EXHDR(key));
+
+	JsonCacheSwitchTo(oldcxt);
 
 	if (v != NULL)
 		PG_RETURN_JSONB(JsonbValueToJsonb(v));
@@ -803,13 +808,18 @@ jsonb_object_field_text(PG_FUNCTION_ARGS)
 	text	   *key = PG_GETARG_TEXT_PP(1);
 	JsonbValue *v;
 	JsonbValue	vbuf;
+	JsonCacheContext oldcxt;
 
 	if (!JB_ROOT_IS_OBJECT(jb))
 		PG_RETURN_NULL();
 
+	oldcxt = JsonCacheSwitchToFunc(fcinfo);
+
 	v = findJsonbValueFromContainerLen(&jb->root, JB_FOBJECT,
 									   VARDATA_ANY(key),
 									   VARSIZE_ANY_EXHDR(key));
+
+	JsonCacheSwitchTo(oldcxt);
 
 	if (v != NULL)
 	{
@@ -1444,13 +1454,23 @@ get_scalar(void *state, char *token, JsonTokenType tokentype)
 Datum
 jsonb_extract_path(PG_FUNCTION_ARGS)
 {
-	return get_jsonb_path_all(fcinfo, false);
+	JsonCacheContext	oldcxt = JsonCacheSwitchToFunc(fcinfo);
+	Datum				result = get_jsonb_path_all(fcinfo, false);
+
+	JsonCacheSwitchTo(oldcxt);
+
+	PG_RETURN_DATUM(result);
 }
 
 Datum
 jsonb_extract_path_text(PG_FUNCTION_ARGS)
 {
-	return get_jsonb_path_all(fcinfo, true);
+	JsonCacheContext	oldcxt = JsonCacheSwitchToFunc(fcinfo);
+	Datum				result = get_jsonb_path_all(fcinfo, true);
+
+	JsonCacheSwitchTo(oldcxt);
+
+	PG_RETURN_DATUM(result);
 }
 
 static Datum
