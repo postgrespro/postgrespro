@@ -507,6 +507,7 @@ extern JsonValue   *jsonFindLastKeyInObject(JsonContainer *obj, const JsonValue 
 extern JsonValue   *jsonFindValueInArray(JsonContainer *array, const JsonValue *elem);
 extern uint32		jsonGetArraySize(JsonContainer *array);
 extern JsonValue   *jsonGetArrayElement(JsonContainer *array, uint32 index);
+extern uint32		JsonGetObjectSize(JsonContainer *object);
 
 extern bool JsonValueScalarEquals(const JsonValue *aScalar,
 								  const JsonValue *bScalar);
