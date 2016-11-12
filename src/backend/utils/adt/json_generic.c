@@ -397,9 +397,7 @@ jsonvArrayIteratorNext(JsonIterator **it, JsonValue *res, bool skipNested)
 		else if (res->type != jbvBinary)
 		{
 			Assert(res->type == jbvArray || res->type == jbvObject);
-			res->val.binary.data = JsonValueToContainer(val);
-			res->val.binary.uniquified = JsonValueIsUniquified(val);
-			res->type = jbvBinary;
+			JsonValueWrapInBinary(val, res);
 		}
 	}
 
@@ -449,10 +447,7 @@ jsonvObjectIteratorNext(JsonIterator **it, JsonValue *res, bool skipNested)
 			else if (res->type != jbvBinary)
 			{
 				Assert(res->type == jbvArray || res->type == jbvObject);
-				res->val.binary.data = JsonValueToContainer(&pair->value);
-				res->val.binary.uniquified =
-											JsonValueIsUniquified(&pair->value);
-				res->type = jbvBinary;
+				JsonValueWrapInBinary(&pair->value, res);
 			}
 		}
 
