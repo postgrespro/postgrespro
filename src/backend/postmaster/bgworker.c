@@ -34,6 +34,7 @@
 #include "storage/shmem.h"
 #include "tcop/tcopprot.h"
 #include "utils/ascii.h"
+#include "utils/jsonbc_dict.h"
 #include "utils/ps_status.h"
 #include "utils/timeout.h"
 
@@ -129,6 +130,9 @@ static const struct
 	},
 	{
 		"ApplyWorkerMain", ApplyWorkerMain
+	},
+	{
+		"JsonbcDictWorkerMain", JsonbcDictWorkerMain
 	}
 };
 

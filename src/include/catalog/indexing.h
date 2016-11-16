@@ -368,7 +368,7 @@ DECLARE_UNIQUE_INDEX(pg_subscription_rel_srrelid_srsubid_index, 6117, on pg_subs
 DECLARE_UNIQUE_INDEX(pg_jsonbc_dict_id_index, 3419, on pg_jsonbc_dict using btree(dict oid_ops, id int4_ops));
 #define JsonbcDictionaryIdIndexId 3419
 
-DECLARE_INDEX(pg_jsonbc_dict_name_index, 3420, on pg_jsonbc_dict using btree(dict oid_ops, name text_pattern_ops));
+DECLARE_UNIQUE_INDEX(pg_jsonbc_dict_name_index, 3420, on pg_jsonbc_dict using btree(dict oid_ops, name text_pattern_ops));
 #define JsonbcDictionaryNameIndexId 3420
 
 /* last step of initialization script: build the indexes declared above */

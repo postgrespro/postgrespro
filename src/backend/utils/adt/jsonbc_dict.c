@@ -33,10 +33,6 @@
 
 #define JSONBC_DICT_TAB "pg_jsonbc_dict"
 
-static JsonbcKeyId
-jsonbcDictGetIdByNameSlow(JsonbcDictId dict, JsonbcKeyName name,
-						  JsonbcKeyId nextKeyId);
-
 void
 jsonbcDictRemoveEntryById(JsonbcDictId dict, JsonbcKeyId key)
 {
@@ -99,7 +95,7 @@ jsonbcDictInsertEntry(JsonbcDictId dict, JsonbcKeyName name,
 	return nextKeyId;
 }
 
-static JsonbcKeyId
+JsonbcKeyId
 jsonbcDictGetIdByNameSeqCached(JsonbcDictId dict, JsonbcKeyName name)
 {
 	text	   *txt = cstring_to_text_with_len(name.s, name.len);
@@ -144,7 +140,7 @@ jsonbcDictGetIdByNameSeq(JsonbcDictId dict, JsonbcKeyName name, bool insert)
 	{
 		JsonbcKeyId nextKeyId = (JsonbcKeyId) nextval_internal(dict, false);
 
-		id = jsonbcDictInsertEntry(dict, name, nextKeyId);
+		id = jsonbcDictWorkerGetIdByName(dict, name, nextKeyId);
 
 		jsonbcDictInvalidateCache(dict, name);
 	}
@@ -249,7 +245,7 @@ jsonbcDictGetNameById(JsonbcDictId dict, JsonbcKeyId id)
 }
 
 #ifndef JSONBC_DICT_UPSERT
-static JsonbcKeyId
+JsonbcKeyId
 jsonbcDictGetIdByNameSlow(JsonbcDictId dict, JsonbcKeyName name,
 						  JsonbcKeyId nextKeyId)
 {
@@ -259,8 +255,9 @@ jsonbcDictGetIdByNameSlow(JsonbcDictId dict, JsonbcKeyName name,
 #else
 static SPIPlanPtr savedPlanInsert = NULL;
 
-static JsonbcKeyId
-jsonbcDictGetIdByNameSlow(JsonbcDictId dict, JsonbcKeyName name)
+JsonbcKeyId
+jsonbcDictGetIdByNameSlow(JsonbcDictId dict, JsonbcKeyName name,
+						  JsonbcKeyId nextKeyId)
 {
 	Oid		argTypes[3] = {JsonbcDictIdTypeOid, TEXTOID, JsonbcKeyIdTypeOid};
 	Datum	args[3];
