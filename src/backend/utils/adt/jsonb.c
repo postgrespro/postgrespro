@@ -235,6 +235,12 @@ jsonb_typeof(PG_FUNCTION_ARGS)
 }
 
 #ifndef JSON_C
+Datum
+jsonb_to_json(PG_FUNCTION_ARGS)
+{
+	PG_RETURN_DATUM(JsonGetDatum(PG_GETARG_JSONB(0)));
+}
+
 JsonbValue *
 JsonValueFromCString(char *json, int len)
 {

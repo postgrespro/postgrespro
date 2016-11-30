@@ -3057,3 +3057,9 @@ json_null_cm_handler(PG_FUNCTION_ARGS)
 
 	PG_RETURN_POINTER(cmr);
 }
+
+Datum
+json_to_jsonb(PG_FUNCTION_ARGS)
+{
+	PG_RETURN_DATUM(JsonGetDatum(JsonGetUniquified(PG_GETARG_JSONB(0))));
+}

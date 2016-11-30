@@ -389,7 +389,7 @@ DATA(insert ( 1562 1562 1687 i f ));
 DATA(insert ( 1700 1700 1703 i f ));
 
 /* json to/from jsonb */
-DATA(insert (  114 3802    0 a i ));
-DATA(insert ( 3802	114    0 a i ));
+DATA(insert (  114 3802 4161 a f ));
+DATA(insert ( 3802	114 4160 a f ));
 
 #endif   /* PG_CAST_H */

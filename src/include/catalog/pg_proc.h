@@ -4454,6 +4454,8 @@ DATA(insert OID = 323 (  json_recv		   PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 
 DESCR("I/O");
 DATA(insert OID = 324 (  json_send		   PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 17 "114" _null_ _null_ _null_ _null_ _null_ json_send _null_ _null_ _null_ ));
 DESCR("I/O");
+DATA(insert OID = 4160 (  json             PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 114 "3802" _null_ _null_ _null_ _null_ _null_ jsonb_to_json _null_ _null_ _null_ ));
+DESCR("cast jsonb as json");
 DATA(insert OID = 3153 (  array_to_json    PGNSP PGUID 12 1 0 0 0 f f f f t f s s 1 0 114 "2277" _null_ _null_ _null_ _null_ _null_ array_to_json _null_ _null_ _null_ ));
 DESCR("map array to json");
 DATA(insert OID = 3154 (  array_to_json    PGNSP PGUID 12 1 0 0 0 f f f f t f s s 2 0 114 "2277 16" _null_ _null_ _null_ _null_ _null_ array_to_json_pretty _null_ _null_ _null_ ));
@@ -4922,6 +4924,8 @@ DATA(insert OID =  3804 (  jsonb_out		PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0
 DESCR("I/O");
 DATA(insert OID =  3803 (  jsonb_send		PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 17 "3802" _null_ _null_ _null_ _null_ _null_ jsonb_send _null_ _null_ _null_ ));
 DESCR("I/O");
+DATA(insert OID =  4161 (  jsonb            PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 3802 "114" _null_ _null_ _null_ _null_ _null_ json_to_jsonb _null_ _null_ _null_ ));
+DESCR("cast json as jsonb");
 
 DATA(insert OID = 3263 (  jsonb_object	 PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 3802 "1009" _null_ _null_ _null_ _null_ _null_ jsonb_object _null_ _null_ _null_ ));
 DESCR("map text array of key value pairs to jsonb object");
