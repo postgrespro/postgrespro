@@ -61,3 +61,4 @@ test: create-trigger
 test: async-notify
 test: vacuum-reltuples
 test: timeouts
+test: jsonbc

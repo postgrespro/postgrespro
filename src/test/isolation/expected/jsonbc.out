@@ -1,0 +1,334 @@
+Parsed test spec with 2 sessions
+
+starting permutation: s1rc s2rc s1ia s2ia s1sd s1sf s2sd s2sf s1ci s2ci s1sd s1sf
+step s1rc: SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+step s2rc: SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+step s1ia: INSERT INTO foo VALUES (jsonb_build_object('a', 1));
+step s2ia: INSERT INTO foo VALUES (jsonb_build_object('a', 2));
+step s1sd: SELECT id, name FROM pg_jsonbc_dict;
+id             name           
+
+1              a              
+step s1sf: SELECT * FROM foo;
+bar            
+
+{"a": 1}       
+step s2sd: SELECT id, name FROM pg_jsonbc_dict;
+id             name           
+
+1              a              
+step s2sf: SELECT * FROM foo;
+bar            
+
+{"a": 2}       
+step s1ci: COMMIT;
+step s2ci: COMMIT;
+step s1sd: SELECT id, name FROM pg_jsonbc_dict;
+id             name           
+
+1              a              
+step s1sf: SELECT * FROM foo;
+bar            
+
+{"a": 1}       
+{"a": 2}       
+
+starting permutation: s1rc s2rc s1ia s2ia s1ci s2rb s1sd s1sf
+step s1rc: SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+step s2rc: SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+step s1ia: INSERT INTO foo VALUES (jsonb_build_object('a', 1));
+step s2ia: INSERT INTO foo VALUES (jsonb_build_object('a', 2));
+step s1ci: COMMIT;
+step s2rb: ROLLBACK;
+step s1sd: SELECT id, name FROM pg_jsonbc_dict;
+id             name           
+
+1              a              
+step s1sf: SELECT * FROM foo;
+bar            
+
+{"a": 1}       
+
+starting permutation: s1rc s2rc s1ia s2ia s1rb s2ci s1sd s1sf
+step s1rc: SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+step s2rc: SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+step s1ia: INSERT INTO foo VALUES (jsonb_build_object('a', 1));
+step s2ia: INSERT INTO foo VALUES (jsonb_build_object('a', 2));
+step s1rb: ROLLBACK;
+step s2ci: COMMIT;
+step s1sd: SELECT id, name FROM pg_jsonbc_dict;
+id             name           
+
+1              a              
+step s1sf: SELECT * FROM foo;
+bar            
+
+{"a": 2}       
+
+starting permutation: s1rc s2rc s1ia s2ia s1rb s2rb s1sd s1sf
+step s1rc: SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+step s2rc: SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+step s1ia: INSERT INTO foo VALUES (jsonb_build_object('a', 1));
+step s2ia: INSERT INTO foo VALUES (jsonb_build_object('a', 2));
+step s1rb: ROLLBACK;
+step s2rb: ROLLBACK;
+step s1sd: SELECT id, name FROM pg_jsonbc_dict;
+id             name           
+
+1              a              
+step s1sf: SELECT * FROM foo;
+bar            
+
+
+starting permutation: s1rc s2rc s1ia s2ia s2ci s1ci s1sd s1sf
+step s1rc: SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+step s2rc: SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+step s1ia: INSERT INTO foo VALUES (jsonb_build_object('a', 1));
+step s2ia: INSERT INTO foo VALUES (jsonb_build_object('a', 2));
+step s2ci: COMMIT;
+step s1ci: COMMIT;
+step s1sd: SELECT id, name FROM pg_jsonbc_dict;
+id             name           
+
+1              a              
+step s1sf: SELECT * FROM foo;
+bar            
+
+{"a": 1}       
+{"a": 2}       
+
+starting permutation: s1rc s2rc s1ia s2ia s2ci s1rb s1sd s1sf
+step s1rc: SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+step s2rc: SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+step s1ia: INSERT INTO foo VALUES (jsonb_build_object('a', 1));
+step s2ia: INSERT INTO foo VALUES (jsonb_build_object('a', 2));
+step s2ci: COMMIT;
+step s1rb: ROLLBACK;
+step s1sd: SELECT id, name FROM pg_jsonbc_dict;
+id             name           
+
+1              a              
+step s1sf: SELECT * FROM foo;
+bar            
+
+{"a": 2}       
+
+starting permutation: s1rc s2rc s1ia s2ia s2rb s1ci s1sd s1sf
+step s1rc: SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+step s2rc: SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+step s1ia: INSERT INTO foo VALUES (jsonb_build_object('a', 1));
+step s2ia: INSERT INTO foo VALUES (jsonb_build_object('a', 2));
+step s2rb: ROLLBACK;
+step s1ci: COMMIT;
+step s1sd: SELECT id, name FROM pg_jsonbc_dict;
+id             name           
+
+1              a              
+step s1sf: SELECT * FROM foo;
+bar            
+
+{"a": 1}       
+
+starting permutation: s1rc s2rc s1ia s2ia s2rb s1rb s1sd s1sf
+step s1rc: SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+step s2rc: SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+step s1ia: INSERT INTO foo VALUES (jsonb_build_object('a', 1));
+step s2ia: INSERT INTO foo VALUES (jsonb_build_object('a', 2));
+step s2rb: ROLLBACK;
+step s1rb: ROLLBACK;
+step s1sd: SELECT id, name FROM pg_jsonbc_dict;
+id             name           
+
+1              a              
+step s1sf: SELECT * FROM foo;
+bar            
+
+
+starting permutation: s1sr s2sr s1ia s2ia s1sd s1sf s1ci s2ci s1sd s1sf
+step s1sr: SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+step s2sr: SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+step s1ia: INSERT INTO foo VALUES (jsonb_build_object('a', 1));
+step s2ia: INSERT INTO foo VALUES (jsonb_build_object('a', 2));
+step s1sd: SELECT id, name FROM pg_jsonbc_dict;
+id             name           
+
+step s1sf: SELECT * FROM foo;
+bar            
+
+{"a": 1}       
+step s1ci: COMMIT;
+step s2ci: COMMIT;
+step s1sd: SELECT id, name FROM pg_jsonbc_dict;
+id             name           
+
+1              a              
+step s1sf: SELECT * FROM foo;
+bar            
+
+{"a": 1}       
+{"a": 2}       
+
+starting permutation: s1sr s2sr s1ia s2ia s1ci s2rb s1sd s1sf
+step s1sr: SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+step s2sr: SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+step s1ia: INSERT INTO foo VALUES (jsonb_build_object('a', 1));
+step s2ia: INSERT INTO foo VALUES (jsonb_build_object('a', 2));
+step s1ci: COMMIT;
+step s2rb: ROLLBACK;
+step s1sd: SELECT id, name FROM pg_jsonbc_dict;
+id             name           
+
+1              a              
+step s1sf: SELECT * FROM foo;
+bar            
+
+{"a": 1}       
+
+starting permutation: s1sr s2sr s1ia s2ia s1rb s2ci s1sd s1sf
+step s1sr: SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+step s2sr: SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+step s1ia: INSERT INTO foo VALUES (jsonb_build_object('a', 1));
+step s2ia: INSERT INTO foo VALUES (jsonb_build_object('a', 2));
+step s1rb: ROLLBACK;
+step s2ci: COMMIT;
+step s1sd: SELECT id, name FROM pg_jsonbc_dict;
+id             name           
+
+1              a              
+step s1sf: SELECT * FROM foo;
+bar            
+
+{"a": 2}       
+
+starting permutation: s1sr s2sr s1ia s2ia s1rb s2rb s1sd s1sf
+step s1sr: SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+step s2sr: SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+step s1ia: INSERT INTO foo VALUES (jsonb_build_object('a', 1));
+step s2ia: INSERT INTO foo VALUES (jsonb_build_object('a', 2));
+step s1rb: ROLLBACK;
+step s2rb: ROLLBACK;
+step s1sd: SELECT id, name FROM pg_jsonbc_dict;
+id             name           
+
+1              a              
+step s1sf: SELECT * FROM foo;
+bar            
+
+
+starting permutation: s1sr s2sr s1ia s2ia s2ci s1ci s1sd s1sf
+step s1sr: SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+step s2sr: SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+step s1ia: INSERT INTO foo VALUES (jsonb_build_object('a', 1));
+step s2ia: INSERT INTO foo VALUES (jsonb_build_object('a', 2));
+step s2ci: COMMIT;
+step s1ci: COMMIT;
+step s1sd: SELECT id, name FROM pg_jsonbc_dict;
+id             name           
+
+1              a              
+step s1sf: SELECT * FROM foo;
+bar            
+
+{"a": 1}       
+{"a": 2}       
+
+starting permutation: s1sr s2sr s1ia s2ia s2ci s1rb s1sd s1sf
+step s1sr: SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+step s2sr: SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+step s1ia: INSERT INTO foo VALUES (jsonb_build_object('a', 1));
+step s2ia: INSERT INTO foo VALUES (jsonb_build_object('a', 2));
+step s2ci: COMMIT;
+step s1rb: ROLLBACK;
+step s1sd: SELECT id, name FROM pg_jsonbc_dict;
+id             name           
+
+1              a              
+step s1sf: SELECT * FROM foo;
+bar            
+
+{"a": 2}       
+
+starting permutation: s1sr s2sr s1ia s2ia s2rb s1ci s1sd s1sf
+step s1sr: SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+step s2sr: SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+step s1ia: INSERT INTO foo VALUES (jsonb_build_object('a', 1));
+step s2ia: INSERT INTO foo VALUES (jsonb_build_object('a', 2));
+step s2rb: ROLLBACK;
+step s1ci: COMMIT;
+step s1sd: SELECT id, name FROM pg_jsonbc_dict;
+id             name           
+
+1              a              
+step s1sf: SELECT * FROM foo;
+bar            
+
+{"a": 1}       
+
+starting permutation: s1sr s2sr s1ia s2ia s2rb s1rb s1sd s1sf
+step s1sr: SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+step s2sr: SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+step s1ia: INSERT INTO foo VALUES (jsonb_build_object('a', 1));
+step s2ia: INSERT INTO foo VALUES (jsonb_build_object('a', 2));
+step s2rb: ROLLBACK;
+step s1rb: ROLLBACK;
+step s1sd: SELECT id, name FROM pg_jsonbc_dict;
+id             name           
+
+1              a              
+step s1sf: SELECT * FROM foo;
+bar            
+
+
+starting permutation: s1sr s2sr s1ia s1ia s1ib s1ic s2ib s2ia s2ib s1ci s2ci s1sd s1sf
+step s1sr: SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+step s2sr: SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+step s1ia: INSERT INTO foo VALUES (jsonb_build_object('a', 1));
+step s1ia: INSERT INTO foo VALUES (jsonb_build_object('a', 1));
+step s1ib: INSERT INTO foo VALUES (jsonb_build_object('b', 1));
+step s1ic: INSERT INTO foo VALUES (jsonb_build_object('a', 1, 'b', 1, 'c', jsonb_build_object('a', 1)));
+step s2ib: INSERT INTO foo VALUES (jsonb_build_object('b', 2));
+step s2ia: INSERT INTO foo VALUES (jsonb_build_object('a', 2));
+step s2ib: INSERT INTO foo VALUES (jsonb_build_object('b', 2));
+step s1ci: COMMIT;
+step s2ci: COMMIT;
+step s1sd: SELECT id, name FROM pg_jsonbc_dict;
+id             name           
+
+1              a              
+2              b              
+3              c              
+step s1sf: SELECT * FROM foo;
+bar            
+
+{"a": 1}       
+{"a": 1}       
+{"b": 1}       
+{"a": 1, "b": 1, "c": {"a": 1}}
+{"b": 2}       
+{"a": 2}       
+{"b": 2}       
+
+starting permutation: s1sr s2sr s1ic s1ic s1ia s2ic s2ib s1ci s2ci s1sd s1sf
+step s1sr: SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+step s2sr: SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+step s1ic: INSERT INTO foo VALUES (jsonb_build_object('a', 1, 'b', 1, 'c', jsonb_build_object('a', 1)));
+step s1ic: INSERT INTO foo VALUES (jsonb_build_object('a', 1, 'b', 1, 'c', jsonb_build_object('a', 1)));
+step s1ia: INSERT INTO foo VALUES (jsonb_build_object('a', 1));
+step s2ic: INSERT INTO foo VALUES (jsonb_build_object('a', 2, 'b', 2, 'c', jsonb_build_object('a', 2)));
+step s2ib: INSERT INTO foo VALUES (jsonb_build_object('b', 2));
+step s1ci: COMMIT;
+step s2ci: COMMIT;
+step s1sd: SELECT id, name FROM pg_jsonbc_dict;
+id             name           
+
+1              a              
+2              b              
+3              c              
+step s1sf: SELECT * FROM foo;
+bar            
+
+{"a": 1, "b": 1, "c": {"a": 1}}
+{"a": 1, "b": 1, "c": {"a": 1}}
+{"a": 1}       
+{"a": 2, "b": 2, "c": {"a": 2}}
+{"b": 2}       
