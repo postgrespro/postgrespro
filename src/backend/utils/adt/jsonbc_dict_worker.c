@@ -11,28 +11,37 @@
 #include "pgstat.h"
 #include "access/xact.h"
 #include "executor/spi.h"
+#include "lib/ilist.h"
 #include "mb/pg_wchar.h"
 #include "postmaster/bgworker.h"
 #include "storage/ipc.h"
 #include "storage/latch.h"
 #include "storage/proc.h"
 #include "storage/shm_mq.h"
+#include "storage/spin.h"
 #include "utils/hsearch.h"
 #include "utils/jsonbc_dict.h"
 #include "utils/memutils.h"
 
 #define JSONBC_MQ_BUF_SIZE 1024
 
+typedef struct AutoResetEvent
+{
+	Latch	   *latch;
+	bool		set;
+} AutoResetEvent;
+
 typedef struct JsonbcDictWorker
 {
 	Oid					dbid;
+	BackgroundWorkerHandle	*handle;
 	bool				started;
 
-	Latch		   		workerLatch;
-	Latch			   	backendLatch;
+	dlist_node			lruNode;
 
 	struct
 	{
+		AutoResetEvent	event;
 		JsonbcDictId	dict;
 		JsonbcKeyId		nextKeyId;
 		shm_mq		   *keymq;
@@ -40,6 +49,7 @@ typedef struct JsonbcDictWorker
 
 	struct
 	{
+		AutoResetEvent	event;
 		JsonbcKeyId		id;
 		shm_mq		   *errmq;
 	} response;
@@ -47,9 +57,16 @@ typedef struct JsonbcDictWorker
 	char				mqbuf[JSONBC_MQ_BUF_SIZE];
 } JsonbcDictWorker;
 
-typedef HTAB JsonbcDictWorkers;
+typedef struct JsonbcDictWorkers
+{
+	slock_t				mutex;
+	dlist_head			lruList;
+	int					nworkers;
+	JsonbcDictWorker	workers[FLEXIBLE_ARRAY_MEMBER];
+} JsonbcDictWorkers;
 
-static JsonbcDictWorker	   *jsonbcDictWorker;
+int jsonbc_max_workers; /* GUC parameter */
+
 static JsonbcDictWorkers   *jsonbcDictWorkers;
 static bool 				jsonbcDictWorkerShutdownRequested = false;
 
@@ -62,11 +79,7 @@ handle_sigterm(SIGNAL_ARGS)
 
 	jsonbcDictWorkerShutdownRequested = true;
 
-	if (MyProc)
-		SetLatch(&MyProc->procLatch);
-
-	if (jsonbcDictWorker)
-		SetLatch(&jsonbcDictWorker->workerLatch);
+	SetLatch(MyLatch);
 
 	errno = save_errno;
 }
@@ -74,15 +87,26 @@ handle_sigterm(SIGNAL_ARGS)
 void
 JsonbcDictWorkerShmemInit()
 {
-	HASHCTL hctl;
+	bool		found;
 
-	memset(&hctl, 0, sizeof(hctl));
-	hctl.keysize = sizeof(Oid);
-	hctl.entrysize = sizeof(JsonbcDictWorker);
-	hctl.hash = oid_hash;
+	if (jsonbc_max_workers <= 0)
+		return;
 
-	jsonbcDictWorkers = ShmemInitHash("jsonbc dictionary workers hash", 16, 128,
-									  &hctl, HASH_ELEM | HASH_FUNCTION);
+	jsonbcDictWorkers = (JsonbcDictWorkers *)
+			ShmemInitStruct("jsonbc dictionary workers",
+							offsetof(JsonbcDictWorkers, workers) +
+								sizeof(JsonbcDictWorker) * jsonbc_max_workers,
+							&found);
+
+	if (found)
+		return;
+
+	dlist_init(&jsonbcDictWorkers->lruList);
+	SpinLockInit(&jsonbcDictWorkers->mutex);
+	jsonbcDictWorkers->nworkers = jsonbc_max_workers;
+
+	memset(jsonbcDictWorkers->workers, 0,
+		   sizeof(JsonbcDictWorker) * jsonbc_max_workers);
 }
 
 static char *
@@ -143,6 +167,64 @@ jsonbcDictWorkerSendString(shm_mq *mq, const char *str, int len)
 	shm_mq_detach(mq);
 }
 
+static void
+AutoResetEventOwn(AutoResetEvent *event)
+{
+	event->latch = MyLatch;
+}
+
+static void
+AutoResetEventDisown(AutoResetEvent *event)
+{
+	/* event->latch = NULL; */
+}
+
+static void
+AutoResetEventSet(AutoResetEvent *event)
+{
+	pg_memory_barrier();
+
+	if (event->set)
+		return;
+
+	event->set = true;
+	SetLatch(event->latch);
+}
+
+static void
+AutoResetEventReset(AutoResetEvent *event)
+{
+	event->set = false;
+	pg_memory_barrier();
+}
+
+static int
+AutoResetEventWait(AutoResetEvent *event)
+{
+	while (!event->set)
+	{
+		int		rc = WaitLatch(MyLatch, WL_LATCH_SET | WL_POSTMASTER_DEATH, 0,
+							   WAIT_EVENT_JSONBC_DICT_WORKER);
+
+		if (!(rc & WL_LATCH_SET))
+			return rc;
+
+		if (jsonbcDictWorkerShutdownRequested)
+			return 0;
+
+		ResetLatch(MyLatch);
+	}
+
+	if (jsonbcDictWorkerShutdownRequested)
+		return false;
+
+	AutoResetEventReset(event);
+
+	pg_read_barrier();
+
+	return WL_LATCH_SET;
+}
+
 void
 JsonbcDictWorkerMain(Datum main_arg)
 {
@@ -166,47 +248,41 @@ JsonbcDictWorkerMain(Datum main_arg)
 
 	SetClientEncoding(GetDatabaseEncoding());
 
-	OwnLatch(&wrk->workerLatch);
-	ResetLatch(&wrk->workerLatch);
-	SetLatch(&wrk->backendLatch);
+	AutoResetEventOwn(&wrk->request.event);
 
-	jsonbcDictWorker = wrk;
+	/* signal that we are ready to receive requests */
+	AutoResetEventSet(&wrk->response.event);
 
 	for (;;)
 	{
-		int		rc = WaitLatch(&wrk->workerLatch,
-							   WL_LATCH_SET | WL_POSTMASTER_DEATH, 0,
-							   WAIT_EVENT_JSONBC_DICT_WORKER);
+		int rc = AutoResetEventWait(&wrk->request.event);
 
 		if (rc & WL_POSTMASTER_DEATH)
 			exit(1);
 
-		if (jsonbcDictWorkerShutdownRequested)
-			break;
-
-		ResetLatch(&wrk->workerLatch);
+		if (!rc)
+			break; /* shutdown */
 
 		PG_TRY();
 		{
 			JsonbcKeyName	key;
+			JsonbcKeyId		keyid;
 
 			key.s = jsonbcDictWorkerReceiveString(wrk->request.keymq, &key.len);
 
-
 			StartTransactionCommand();
 
-			wrk->response.id = jsonbcDictGetIdByNameSeqCached(wrk->request.dict,
-															  key);
+			keyid = jsonbcDictGetIdByNameSeqCached(wrk->request.dict, key);
 
-			if (wrk->response.id == JsonbcInvalidKeyId)
-				wrk->response.id =
-						jsonbcDictGetIdByNameSlow(wrk->request.dict,
-												  key,
+			if (keyid == JsonbcInvalidKeyId)
+				keyid = jsonbcDictGetIdByNameSlow(wrk->request.dict, key,
 												  wrk->request.nextKeyId);
 
 			CommitTransactionCommand();
 
-			SetLatch(&wrk->backendLatch);
+			wrk->response.id = keyid;
+
+			AutoResetEventSet(&wrk->response.event);
 		}
 		PG_CATCH();
 		{
@@ -215,10 +291,11 @@ JsonbcDictWorkerMain(Datum main_arg)
 			MemoryContextSwitchTo(mcxt);
 			edata = CopyErrorData();
 			FlushErrorState();
+
 			wrk->response.id = JsonbcInvalidKeyId;
 			wrk->response.errmq = shm_mq_create(wrk->mqbuf, sizeof(wrk->mqbuf));
 
-			SetLatch(&wrk->backendLatch);
+			AutoResetEventSet(&wrk->response.event);
 
 			jsonbcDictWorkerSendString(wrk->response.errmq,
 									   edata->message, strlen(edata->message));
@@ -228,45 +305,20 @@ JsonbcDictWorkerMain(Datum main_arg)
 		PG_END_TRY();
 	}
 
-	DisownLatch(&wrk->workerLatch);
-
 	proc_exit(0);
 }
 
-static JsonbcDictWorker *
-jsonbcDictWorkerStart(Oid dbid)
+static void
+jsonbcDictWorkerStart(JsonbcDictWorker *wrk)
 {
 	BackgroundWorker		bgworker;
 	BackgroundWorkerHandle *bgwhandle;
-	JsonbcDictWorker	   *wrk;
-	LWLock				   *partitionLock;
 	MemoryContext			oldcontext;
 	BgwHandleStatus			status;
 	pid_t					pid;
-	uint32					hashcode;
 	int						rc;
-	bool					found;
 
-	hashcode = oid_hash(&dbid, sizeof(dbid));
-	partitionLock = LockHashPartitionLock(hashcode);
-	LWLockAcquire(partitionLock, LW_EXCLUSIVE);
-
-	wrk = hash_search_with_hash_value(jsonbcDictWorkers, &dbid, hashcode,
-									  HASH_ENTER, &found);
-
-	LWLockRelease(partitionLock);
-
-
-	if (found && wrk->started)
-		return wrk;
-
-	if (!found)
-	{
-		InitSharedLatch(&wrk->workerLatch);
-		InitSharedLatch(&wrk->backendLatch);
-	}
-
-	elog(DEBUG1, "starting jsonbc dictionary background worker for DB %d", dbid);
+	elog(DEBUG1, "starting jsonbc dictionary background worker for DB %d", wrk->dbid);
 
 	/* We might be running in a short-lived memory context. */
 	oldcontext = MemoryContextSwitchTo(TopTransactionContext);
@@ -282,8 +334,8 @@ jsonbcDictWorkerStart(Oid dbid)
 	bgworker.bgw_main_arg = PointerGetDatum(wrk);
 	bgworker.bgw_notify_pid = MyProcPid;
 
-	OwnLatch(&wrk->backendLatch);
-	ResetLatch(&wrk->backendLatch);
+	AutoResetEventOwn(&wrk->response.event);
+	AutoResetEventReset(&wrk->response.event);
 
 	PG_TRY();
 	{
@@ -308,19 +360,21 @@ jsonbcDictWorkerStart(Oid dbid)
 					 errhint("Kill all remaining database processes and restart the database.")));
 		Assert(status == BGWH_STARTED);
 
-		wrk->started = true; /* FIXME use BackgroundWorkerHandle */
+		GetSharedBackgroundWorkerHandle(bgwhandle, &wrk->handle);
+		wrk->started = true;
 
-		rc = WaitLatch(&wrk->backendLatch, WL_LATCH_SET | WL_POSTMASTER_DEATH,
-					   0, WAIT_EVENT_JSONBC_DICT_WORKER);
+		pfree(bgwhandle);
+
+		rc = AutoResetEventWait(&wrk->response.event);
 	}
 	PG_CATCH();
 	{
-		DisownLatch(&wrk->backendLatch);
+		AutoResetEventDisown(&wrk->response.event);
 		PG_RE_THROW();
 	}
 	PG_END_TRY();
 
-	DisownLatch(&wrk->backendLatch);
+	AutoResetEventDisown(&wrk->response.event);
 
 	if (rc & WL_POSTMASTER_DEATH)
 		ereport(ERROR,
@@ -329,9 +383,37 @@ jsonbcDictWorkerStart(Oid dbid)
 				 errhint("Kill all remaining database processes and restart the database.")));
 
 	MemoryContextSwitchTo(oldcontext);
-
-	return wrk;
 }
+
+static void
+jsonbcDictWorkerStop(JsonbcDictWorker *wrk)
+{
+	BgwHandleStatus		bgwstatus;
+
+	TerminateBackgroundWorker(wrk->handle);
+
+#if 0 /* FIXME */
+	SetBackgroundWorkerNotifyPid(wrk->handle, MyProcPid);
+
+	bgwstatus = WaitForBackgroundWorkerShutdown(wrk->handle);
+
+	if (bgwstatus == BGWH_POSTMASTER_DIED)
+		ereport(ERROR,
+				(errcode(ERRCODE_INSUFFICIENT_RESOURCES),
+				 errmsg("cannot start background processes without postmaster"),
+				 errhint("Kill all remaining database processes and restart the database.")));
+
+	Assert(bgwstatus == BGWH_STOPPED);
+#endif
+
+	wrk->started = false;
+}
+
+typedef struct JsonbcDictWorkerHandle
+{
+	JsonbcDictWorker	   *worker;
+	LOCKTAG					locktag;
+} JsonbcDictWorkerHandle;
 
 #define PG_JSONBC_DICT_LOCK_MAGIC 0x3C59A016
 
@@ -346,22 +428,180 @@ jsonbcDictWorkerInitLockTag(LOCKTAG *tag, Oid dbid)
 	tag->locktag_lockmethodid = USER_LOCKMETHOD;
 }
 
-JsonbcKeyId
-jsonbcDictWorkerGetIdByName(JsonbcDictId dict, JsonbcKeyName key,
-							JsonbcKeyId nextKeyId)
+static JsonbcDictWorker *
+jsonbcDictWorkerFind(Oid dbid)
 {
-	LOCKTAG					tag;
-	JsonbcDictWorker	   *wrk;
-	JsonbcKeyId				result;
-	char				   *errmsg;
-	int					    errmsglen;
+	JsonbcDictWorker	   *result = NULL;
+	JsonbcDictWorker	   *free = NULL;
+	JsonbcDictWorker	   *worker;
+	int						i;
 
-	jsonbcDictWorkerInitLockTag(&tag, MyDatabaseId);
-	LockAcquire(&tag, ExclusiveLock, false, false);
+	SpinLockAcquire(&jsonbcDictWorkers->mutex);
 
-	wrk = jsonbcDictWorkerStart(MyDatabaseId);
+	for (i = 0, worker = jsonbcDictWorkers->workers;
+		 i < jsonbcDictWorkers->nworkers;
+		 i++, worker++)
+	{
+		if (worker->dbid == dbid)
+		{
+			result = worker;
+			dlist_delete(&result->lruNode);
+			dlist_push_tail(&jsonbcDictWorkers->lruList, &result->lruNode);
+			break;
+		}
 
-	OwnLatch(&wrk->backendLatch);
+		if (!worker->dbid && !free)
+			free = worker;
+	}
+
+	if (!result && free)
+	{
+		result = free;
+		result->dbid = dbid;
+		dlist_push_tail(&jsonbcDictWorkers->lruList, &result->lruNode);
+	}
+
+	SpinLockRelease(&jsonbcDictWorkers->mutex);
+
+	return result;
+}
+
+static JsonbcDictWorker *
+jsonbcDictWorkerPeekVictim(Oid *dbid)
+{
+	JsonbcDictWorker   *victim = NULL;
+
+	SpinLockAcquire(&jsonbcDictWorkers->mutex);
+	if (!dlist_is_empty(&jsonbcDictWorkers->lruList))
+	{
+		victim = dlist_container(JsonbcDictWorker, lruNode,
+								dlist_head_node(&jsonbcDictWorkers->lruList));
+		*dbid = victim->dbid;
+	}
+	SpinLockRelease(&jsonbcDictWorkers->mutex);
+
+	return victim;
+}
+
+static bool
+jsonbcDictWorkerCheckVictim(JsonbcDictWorker *victim, Oid dbid)
+{
+	bool	result;
+
+	SpinLockAcquire(&jsonbcDictWorkers->mutex);
+
+	if (dlist_is_empty(&jsonbcDictWorkers->lruList))
+		result = false;
+	else
+	{
+		JsonbcDictWorker *lru = dlist_container(JsonbcDictWorker, lruNode,
+						dlist_head_node(&jsonbcDictWorkers->lruList));
+		result = victim == lru && lru->dbid == dbid;
+	}
+
+	SpinLockRelease(&jsonbcDictWorkers->mutex);
+
+	return result;
+}
+
+static Oid
+jsonbcDictWorkerGetDbId(JsonbcDictWorker *worker)
+{
+	Oid		dbid;
+
+	SpinLockAcquire(&jsonbcDictWorkers->mutex);
+	dbid = worker->dbid;
+	SpinLockRelease(&jsonbcDictWorkers->mutex);
+
+	return dbid;
+}
+
+static void
+jsonbcDictWorkerReassignDbId(JsonbcDictWorker *worker, Oid dbid)
+{
+	SpinLockAcquire(&jsonbcDictWorkers->mutex);
+
+	Assert(!worker->started);
+
+	dlist_delete(&worker->lruNode);
+	dlist_push_tail(&jsonbcDictWorkers->lruList, &worker->lruNode);
+	worker->started = false;
+	worker->dbid = dbid;
+
+	SpinLockRelease(&jsonbcDictWorkers->mutex);
+}
+
+static JsonbcDictWorker *
+jsonbcDictWorkerTryReuseOne(Oid dbid)
+{
+	LOCKTAG				locktag;
+	JsonbcDictWorker   *victim;
+	Oid					victimdbid;
+
+	if (!(victim = jsonbcDictWorkerPeekVictim(&victimdbid)))
+		return NULL;
+
+	jsonbcDictWorkerInitLockTag(&locktag, victimdbid);
+	LockAcquire(&locktag, ExclusiveLock, false, false);
+
+	if (jsonbcDictWorkerCheckVictim(victim, victimdbid))
+	{
+		jsonbcDictWorkerStop(victim);
+		jsonbcDictWorkerReassignDbId(victim, dbid);
+	}
+	else
+		victim = NULL;
+
+	LockRelease(&locktag, ExclusiveLock, false);
+
+	return victim;
+}
+
+static JsonbcDictWorkerHandle
+jsonbcDictWorkerAcquire(Oid dbid)
+{
+	JsonbcDictWorkerHandle		handle;
+	JsonbcDictWorker		   *worker;
+
+	jsonbcDictWorkerInitLockTag(&handle.locktag, dbid);
+	LockAcquire(&handle.locktag, ExclusiveLock, false, false);
+
+	while (!(worker = jsonbcDictWorkerFind(dbid)))
+	{
+		LockRelease(&handle.locktag, ExclusiveLock, false);
+		worker = jsonbcDictWorkerTryReuseOne(dbid);
+		LockAcquire(&handle.locktag, ExclusiveLock, false, false);
+
+		if (worker && jsonbcDictWorkerGetDbId(worker) == dbid)
+			break;
+	}
+
+	handle.worker = worker;
+
+	if (!worker->started)
+		jsonbcDictWorkerStart(worker);
+
+	return handle;
+}
+
+static void
+jsonbcDictWorkerRelease(JsonbcDictWorkerHandle *handle)
+{
+	LockRelease(&handle->locktag, ExclusiveLock, false);
+	handle->worker = NULL;
+}
+
+static JsonbcKeyId
+jsonbcDictWorkerExecRequest(JsonbcDictWorker *wrk,
+							JsonbcDictId dict,
+							JsonbcKeyName key,
+							JsonbcKeyId nextKeyId,
+							char **errormsg,
+							int *errormsglen)
+{
+	JsonbcKeyId		result;
+
+	AutoResetEventOwn(&wrk->response.event);
 
 	PG_TRY();
 	{
@@ -369,35 +609,63 @@ jsonbcDictWorkerGetIdByName(JsonbcDictId dict, JsonbcKeyName key,
 		wrk->request.nextKeyId = nextKeyId;
 		wrk->request.keymq = shm_mq_create(wrk->mqbuf, sizeof(wrk->mqbuf));
 
-		ResetLatch(&wrk->backendLatch);
-		SetLatch(&wrk->workerLatch);
+		AutoResetEventSet(&wrk->request.event);
 
 		jsonbcDictWorkerSendString(wrk->request.keymq, key.s, key.len);
 
-		(void) WaitLatch(&wrk->backendLatch, WL_LATCH_SET, 0,
-						 WAIT_EVENT_JSONBC_DICT_WORKER);
+		if (AutoResetEventWait(&wrk->response.event) & WL_POSTMASTER_DEATH)
+			ereport(ERROR,
+					(errcode(ERRCODE_INSUFFICIENT_RESOURCES),
+					 errmsg("cannot execute jsonbc worker requests without postmaster"),
+					 errhint("Kill all remaining database processes and restart the database.")));
 
 		result = wrk->response.id;
 
 		elog(DEBUG1, "received response from jsonbc worker: %d", result);
 
 		if (result == JsonbcInvalidKeyId)
-			errmsg = jsonbcDictWorkerReceiveString(wrk->response.errmq, &errmsglen);
-
+			*errormsg = jsonbcDictWorkerReceiveString(wrk->response.errmq,
+													  errormsglen);
 	}
 	PG_CATCH();
 	{
-		DisownLatch(&wrk->backendLatch);
+		AutoResetEventDisown(&wrk->response.event);
 		PG_RE_THROW();
 	}
 	PG_END_TRY();
 
-	DisownLatch(&wrk->backendLatch);
-	LockRelease(&tag, ExclusiveLock, false);
+	AutoResetEventDisown(&wrk->response.event);
+
+	return result;
+}
+
+JsonbcKeyId
+jsonbcDictWorkerGetIdByName(JsonbcDictId dict, JsonbcKeyName key,
+							JsonbcKeyId nextKeyId)
+{
+	JsonbcDictWorkerHandle	worker;
+	JsonbcKeyId				result;
+	char				   *errmessage;
+	int					    errmessagelen;
+
+	if (jsonbc_max_workers <= 0)
+		ereport(ERROR,
+				(errcode(ERRCODE_CONFIGURATION_LIMIT_EXCEEDED),
+				 errmsg("cannot insert new keys into pg_jsonbc_dict: "
+						"no jsonbc dictionary workers were configured"),
+				 errhint("Consider increasing the configuration parameter "
+						 "\"jsonbc_max_workers\".")));
+
+	worker = jsonbcDictWorkerAcquire(MyDatabaseId);
+
+	result = jsonbcDictWorkerExecRequest(worker.worker, dict, key, nextKeyId,
+										 &errmessage, &errmessagelen);
+
+	jsonbcDictWorkerRelease(&worker);
 
 	if (result == JsonbcInvalidKeyId)
 		elog(ERROR, "failed to insert key into jsonbc dictionary (%.*s)",
-			 errmsglen, errmsg);
+			 errmessagelen, errmessage);
 
 	return result;
 }

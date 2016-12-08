@@ -18,6 +18,8 @@ typedef Oid JsonbcDictId;
 #define JsonbcDictIdGetDatum(datum)	ObjectIdGetDatum(datum)
 #define DatumGetJsonbcDictId(datum)	DatumGetObjectId(datum)
 
+extern int jsonbc_max_workers; /* GUC parameter */
+
 typedef struct
 {
 	const char *s;

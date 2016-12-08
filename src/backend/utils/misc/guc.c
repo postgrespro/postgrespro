@@ -79,6 +79,7 @@
 #include "utils/builtins.h"
 #include "utils/bytea.h"
 #include "utils/guc_tables.h"
+#include "utils/jsonbc_dict.h"
 #include "utils/memutils.h"
 #include "utils/pg_locale.h"
 #include "utils/plancache.h"
@@ -189,6 +190,7 @@ static void assign_pgstat_temp_directory(const char *newval, void *extra);
 static bool check_application_name(char **newval, void **extra, GucSource source);
 static void assign_application_name(const char *newval, void *extra);
 static bool check_cluster_name(char **newval, void **extra, GucSource source);
+static bool check_jsonbc_max_workers(int *newval, void **extra, GucSource source);
 static const char *show_unix_socket_permissions(void);
 static const char *show_log_file_mode(void);
 
@@ -2887,6 +2889,18 @@ static struct config_int ConfigureNamesInt[] =
 		&gin_pending_list_limit,
 		4096, 64, MAX_KILOBYTES,
 		NULL, NULL, NULL
+	},
+
+	{
+		{"jsonbc_max_workers",
+			PGC_POSTMASTER,
+			RESOURCES_ASYNCHRONOUS,
+			gettext_noop("Maximum number of jsonbc dictionary worker processes."),
+			NULL,
+		},
+		&jsonbc_max_workers,
+		8, 0, MAX_BACKENDS,
+		check_jsonbc_max_workers, NULL, NULL
 	},
 
 	/* End-of-list marker */
@@ -10483,6 +10497,12 @@ check_cluster_name(char **newval, void **extra, GucSource source)
 	}
 
 	return true;
+}
+
+static bool
+check_jsonbc_max_workers(int *newval, void **extra, GucSource source)
+{
+	return *newval <= max_worker_processes;
 }
 
 static const char *
