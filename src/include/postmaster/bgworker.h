@@ -128,6 +128,10 @@ extern BgwHandleStatus
 /* Terminate a bgworker */
 extern void TerminateBackgroundWorker(BackgroundWorkerHandle *handle);
 
+extern BackgroundWorkerHandle *
+			GetSharedBackgroundWorkerHandle(BackgroundWorkerHandle *handle,
+											BackgroundWorkerHandle **shhandle);
+
 /* This is valid in a running worker */
 extern PGDLLIMPORT BackgroundWorker *MyBgworkerEntry;
 

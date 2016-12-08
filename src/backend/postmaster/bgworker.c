@@ -1028,6 +1028,16 @@ RegisterDynamicBackgroundWorker(BackgroundWorker *worker,
 	return success;
 }
 
+BackgroundWorkerHandle *
+GetSharedBackgroundWorkerHandle(BackgroundWorkerHandle *handle,
+								BackgroundWorkerHandle **shhandle)
+{
+	if (!*shhandle)
+		*shhandle = ShmemAlloc(sizeof(*handle));
+	memcpy(*shhandle, handle, sizeof(*handle));
+	return *shhandle;
+}
+
 /*
  * Get the PID of a dynamically-registered background worker.
  *
