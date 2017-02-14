@@ -1951,7 +1951,7 @@ dacosd(PG_FUNCTION_ARGS)
 	if (arg1 < -1.0 || arg1 > 1.0)
 		ereport(ERROR,
 				(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
-				 errmsg("input is out of range")));
+				 errmsg("input is out of [-1, 1] range")));
 
 	if (arg1 >= 0.0)
 		result = acosd_q1(arg1);
@@ -1986,7 +1986,7 @@ dasind(PG_FUNCTION_ARGS)
 	if (arg1 < -1.0 || arg1 > 1.0)
 		ereport(ERROR,
 				(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
-				 errmsg("input is out of range")));
+				 errmsg("input is out of [-1, 1] range")));
 
 	if (arg1 >= 0.0)
 		result = asind_q1(arg1);
@@ -2500,7 +2500,6 @@ float8_combine(PG_FUNCTION_ARGS)
 	float8		N,
 				sumX,
 				sumX2;
-
 	if (!AggCheckCallContext(fcinfo, NULL))
 		elog(ERROR, "aggregate function called in non-aggregate context");
 
