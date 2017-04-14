@@ -373,6 +373,6 @@ extern Jsonb *JsonbValueToJsonb(JsonbValue *val);
 extern void JsonbHashScalarValue(const JsonbValue *scalarVal, uint32 *hash);
 
 extern int reserveFromBuffer(StringInfo buffer, int len);
-extern void appendToBuffer(StringInfo buffer, const char *data, int len);
+extern void appendToBuffer(StringInfo buffer, const void *data, int len);
 
 #endif   /* __JSONB_H__ */
