@@ -60,6 +60,7 @@ typedef struct CompressionMethodOpArgs
 		struct
 		{
 			Oid	typeid;
+			Oid cmhanderid;
 		} getRoutine;
 	} args;
 } CompressionMethodOpArgs;

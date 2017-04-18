@@ -251,6 +251,7 @@ GetCompressionMethodRoutine(Oid cmhandler, Oid typeid)
 
 	opargs.op = CMOP_GET_ROUTINE;
 	opargs.args.getRoutine.typeid = typeid;
+	opargs.args.getRoutine.cmhanderid = cmhandler;
 
 	datum = OidFunctionCall1(cmhandler, PointerGetDatum(&opargs));
 	routine = (CompressionMethodRoutine *) DatumGetPointer(datum);
