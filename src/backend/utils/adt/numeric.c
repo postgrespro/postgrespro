@@ -3175,6 +3175,79 @@ numeric_float4(PG_FUNCTION_ARGS)
 }
 
 
+bool
+numeric_get_small(Numeric value, uint32 *out)
+{
+	NumericDigit   *digits;
+	uint32			result;
+	int				weight,
+					ndigits,
+					i;
+
+	if (NUMERIC_SIGN(value) == NUMERIC_NAN)
+		return false;
+
+	if (NUMERIC_DSCALE(value) != 0)
+		return false;
+
+	weight = NUMERIC_WEIGHT(value);
+	if (weight > 2)
+		return false;
+
+	digits = NUMERIC_DIGITS(value);
+	if (weight == 2 && digits[0] > 20)
+		return false;
+
+	ndigits = NUMERIC_NDIGITS(value);
+	result = 0;
+	for (i = 0; i <= weight; i++)
+	{
+		result *= NBASE;
+		if (i < ndigits)
+			result += digits[i];
+	}
+
+	if (NUMERIC_SIGN(value) == NUMERIC_NEG)
+		result = -result;
+
+	*out = result;
+
+	return true;
+}
+
+Numeric
+small_to_numeric(uint32 value)
+{
+	NumericDigit	digits[3];
+	Numeric			result;
+	Size			len;
+	int				weight;
+	bool			sign;
+
+	sign = (int32) value < 0;
+	if (sign)
+		value = -value;
+
+	digits[0] = (value / NBASE / NBASE) % NBASE;
+	digits[1] = (value / NBASE) % NBASE;
+	digits[2] = value % NBASE;
+
+	weight = digits[0] ? 2 : digits[1] ? 1 : 0;
+
+	len = NUMERIC_HDRSZ_SHORT + (weight + 1) * sizeof(NumericDigit);
+	result = (Numeric) palloc(len);
+	SET_VARSIZE(result, len);
+	result->choice.n_short.n_header =
+			(sign ? NUMERIC_SHORT | NUMERIC_SHORT_SIGN_MASK : NUMERIC_SHORT) |
+			(weight & NUMERIC_SHORT_WEIGHT_MASK);
+
+	memcpy(NUMERIC_DIGITS(result), digits + (2 - weight),
+		   (weight + 1) * sizeof(NumericDigit));
+
+	return result;
+}
+
+
 /* ----------------------------------------------------------------------
  *
  * Aggregate functions

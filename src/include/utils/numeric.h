@@ -60,5 +60,7 @@ extern bool numeric_is_nan(Numeric num);
 int32		numeric_maximum_size(int32 typmod);
 extern char *numeric_out_sci(Numeric num, int scale);
 extern char *numeric_normalize(Numeric num);
+extern bool numeric_get_small(Numeric value, uint32 *out);
+extern Numeric small_to_numeric(uint32 value);
 
 #endif   /* _PG_NUMERIC_H_ */
