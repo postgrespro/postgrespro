@@ -1,0 +1,5 @@
+# bson extension
+comment = 'BSON compression method for json/jsonb types'
+default_version = '1.0'
+module_pathname = '$libdir/bson'
+relocatable = true
